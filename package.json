@@ -1,0 +1,20 @@
+{
+  "name": "mahita-jewelry",
+  "version": "1.0.0",
+  "description": "Mahita Jewelry Store - Indian jewelry e-commerce platform",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-basic-auth": "^1.2.1",
+    "sql.js": "^1.10.3",
+    "bcryptjs": "^2.4.3",
+    "express-session": "^1.18.0",
+    "multer": "^1.4.5-lts.1",
+    "nodemailer": "^6.9.8",
+    "uuid": "^9.0.1"
+  }
+}

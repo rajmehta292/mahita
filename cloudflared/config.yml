@@ -1,0 +1,7 @@
+tunnel: 84a020a6-a24f-427e-b040-80fd8c4d92ab
+credentials-file: /Users/rmehta01/.cloudflared/84a020a6-a24f-427e-b040-80fd8c4d92ab.json
+
+ingress:
+  - hostname: mahita.ai
+    service: http://localhost:3000
+  - service: http_status:404
