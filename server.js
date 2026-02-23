@@ -100,91 +100,133 @@ app.get('/', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mahita Jewelry - Exquisite Indian Jewelry</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #FFFEF5; color: #333; }
-    .header { background: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
-    .logo { font-size: 1.8rem; font-weight: bold; color: #fff; text-decoration: none; }
-    .nav { display: flex; gap: 1.5rem; }
-    .nav a { color: #fff; text-decoration: none; font-weight: 500; transition: opacity 0.3s; }
-    .nav a:hover { opacity: 0.8; }
-    .hero { background: linear-gradient(135deg, #8B0000 0%, #DC143C 100%); color: white; padding: 4rem 2rem; text-align: center; }
-    .hero h1 { font-size: 3rem; margin-bottom: 1rem; }
-    .hero p { font-size: 1.3rem; opacity: 0.95; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-    .section-title { text-align: center; margin-bottom: 2rem; color: #D4AF37; font-size: 2rem; }
-    .categories { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 3rem; }
-    .category-card { background: white; padding: 1.5rem; border-radius: 10px; text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); transition: transform 0.3s; text-decoration: none; color: inherit; }
-    .category-card:hover { transform: translateY(-5px); }
-    .category-card h3 { color: #8B0000; margin-bottom: 0.5rem; }
-    .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 2rem; }
-    .product-card { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); transition: transform 0.3s; }
-    .product-card:hover { transform: translateY(-5px); }
-    .product-image { width: 100%; height: 250px; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; color: #999; font-size: 3rem; }
-    .product-info { padding: 1.5rem; }
-    .product-info h3 { color: #333; margin-bottom: 0.5rem; }
-    .product-info p { color: #666; font-size: 0.9rem; margin-bottom: 1rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .product-price { font-size: 1.2rem; color: #D4AF37; font-weight: bold; margin-bottom: 1rem; }
-    .btn { display: inline-block; padding: 0.8rem 1.5rem; background: #8B0000; color: white; text-decoration: none; border-radius: 5px; transition: background 0.3s; border: none; cursor: pointer; }
-    .btn:hover { background: #DC143C; }
-    .footer { background: #333; color: white; padding: 2rem; text-align: center; margin-top: 3rem; }
-    .search-bar { display: flex; gap: 0.5rem; }
-    .search-bar input { padding: 0.5rem 1rem; border: none; border-radius: 5px; width: 250px; }
-    .search-bar button { padding: 0.5rem 1rem; background: #8B0000; color: white; border: none; border-radius: 5px; cursor: pointer; }
-  </style>
+  <title>Mahita Jewelry | Modern Heirlooms, Crafted to Last</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <header class="header">
-    <a href="/" class="logo">Mahita</a>
-    <nav class="nav">
-      <a href="/">Home</a>
-      <a href="/products">Products</a>
-      <a href="/admin">Admin</a>
-    </nav>
-    <form class="search-bar" action="/search" method="GET">
-      <input type="text" name="q" placeholder="Search jewelry...">
-      <button type="submit">Search</button>
-    </form>
+    <div class="header-inner">
+      <a href="/" class="logo">
+        <img src="/vectorized.svg" alt="Mahita" style="height: 42px;">
+      </a>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/products">Collection</a>
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="/search" aria-label="Search">🔍</a>
+      </div>
+    </div>
   </header>
-  
+
   <section class="hero">
-    <h1>Exquisite Indian Jewelry</h1>
-    <p>Discover our stunning collection of traditional and modern jewelry</p>
+    <div class="container">
+      <div class="hero-content">
+        <p class="hero-label">Exquisite Indian Jewelry</p>
+        <h1>Modern Heirlooms,<br>Crafted to Last</h1>
+        <p>Discover our curated collection of timeless pieces that blend traditional craftsmanship with contemporary elegance.</p>
+        <a href="/products" class="btn btn-primary">Explore Collection</a>
+      </div>
+    </div>
   </section>
-  
-  <main class="container">
-    <h2 class="section-title">Browse by Category</h2>
-    <div class="categories">
-      ${categories.map(cat => `
-        <a href="/category/${cat.slug}" class="category-card">
-          <h3>${cat.name}</h3>
-          <p>${cat.description || ''}</p>
-        </a>
-      `).join('')}
+
+  <section class="featured-products">
+    <div class="container">
+      <div class="section-header">
+        <h2>Our Collection</h2>
+        <p>Each piece tells a story of heritage and craftsmanship</p>
+      </div>
+      
+      ${categories.length > 0 ? `
+      <div class="categories-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-lg); margin-bottom: var(--space-2xl);">
+        ${categories.slice(0, 4).map(cat => `
+          <a href="/category/${cat.slug}" style="display: block; background: var(--color-paper); padding: var(--space-xl); border-radius: var(--radius-md); text-align: center; border: 1px solid var(--color-border); transition: all var(--transition-normal);">
+            <h3 style="font-family: var(--font-serif); font-size: 1.25rem; color: var(--color-brand); margin-bottom: var(--space-sm);">${cat.name}</h3>
+            <p style="font-size: 0.85rem; color: var(--color-muted);">${cat.description || 'View collection'}</p>
+          </a>
+        `).join('')}
+      </div>
+      ` : ''}
+
+      <div class="products-grid">
+        ${products.length > 0 ? products.map(prod => {
+          const images = prod.images && prod.images.length > 0 ? prod.images : [];
+          const imageUrl = images.length > 0 ? (images[0].filename || images[0].url || images[0]) : '';
+          return `
+          <a href="/product/${prod.id}" class="product-card">
+            <div class="product-card-image">
+              ${imageUrl ? `<img src="${imageUrl}" alt="${prod.name}" loading="lazy">` : '<div class="product-card-placeholder">💎</div>'}
+            </div>
+            <div class="product-card-info">
+              <p class="product-card-title">${prod.name}</p>
+              <p class="product-card-price">${prod.price && prod.price > 0 ? '₹' + prod.price.toLocaleString() : 'Price on request'}</p>
+            </div>
+          </a>
+          `;
+        }).join('') : '<p style="text-align: center; grid-column: 1/-1; color: var(--color-muted);">No products available yet.</p>'}
+      </div>
+      
+      ${products.length > 0 ? `<div style="text-align: center; margin-top: var(--space-xl);">
+        <a href="/products" class="btn btn-secondary">View All Products</a>
+      </div>` : ''}
     </div>
-    
-    <h2 class="section-title">Featured Collection</h2>
-    <div class="products-grid">
-      ${products.map(prod => {
-        const images = prod.images && prod.images.length > 0 ? prod.images : [];
-        const imageUrl = images.length > 0 ? images[0] : '';
-        return `
-        <div class="product-card">
-          ${imageUrl ? `<div class="product-image"><img src="${imageUrl}" alt="${prod.name}"></div>` : '<div class="product-image">💎</div>'}
-          <div class="product-info">
-            <h3>${prod.name}</h3>
-            <p>${prod.description || ''}</p>
-            <div class="product-price">₹${prod.price?.toLocaleString() || 'Contact for price'}</div>
-            <a href="/product/${prod.id}" class="btn">View Details</a>
-          </div>
+  </section>
+
+  <section class="editorial">
+    <div class="container">
+      <div class="editorial-grid">
+        <div class="editorial-content">
+          <h2>Crafted with Love</h2>
+          <p>Each piece in our collection is thoughtfully designed and meticulously crafted by skilled artisans who have inherited generations of jewelry-making knowledge.</p>
+          <p style="margin-top: var(--space-md);">We believe jewelry is more than an accessory—it's a memory, a celebration, and a treasure to be passed down through generations.</p>
+          <a href="/about" class="btn btn-primary" style="margin-top: var(--space-lg);">Learn Our Story</a>
         </div>
-      `}).join('')}
+        <div class="editorial-image" style="background: linear-gradient(135deg, var(--color-brand-light), var(--color-brand)); display: flex; align-items: center; justify-content: center;">
+          <span style="font-size: 6rem; opacity: 0.3;">✨</span>
+        </div>
+      </div>
     </div>
-  </main>
-  
+  </section>
+
   <footer class="footer">
-    <p>&copy; ${new Date().getFullYear()} Mahita Jewelry. All rights reserved.</p>
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img src="/vectorized.svg" alt="Mahita" style="height: 36px; filter: brightness(0) invert(1);">
+          <p>Exquisite Indian jewelry crafted with traditional artistry and modern elegance.</p>
+        </div>
+        <div>
+          <h4>Shop</h4>
+          <ul>
+            <li><a href="/products">All Products</a></li>
+            ${categories.slice(0, 3).map(cat => `<li><a href="/category/${cat.slug}">${cat.name}</a></li>`).join('')}
+          </ul>
+        </div>
+        <div>
+          <h4>Company</h4>
+          <ul>
+            <li><a href="/about">About Us</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Support</h4>
+          <ul>
+            <li><a href="/shipping">Shipping</a></li>
+            <li><a href="/returns">Returns</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; ${new Date().getFullYear()} Mahita Jewelry. All rights reserved.</p>
+        <p>Made with ❤️ in India</p>
+      </div>
+    </div>
   </footer>
 </body>
 </html>`;
@@ -234,65 +276,93 @@ app.get('/products', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>All Products - Mahita Jewelry</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #FFFEF5; color: #333; }
-    .header { background: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
-    .logo { font-size: 1.8rem; font-weight: bold; color: #fff; text-decoration: none; }
-    .nav { display: flex; gap: 1.5rem; }
-    .nav a { color: #fff; text-decoration: none; font-weight: 500; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-    h1 { color: #D4AF37; margin-bottom: 2rem; }
-    .filters { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; }
-    .filter-btn { padding: 0.5rem 1rem; background: white; border: 2px solid #D4AF37; border-radius: 5px; cursor: pointer; transition: all 0.3s; text-decoration: none; color: #333; }
-    .filter-btn.active, .filter-btn:hover { background: #D4AF37; color: white; }
-    .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 2rem; }
-    .product-card { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-    .product-image { width: 100%; height: 250px; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; color: #999; font-size: 3rem; overflow: hidden; }
-    .product-image img { width: 100%; height: 100%; object-fit: cover; }
-    .product-info { padding: 1.5rem; }
-    .product-info h3 { margin-bottom: 0.5rem; }
-    .product-info p { color: #666; font-size: 0.9rem; margin-bottom: 1rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .product-price { font-size: 1.2rem; color: #D4AF37; font-weight: bold; margin-bottom: 1rem; }
-    .btn { display: inline-block; padding: 0.8rem 1.5rem; background: #8B0000; color: white; text-decoration: none; border-radius: 5px; }
-    .back-link { display: inline-block; margin-bottom: 1rem; color: #D4AF37; text-decoration: none; }
-  </style>
+  <title>Collection | Mahita Jewelry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <header class="header">
-    <a href="/" class="logo">Mahita</a>
-    <nav class="nav">
-      <a href="/">Home</a>
-      <a href="/products">Products</a>
-      <a href="/admin">Admin</a>
-    </nav>
-  </header>
-  
-  <main class="container">
-    <a href="/" class="back-link">← Back to Home</a>
-    <h1>Our Collection</h1>
-    <div class="filters">
-      <a href="/products" class="filter-btn active">All</a>
-      ${categories.map(cat => `<a href="/category/${cat.slug}" class="filter-btn">${cat.name}</a>`).join('')}
+    <div class="header-inner">
+      <a href="/" class="logo">
+        <img src="/vectorized.svg" alt="Mahita" style="height: 42px;">
+      </a>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/products">Collection</a>
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="/search" aria-label="Search">🔍</a>
+      </div>
     </div>
+  </header>
+
+  <main class="container" style="padding-top: var(--space-2xl);">
+    <div class="section-header">
+      <h1>Our Collection</h1>
+      <p>Discover our curated selection of exquisite jewelry</p>
+    </div>
+    
+    <div class="filters" style="display: flex; gap: var(--space-sm); margin-bottom: var(--space-xl); flex-wrap: wrap;">
+      <a href="/products" class="btn btn-primary">All</a>
+      ${categories.map(cat => `<a href="/category/${cat.slug}" class="btn btn-secondary">${cat.name}</a>`).join('')}
+    </div>
+    
     <div class="products-grid">
-      ${products.map(prod => {
+      ${products.length > 0 ? products.map(prod => {
         const images = prod.images && prod.images.length > 0 ? prod.images : [];
-        const imageUrl = images.length > 0 ? images[0] : '';
+        const imageUrl = images.length > 0 ? (images[0].filename || images[0].url || images[0]) : '';
         return `
-        <div class="product-card">
-          ${imageUrl ? `<div class="product-image"><img src="${imageUrl}" alt="${prod.name}"></div>` : '<div class="product-image">💎</div>'}
-          <div class="product-info">
-            <h3>${prod.name}</h3>
-            <p>${prod.description || ''}</p>
-            <div class="product-price">₹${prod.price?.toLocaleString() || 'Contact for price'}</div>
-            <a href="/product/${prod.id}" class="btn">View Details</a>
+        <a href="/product/${prod.id}" class="product-card">
+          <div class="product-card-image">
+            ${imageUrl ? `<img src="${imageUrl}" alt="${prod.name}" loading="lazy">` : '<div class="product-card-placeholder">💎</div>'}
           </div>
-        </div>
-      `}).join('')}
+          <div class="product-card-info">
+            <p class="product-card-title">${prod.name}</p>
+            <p class="product-card-price">${prod.price && prod.price > 0 ? '₹' + prod.price.toLocaleString() : 'Price on request'}</p>
+          </div>
+        </a>
+        `;
+      }).join('') : '<p style="text-align: center; grid-column: 1/-1; color: var(--color-muted);">No products available.</p>'}
     </div>
   </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img src="/vectorized.svg" alt="Mahita" style="height: 36px; filter: brightness(0) invert(1);">
+          <p>Exquisite Indian jewelry crafted with traditional artistry.</p>
+        </div>
+        <div>
+          <h4>Shop</h4>
+          <ul>
+            <li><a href="/products">All Products</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Company</h4>
+          <ul>
+            <li><a href="/about">About Us</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Support</h4>
+          <ul>
+            <li><a href="/shipping">Shipping</a></li>
+            <li><a href="/returns">Returns</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; ${new Date().getFullYear()} Mahita Jewelry. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
 </body>
 </html>`;
   res.send(html);
@@ -310,56 +380,88 @@ app.get('/category/:slug', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${category.name} - Mahita Jewelry</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #FFFEF5; color: #333; }
-    .header { background: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
-    .logo { font-size: 1.8rem; font-weight: bold; color: #fff; text-decoration: none; }
-    .nav { display: flex; gap: 1.5rem; }
-    .nav a { color: #fff; text-decoration: none; font-weight: 500; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-    h1 { color: #D4AF37; margin-bottom: 1rem; }
-    .category-desc { color: #666; margin-bottom: 2rem; font-size: 1.1rem; }
-    .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 2rem; }
-    .product-card { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-    .product-image { width: 100%; height: 250px; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; color: #999; font-size: 3rem; }
-    .product-info { padding: 1.5rem; }
-    .product-info h3 { margin-bottom: 0.5rem; }
-    .product-info p { color: #666; font-size: 0.9rem; margin-bottom: 1rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .product-price { font-size: 1.2rem; color: #D4AF37; font-weight: bold; margin-bottom: 1rem; }
-    .btn { display: inline-block; padding: 0.8rem 1.5rem; background: #8B0000; color: white; text-decoration: none; border-radius: 5px; }
-    .back-link { display: inline-block; margin-bottom: 1rem; color: #D4AF37; text-decoration: none; }
-  </style>
+  <title>${category.name} | Mahita Jewelry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <header class="header">
-    <a href="/" class="logo">Mahita</a>
-    <nav class="nav">
-      <a href="/">Home</a>
-      <a href="/products">Products</a>
-      <a href="/admin">Admin</a>
-    </nav>
+    <div class="header-inner">
+      <a href="/" class="logo">
+        <img src="/vectorized.svg" alt="Mahita" style="height: 42px;">
+      </a>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/products">Collection</a>
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="/search" aria-label="Search">🔍</a>
+      </div>
+    </div>
   </header>
-  
-  <main class="container">
-    <a href="/products" class="back-link">← Back to Products</a>
-    <h1>${category.name}</h1>
-    <p class="category-desc">${category.description || ''}</p>
+
+  <main class="container" style="padding-top: var(--space-2xl);">
+    <div class="section-header">
+      <h1>${category.name}</h1>
+      <p>${category.description || 'Browse our collection'}</p>
+    </div>
+    
     <div class="products-grid">
-      ${products.length > 0 ? products.map(prod => `
-        <div class="product-card">
-          <div class="product-image">💎</div>
-          <div class="product-info">
-            <h3>${prod.name}</h3>
-            <p>${prod.description || ''}</p>
-            <div class="product-price">₹${prod.price?.toLocaleString() || 'Contact for price'}</div>
-            <a href="/product/${prod.id}" class="btn">View Details</a>
+      ${products.length > 0 ? products.map(prod => {
+        const images = prod.images && prod.images.length > 0 ? prod.images : [];
+        const imageUrl = images.length > 0 ? (images[0].filename || images[0].url || images[0]) : '';
+        return `
+        <a href="/product/${prod.id}" class="product-card">
+          <div class="product-card-image">
+            ${imageUrl ? `<img src="${imageUrl}" alt="${prod.name}" loading="lazy">` : '<div class="product-card-placeholder">💎</div>'}
           </div>
-        </div>
-      `).join('') : '<p>No products in this category yet.</p>'}
+          <div class="product-card-info">
+            <p class="product-card-title">${prod.name}</p>
+            <p class="product-card-price">${prod.price && prod.price > 0 ? '₹' + prod.price.toLocaleString() : 'Price on request'}</p>
+          </div>
+        </a>
+        `;
+      }).join('') : '<p style="text-align: center; grid-column: 1/-1; color: var(--color-muted);">No products in this category yet.</p>'}
     </div>
   </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img src="/vectorized.svg" alt="Mahita" style="height: 36px; filter: brightness(0) invert(1);">
+          <p>Exquisite Indian jewelry crafted with traditional artistry.</p>
+        </div>
+        <div>
+          <h4>Shop</h4>
+          <ul>
+            <li><a href="/products">All Products</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Company</h4>
+          <ul>
+            <li><a href="/about">About Us</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Support</h4>
+          <ul>
+            <li><a href="/shipping">Shipping</a></li>
+            <li><a href="/returns">Returns</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; ${new Date().getFullYear()} Mahita Jewelry. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
 </body>
 </html>`;
   res.send(html);
@@ -377,131 +479,106 @@ app.get('/product/:id', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${product.name} - Mahita Jewelry</title>
+  <title>${product.name} | Mahita Jewelry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #FFFEF5; color: #333; }
-    .header { background: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
-    .logo { font-size: 1.8rem; font-weight: bold; color: #fff; text-decoration: none; }
-    .nav { display: flex; gap: 1.5rem; }
-    .nav a { color: #fff; text-decoration: none; font-weight: 500; }
-    .container { max-width: 1000px; margin: 0 auto; padding: 2rem; }
-    .product-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
-    @media (max-width: 768px) { .product-detail { grid-template-columns: 1fr; } }
-    .product-image { width: 100%; height: 400px; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; color: #999; font-size: 6rem; border-radius: 10px; overflow: hidden; position: relative; }
-    .product-image img { width: 100%; height: 100%; object-fit: cover; }
-    /* Carousel styles */
-    .carousel { position: relative; width: 100%; height: 400px; border-radius: 10px; overflow: hidden; background: #f5f5f5; }
-    .carousel-track { display: flex; transition: transform 0.5s ease; height: 100%; }
-    .carousel-slide { min-width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
-    .carousel-slide img, .carousel-slide video { width: 100%; height: 100%; object-fit: contain; background: #1a1a1a; }
-    .carousel-slide video { object-fit: contain; }
-    .carousel-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.5); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; z-index: 10; }
-    .carousel-nav:hover { background: rgba(0,0,0,0.8); }
-    .carousel-prev { left: 10px; }
-    .carousel-next { right: 10px; }
-    .carousel-indicators { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; z-index: 10; }
-    .carousel-indicator { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.5); border: none; cursor: pointer; }
-    .carousel-indicator.active { background: rgba(255,255,255,1); }
-    .product-placeholder { width: 100%; height: 400px; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; color: #999; font-size: 6rem; border-radius: 10px; }
-    .product-info h1 { color: #8B0000; margin-bottom: 0.5rem; }
-    .category { color: #D4AF37; font-size: 0.9rem; margin-bottom: 1rem; }
-    .price { font-size: 2rem; color: #D4AF37; font-weight: bold; margin: 1rem 0; }
-    .description { color: #666; line-height: 1.8; margin-bottom: 2rem; }
-    .btn { display: inline-block; padding: 1rem 2rem; background: #8B0000; color: white; text-decoration: none; border-radius: 5px; font-size: 1.1rem; border: none; cursor: pointer; transition: background 0.3s; }
-    .btn:hover { background: #DC143C; }
-    .back-link { display: inline-block; margin-bottom: 1rem; color: #D4AF37; text-decoration: none; }
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
-    .modal.active { display: flex; }
-    .modal-content { background: white; padding: 2rem; border-radius: 15px; max-width: 500px; width: 90%; max-height: 90vh; overflow-y: auto; }
-    .modal h2 { color: #8B0000; margin-bottom: 1.5rem; }
-    .form-group { margin-bottom: 1rem; }
-    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
-    .form-group input, .form-group textarea { width: 100%; padding: 0.8rem; border: 2px solid #ddd; border-radius: 5px; font-size: 1rem; }
-    .form-group textarea { min-height: 100px; resize: vertical; }
-    .modal-buttons { display: flex; gap: 1rem; margin-top: 1.5rem; }
-    .btn-secondary { background: #666; }
-    .success-message { display: none; color: #28a745; text-align: center; padding: 2rem; }
-    .success-message.show { display: block; }
+    .product-detail-page { padding: var(--space-2xl) 0; }
+    .breadcrumb { margin-bottom: var(--space-lg); }
+    .breadcrumb a { color: var(--color-muted); font-size: 0.9rem; }
+    .breadcrumb span { color: var(--color-muted); margin: 0 var(--space-sm); }
   </style>
 </head>
 <body>
   <header class="header">
-    <a href="/" class="logo">Mahita</a>
-    <nav class="nav">
-      <a href="/">Home</a>
-      <a href="/products">Products</a>
-      <a href="/admin">Admin</a>
-    </nav>
+    <div class="header-inner">
+      <a href="/" class="logo">
+        <img src="/vectorized.svg" alt="Mahita" style="height: 42px;">
+      </a>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/products">Collection</a>
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="/search" aria-label="Search">🔍</a>
+      </div>
+    </div>
   </header>
   
-  <main class="container">
-    <a href="/products" class="back-link">← Back to Products</a>
+  <main class="container product-detail-page">
+    <div class="breadcrumb">
+      <a href="/">Home</a> <span>›</span> <a href="/products">Collection</a> <span>›</span> ${product.name}
+    </div>
     
     <div class="product-detail">
-      ${(function() {
-        if (!product.images || product.images.length === 0) return '<div class="product-placeholder">💎</div>';
-        let html = '<div class="carousel" id="productCarousel"><div class="carousel-track" id="carouselTrack">';
-        product.images.forEach(function(img) {
-          var isVideo = img.isVideo || (img.mimetype && img.mimetype.startsWith('video/'));
-          var src = img.filename || img.url || img;
-          if (isVideo) {
-            html += '<div class="carousel-slide"><video src="' + src + '" controls></video></div>';
-          } else {
-            html += '<div class="carousel-slide"><img src="' + src + '" alt="' + product.name + '"></div>';
-          }
-        });
-        html += '</div>';
-        if (product.images.length > 1) {
-          html += '<button class="carousel-nav carousel-prev" onclick="changeSlide(-1)">‹</button>';
-          html += '<button class="carousel-nav carousel-next" onclick="changeSlide(1)">›</button>';
-          html += '<div class="carousel-indicators">';
-          product.images.forEach(function(_, i) {
-            html += '<button class="carousel-indicator ' + (i === 0 ? 'active' : '') + '" onclick="goToSlide(' + i + ')"></button>';
+      <div class="product-gallery">
+        ${(function() {
+          if (!product.images || product.images.length === 0) return '<div class="product-placeholder" style="aspect-ratio: 4/5; background: var(--color-ivory); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 6rem; color: var(--color-muted);">💎</div>';
+          let html = '<div class="carousel" id="productCarousel"><div class="carousel-track" id="carouselTrack">';
+          product.images.forEach(function(img) {
+            var isVideo = img.isVideo || (img.mimetype && img.mimetype.startsWith('video/'));
+            var src = img.filename || img.url || img;
+            if (isVideo) {
+              html += '<div class="carousel-slide"><video src="' + src + '" controls></video></div>';
+            } else {
+              html += '<div class="carousel-slide"><img src="' + src + '" alt="' + product.name + '"></div>';
+            }
           });
           html += '</div>';
-        }
-        html += '</div>';
-        return html;
-      })()}
-      <script>
-        let currentSlide = 0;
-        const track = document.getElementById('carouselTrack');
-        const slides = document.querySelectorAll('.carousel-slide');
-        const totalSlides = slides.length;
-        function updateCarousel() { if (track) track.style.transform = 'translateX(-' + (currentSlide * 100) + '%)'; }
-        function changeSlide(dir) { currentSlide = (currentSlide + dir + totalSlides) % totalSlides; updateCarousel(); updateIndicators(); }
-        function goToSlide(index) { currentSlide = index; updateCarousel(); updateIndicators(); }
-        function updateIndicators() {
-          document.querySelectorAll('.carousel-indicator').forEach(function(ind, i) {
-            ind.classList.toggle('active', i === currentSlide);
-          });
-        }
-        if (totalSlides > 1) setInterval(function() { changeSlide(1); }, 5000);
-      </script>
-      <div class="product-info">
-        <p class="category">${category ? category.name : 'Uncategorized'}</p>
-        <h1>${product.name}</h1>
-        <p class="price">₹${product.price?.toLocaleString() || 'Contact for price'}</p>
-        <p class="description">${product.description || 'No description available.'}</p>
-        ${product.cutwise_url ? `<div class="cutwise-widget" style="margin: 1.5rem 0; padding: 1rem; background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%); border-radius: 10px; border: 1px solid #e0e0e0;">
-          <p style="margin-bottom: 1rem; color: #444; font-weight: 600; font-size: 1.1rem;">💎 View this piece on Cutwise</p>
-          <a href="${product.cutwise_url}" target="_blank" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 1rem 2rem; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 500; transition: transform 0.2s, box-shadow 0.2s;">
-            <span>View Details on Cutwise</span>
-            <span style="font-size: 1.2rem;">→</span>
-          </a>
-          <p style="margin-top: 0.8rem; font-size: 0.85rem; color: #666;">Opens in a new tab • View certified details and pricing</p>
-        </div>` : ''}
-        ${(function() {
-          if (product.price && product.price > 0) {
-            return '<div style="display: flex; gap: 1rem; margin-top: 1rem;">' +
-              '<button class="btn btn-buy" onclick="buyNow()" style="flex: 1;">Buy Now</button>' +
-              '<button class="btn" onclick="openQuoteModal()" style="flex: 1;">Request Quote</button>' +
-              '</div>';
-          } else {
-            return '<button class="btn" onclick="openQuoteModal()">Request Quote</button>';
+          if (product.images.length > 1) {
+            html += '<button class="carousel-nav carousel-prev" onclick="changeSlide(-1)">‹</button>';
+            html += '<button class="carousel-nav carousel-next" onclick="changeSlide(1)">›</button>';
+            html += '<div class="carousel-indicators">';
+            product.images.forEach(function(_, i) {
+              html += '<button class="carousel-indicator ' + (i === 0 ? 'active' : '') + '" onclick="goToSlide(' + i + ')"></button>';
+            });
+            html += '</div>';
           }
+          html += '</div>';
+          return html;
         })()}
+        <script>
+          var currentSlide = 0;
+          var track = document.getElementById('carouselTrack');
+          var slides = document.querySelectorAll('.carousel-slide');
+          var totalSlides = slides.length;
+          function updateCarousel() { if (track) track.style.transform = 'translateX(-' + (currentSlide * 100) + '%)'; }
+          function changeSlide(dir) { currentSlide = (currentSlide + dir + totalSlides) % totalSlides; updateCarousel(); updateIndicators(); }
+          function goToSlide(index) { currentSlide = index; updateCarousel(); updateIndicators(); }
+          function updateIndicators() {
+            document.querySelectorAll('.carousel-indicator').forEach(function(ind, i) {
+              ind.classList.toggle('active', i === currentSlide);
+            });
+          }
+          if (totalSlides > 1) setInterval(function() { changeSlide(1); }, 5000);
+        </script>
+      </div>
+      
+      <div class="product-info">
+        ${category ? `<p class="product-category">${category.name}</p>` : ''}
+        <h1 class="product-title">${product.name}</h1>
+        <p class="product-price">${product.price && product.price > 0 ? '₹' + product.price.toLocaleString() : 'Price on request'}</p>
+        <p class="product-description">${product.description || 'A beautiful piece from our collection.'}</p>
+        
+        ${product.cutwise_url ? `<div style="margin: var(--space-lg) 0; padding: var(--space-lg); background: var(--color-ivory); border-radius: var(--radius-md); border: 1px solid var(--color-border);">
+          <p style="font-weight: 600; margin-bottom: var(--space-md);">View on Cutwise</p>
+          <a href="${product.cutwise_url}" target="_blank" class="btn btn-secondary">View Details →</a>
+        </div>` : ''}
+        
+        <div class="product-actions">
+          ${(function() {
+            if (product.price && product.price > 0) {
+              return '<button class="btn btn-primary" onclick="buyNow()">Buy Now</button>' +
+                     '<button class="btn btn-secondary" onclick="openQuoteModal()">Request Quote</button>';
+            } else {
+              return '<button class="btn btn-primary" onclick="openQuoteModal()">Request Quote</button>';
+            }
+          })()}
+        </div>
       </div>
     </div>
   </main>
@@ -509,7 +586,7 @@ app.get('/product/:id', (req, res) => {
   <div class="modal" id="quoteModal">
     <div class="modal-content">
       <h2>Request a Quote</h2>
-      <p style="margin-bottom: 1rem; color: #666;">Product: <strong>${product.name}</strong></p>
+      <p style="margin-bottom: var(--space-lg); color: var(--color-muted);">Product: <strong>${product.name}</strong></p>
       
       <div id="quoteForm">
         <div class="form-group">
@@ -526,10 +603,10 @@ app.get('/product/:id', (req, res) => {
         </div>
         <div class="form-group">
           <label>Message</label>
-          <textarea id="customerMessage" placeholder="Any specific requirements or questions?"></textarea>
+          <textarea id="customerMessage" placeholder="Any specific requirements?"></textarea>
         </div>
         <div class="modal-buttons">
-          <button class="btn" onclick="submitQuote()">Submit Request</button>
+          <button class="btn btn-primary" onclick="submitQuote()">Submit</button>
           <button class="btn btn-secondary" onclick="closeQuoteModal()">Cancel</button>
         </div>
       </div>
@@ -537,13 +614,13 @@ app.get('/product/:id', (req, res) => {
       <div class="success-message" id="successMessage">
         <h3>Thank you!</h3>
         <p>Your quote request has been submitted. We'll get back to you soon.</p>
-        <button class="btn" onclick="closeQuoteModal()" style="margin-top: 1rem;">Close</button>
+        <button class="btn btn-primary" onclick="closeQuoteModal()" style="margin-top: var(--space-lg);">Close</button>
       </div>
     </div>
   </div>
   
   <script>
-    const productId = ${product.id};
+    var productId = product.id;
     
     function openQuoteModal() {
       document.getElementById('quoteModal').classList.add('active');
@@ -560,10 +637,10 @@ app.get('/product/:id', (req, res) => {
     }
     
     async function submitQuote() {
-      const name = document.getElementById('customerName').value;
-      const email = document.getElementById('customerEmail').value;
-      const phone = document.getElementById('customerPhone').value;
-      const message = document.getElementById('customerMessage').value;
+      var name = document.getElementById('customerName').value;
+      var email = document.getElementById('customerEmail').value;
+      var phone = document.getElementById('customerPhone').value;
+      var message = document.getElementById('customerMessage').value;
       
       if (!name || !email) {
         alert('Please fill in your name and email.');
@@ -571,10 +648,10 @@ app.get('/product/:id', (req, res) => {
       }
       
       try {
-        const res = await fetch('/api/quotes', {
+        var res = await fetch('/api/quotes', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId, name, email, phone, message })
+          body: JSON.stringify({ productId: productId, name: name, email: email, phone: phone, message: message })
         });
         
         if (res.ok) {
@@ -590,13 +667,13 @@ app.get('/product/:id', (req, res) => {
     
     async function buyNow() {
       try {
-        const res = await fetch('/api/create-checkout-session', {
+        var res = await fetch('/api/create-checkout-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ productId: productId })
         });
         
-        const data = await res.json();
+        var data = await res.json();
         
         if (data.url) {
           window.location.href = data.url;
@@ -608,6 +685,40 @@ app.get('/product/:id', (req, res) => {
       }
     }
   </script>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img src="/vectorized.svg" alt="Mahita" style="height: 36px; filter: brightness(0) invert(1);">
+          <p>Exquisite Indian jewelry crafted with traditional artistry.</p>
+        </div>
+        <div>
+          <h4>Shop</h4>
+          <ul>
+            <li><a href="/products">All Products</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Company</h4>
+          <ul>
+            <li><a href="/about">About Us</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Support</h4>
+          <ul>
+            <li><a href="/shipping">Shipping</a></li>
+            <li><a href="/returns">Returns</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; ${new Date().getFullYear()} Mahita Jewelry. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
 </body>
 </html>`;
   res.send(html);
@@ -623,55 +734,90 @@ app.get('/search', (req, res) => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Search Results - Mahita Jewelry</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #FFFEF5; color: #333; }
-    .header { background: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 100; }
-    .logo { font-size: 1.8rem; font-weight: bold; color: #fff; text-decoration: none; }
-    .nav { display: flex; gap: 1.5rem; }
-    .nav a { color: #fff; text-decoration: none; font-weight: 500; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-    h1 { color: #D4AF37; margin-bottom: 1rem; }
-    .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 2rem; }
-    .product-card { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-    .product-image { width: 100%; height: 250px; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; color: #999; font-size: 3rem; }
-    .product-info { padding: 1.5rem; }
-    .product-info h3 { margin-bottom: 0.5rem; }
-    .product-info p { color: #666; font-size: 0.9rem; margin-bottom: 1rem; }
-    .product-price { font-size: 1.2rem; color: #D4AF37; font-weight: bold; margin-bottom: 1rem; }
-    .btn { display: inline-block; padding: 0.8rem 1.5rem; background: #8B0000; color: white; text-decoration: none; border-radius: 5px; }
-    .no-results { text-align: center; padding: 3rem; color: #666; }
-  </style>
+  <title>Search | Mahita Jewelry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <header class="header">
-    <a href="/" class="logo">Mahita</a>
-    <nav class="nav">
-      <a href="/">Home</a>
-      <a href="/products">Products</a>
-      <a href="/admin">Admin</a>
-    </nav>
+    <div class="header-inner">
+      <a href="/" class="logo">
+        <img src="/vectorized.svg" alt="Mahita" style="height: 42px;">
+      </a>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/products">Collection</a>
+        <a href="/about">About</a>
+        <a href="/contact">Contact</a>
+      </nav>
+      <div class="nav-actions">
+        <a href="/search" aria-label="Search">🔍</a>
+      </div>
+    </div>
   </header>
-  
-  <main class="container">
-    <h1>Search Results for "${query}"</h1>
+
+  <main class="container" style="padding-top: var(--space-2xl);">
+    <div class="section-header">
+      <h1>Search Results</h1>
+      <p>${query ? 'Showing results for "' + query + '"' : 'Enter a search term to find products'}</p>
+    </div>
+    
     ${products.length > 0 ? `
     <div class="products-grid">
-      ${products.map(prod => `
-        <div class="product-card">
-          <div class="product-image">💎</div>
-          <div class="product-info">
-            <h3>${prod.name}</h3>
-            <p>${prod.description || ''}</p>
-            <div class="product-price">₹${prod.price?.toLocaleString() || 'Contact for price'}</div>
-            <a href="/product/${prod.id}" class="btn">View Details</a>
+      ${products.map(prod => {
+        const images = prod.images && prod.images.length > 0 ? prod.images : [];
+        const imageUrl = images.length > 0 ? (images[0].filename || images[0].url || images[0]) : '';
+        return `
+        <a href="/product/${prod.id}" class="product-card">
+          <div class="product-card-image">
+            ${imageUrl ? `<img src="${imageUrl}" alt="${prod.name}" loading="lazy">` : '<div class="product-card-placeholder">💎</div>'}
           </div>
-        </div>
-      `).join('')}
+          <div class="product-card-info">
+            <p class="product-card-title">${prod.name}</p>
+            <p class="product-card-price">${prod.price && prod.price > 0 ? '₹' + prod.price.toLocaleString() : 'Price on request'}</p>
+          </div>
+        </a>
+        `;
+      }).join('')}
     </div>
-    ` : '<div class="no-results"><p>No products found. Try a different search term.</p></div>'}
+    ` : query ? '<p style="text-align: center; color: var(--color-muted);">No products found. Try a different search term.</p>' : ''}
   </main>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img src="/vectorized.svg" alt="Mahita" style="height: 36px; filter: brightness(0) invert(1);">
+          <p>Exquisite Indian jewelry crafted with traditional artistry.</p>
+        </div>
+        <div>
+          <h4>Shop</h4>
+          <ul>
+            <li><a href="/products">All Products</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Company</h4>
+          <ul>
+            <li><a href="/about">About Us</a></li>
+            <li><a href="/contact">Contact</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4>Support</h4>
+          <ul>
+            <li><a href="/shipping">Shipping</a></li>
+            <li><a href="/returns">Returns</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; ${new Date().getFullYear()} Mahita Jewelry. All rights reserved.</p>
+      </div>
+    </div>
+  </footer>
 </body>
 </html>`;
   res.send(html);
