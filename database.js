@@ -38,6 +38,7 @@ async function initDatabase() {
       category_id INTEGER,
       price REAL,
       images TEXT,
+      cutwise_url TEXT,
       is_active INTEGER DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -187,8 +188,8 @@ const dbHelpers = {
     if (result.length === 0) return [];
     return result[0].values.map(row => ({
       id: row[0], name: row[1], description: row[2], category_id: row[3],
-      price: row[4], images: JSON.parse(row[5] || '[]'), is_active: row[6],
-      created_at: row[7], updated_at: row[8]
+      price: row[4], images: JSON.parse(row[5] || '[]'), cutwise_url: row[6],
+      is_active: row[7], created_at: row[8], updated_at: row[9]
     }));
   },
   
@@ -200,8 +201,8 @@ const dbHelpers = {
       stmt.free();
       return { 
         id: row[0], name: row[1], description: row[2], category_id: row[3],
-        price: row[4], images: JSON.parse(row[5] || '[]'), is_active: row[6],
-        created_at: row[7], updated_at: row[8]
+        price: row[4], images: JSON.parse(row[5] || '[]'), cutwise_url: row[6],
+        is_active: row[7], created_at: row[8], updated_at: row[9]
       };
     }
     stmt.free();
@@ -213,7 +214,8 @@ const dbHelpers = {
     if (result.length === 0) return [];
     return result[0].values.map(row => ({
       id: row[0], name: row[1], description: row[2], category_id: row[3],
-      price: row[4], images: JSON.parse(row[5] || '[]'), is_active: row[6]
+      price: row[4], images: JSON.parse(row[5] || '[]'), cutwise_url: row[6],
+      is_active: row[7]
     }));
   },
   
@@ -226,23 +228,24 @@ const dbHelpers = {
     if (result.length === 0) return [];
     return result[0].values.map(row => ({
       id: row[0], name: row[1], description: row[2], category_id: row[3],
-      price: row[4], images: JSON.parse(row[5] || '[]'), is_active: row[6]
+      price: row[4], images: JSON.parse(row[5] || '[]'), cutwise_url: row[6],
+      is_active: row[7]
     }));
   },
   
-  createProduct: (name, description, categoryId, price, images = []) => {
+  createProduct: (name, description, categoryId, price, images = [], cutwiseUrl = null) => {
     db.run(
-      "INSERT INTO products (name, description, category_id, price, images) VALUES (?, ?, ?, ?, ?)",
-      [name, description, categoryId, price, JSON.stringify(images)]
+      "INSERT INTO products (name, description, category_id, price, images, cutwise_url) VALUES (?, ?, ?, ?, ?, ?)",
+      [name, description, categoryId, price, JSON.stringify(images), cutwiseUrl]
     );
     saveDatabase();
     return db.exec("SELECT last_insert_rowid()")[0].values[0][0];
   },
   
-  updateProduct: (id, name, description, categoryId, price, images) => {
+  updateProduct: (id, name, description, categoryId, price, images, cutwiseUrl = null) => {
     db.run(
-      "UPDATE products SET name = ?, description = ?, category_id = ?, price = ?, images = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-      [name, description, categoryId, price, JSON.stringify(images), id]
+      "UPDATE products SET name = ?, description = ?, category_id = ?, price = ?, images = ?, cutwise_url = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      [name, description, categoryId, price, JSON.stringify(images), cutwiseUrl, id]
     );
     saveDatabase();
   },

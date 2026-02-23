@@ -358,6 +358,13 @@ app.get('/product/:id', (req, res) => {
         <h1>${product.name}</h1>
         <p class="price">₹${product.price?.toLocaleString() || 'Contact for price'}</p>
         <p class="description">${product.description || 'No description available.'}</p>
+        ${product.cutwise_url ? `<div class="cutwise-widget" style="margin: 1.5rem 0; padding: 1rem; background: #f9f9f9; border-radius: 10px;">
+          <p style="margin-bottom: 1rem; color: #666; font-weight: 500;">View this piece on Cutwise:</p>
+          <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+            <a href="${product.cutwise_url}" target="_blank" style="display: inline-block; padding: 0.8rem 1.5rem; background: #D4AF37; color: white; text-decoration: none; border-radius: 5px;">View on Cutwise 💎</a>
+            <iframe src="https://cutwise.com/widget${product.cutwise_url.replace('https://cutwise.com', '')}" style="width: 100%; height: 350px; border: none; border-radius: 10px; margin-top: 1rem;" scrolling="no"></iframe>
+          </div>
+        </div>` : ''}
         <button class="btn" onclick="openQuoteModal()">Request Quote</button>
       </div>
     </div>
@@ -747,7 +754,7 @@ app.get('/admin/products', requireAdmin, (req, res) => {
               <td>₹${p.price?.toLocaleString() || '-'}</td>
               <td>${p.is_active ? 'Active' : 'Inactive'}</td>
               <td class="actions">
-                <button class="btn-sm btn-edit" onclick="editProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', '${(p.description || '').replace(/'/g, "\\'")}', ${p.category_id}, ${p.price})">Edit</button>
+                <button class="btn-sm btn-edit" onclick="editProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', '${(p.description || '').replace(/'/g, "\\'")}', ${p.category_id}, ${p.price}, '${(p.cutwise_url || '').replace(/'/g, "\\'")}')">Edit</button>
                 <button class="btn-sm btn-delete" onclick="deleteProduct(${p.id})">Delete</button>
               </td>
             </tr>`;
@@ -782,6 +789,11 @@ app.get('/admin/products', requireAdmin, (req, res) => {
           <label>Price (₹)</label>
           <input type="number" id="productPrice">
         </div>
+        <div class="form-group">
+          <label>Cutwise Widget URL</label>
+          <input type="text" id="productCutwise" placeholder="https://cutwise.com/jewelry/1816063">
+          <small>Paste a Cutwise product URL to embed the widget</small>
+        </div>
         <div class="modal-buttons">
           <button type="submit" class="btn">Save Product</button>
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
@@ -801,7 +813,7 @@ app.get('/admin/products', requireAdmin, (req, res) => {
       document.getElementById('productModal').classList.add('active');
     }
     
-    function editProduct(id, name, desc, catId, price) {
+    function editProduct(id, name, desc, catId, price, cutwiseUrl) {
       editingId = id;
       document.getElementById('modalTitle').textContent = 'Edit Product';
       document.getElementById('productId').value = id;
@@ -809,6 +821,7 @@ app.get('/admin/products', requireAdmin, (req, res) => {
       document.getElementById('productDescription').value = desc;
       document.getElementById('productCategory').value = catId || '';
       document.getElementById('productPrice').value = price || '';
+      document.getElementById('productCutwise').value = cutwiseUrl || '';
       document.getElementById('productModal').classList.add('active');
     }
     
@@ -822,7 +835,8 @@ app.get('/admin/products', requireAdmin, (req, res) => {
         name: document.getElementById('productName').value,
         description: document.getElementById('productDescription').value,
         categoryId: document.getElementById('productCategory').value,
-        price: document.getElementById('productPrice').value
+        price: document.getElementById('productPrice').value,
+        cutwiseUrl: document.getElementById('productCutwise').value
       };
       
       const url = editingId ? '/api/admin/products/' + editingId : '/api/admin/products';
@@ -1251,14 +1265,14 @@ app.get('/api/products/:id', (req, res) => {
 });
 
 app.post('/api/admin/products', requireAdmin, (req, res) => {
-  const { name, description, categoryId, price } = req.body;
-  const id = createProduct(name, description, categoryId ? parseInt(categoryId) : null, price ? parseFloat(price) : null);
+  const { name, description, categoryId, price, cutwiseUrl } = req.body;
+  const id = createProduct(name, description, categoryId ? parseInt(categoryId) : null, price ? parseFloat(price) : null, [], cutwiseUrl);
   res.json({ success: true, id });
 });
 
 app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
-  const { name, description, categoryId, price } = req.body;
-  updateProduct(req.params.id, name, description, categoryId ? parseInt(categoryId) : null, price ? parseFloat(price) : null, []);
+  const { name, description, categoryId, price, cutwiseUrl } = req.body;
+  updateProduct(req.params.id, name, description, categoryId ? parseInt(categoryId) : null, price ? parseFloat(price) : null, [], cutwiseUrl);
   res.json({ success: true });
 });
 
