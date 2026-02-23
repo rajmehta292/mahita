@@ -21,7 +21,7 @@ const PORT = process.env.PORT || 3000;
 
 // Create data and uploads directories
 const dataDir = path.join(__dirname, 'data');
-const uploadsDir = path.join(__dirname, 'public', 'uploads');
+const uploadsDir = path.join(__dirname, 'data', 'uploads', 'products');
 if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
@@ -29,6 +29,7 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'data', 'uploads')));
 app.use(session({
   secret: 'mahita-jewelry-secret-key-2024',
   resave: false,
@@ -134,9 +135,12 @@ app.get('/', (req, res) => {
     
     <h2 class="section-title">Featured Collection</h2>
     <div class="products-grid">
-      ${products.map(prod => `
+      ${products.map(prod => {
+        const images = prod.images && prod.images.length > 0 ? prod.images : [];
+        const imageUrl = images.length > 0 ? images[0] : '';
+        return `
         <div class="product-card">
-          <div class="product-image">💎</div>
+          ${imageUrl ? `<div class="product-image"><img src="${imageUrl}" alt="${prod.name}"></div>` : '<div class="product-image">💎</div>'}
           <div class="product-info">
             <h3>${prod.name}</h3>
             <p>${prod.description || ''}</p>
@@ -144,7 +148,7 @@ app.get('/', (req, res) => {
             <a href="/product/${prod.id}" class="btn">View Details</a>
           </div>
         </div>
-      `).join('')}
+      `}).join('')}
     </div>
   </main>
   
@@ -181,7 +185,8 @@ app.get('/products', (req, res) => {
     .filter-btn.active, .filter-btn:hover { background: #D4AF37; color: white; }
     .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 2rem; }
     .product-card { background: white; border-radius: 15px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-    .product-image { width: 100%; height: 250px; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; color: #999; font-size: 3rem; }
+    .product-image { width: 100%; height: 250px; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; color: #999; font-size: 3rem; overflow: hidden; }
+    .product-image img { width: 100%; height: 100%; object-fit: cover; }
     .product-info { padding: 1.5rem; }
     .product-info h3 { margin-bottom: 0.5rem; }
     .product-info p { color: #666; font-size: 0.9rem; margin-bottom: 1rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
@@ -208,9 +213,12 @@ app.get('/products', (req, res) => {
       ${categories.map(cat => `<a href="/category/${cat.slug}" class="filter-btn">${cat.name}</a>`).join('')}
     </div>
     <div class="products-grid">
-      ${products.map(prod => `
+      ${products.map(prod => {
+        const images = prod.images && prod.images.length > 0 ? prod.images : [];
+        const imageUrl = images.length > 0 ? images[0] : '';
+        return `
         <div class="product-card">
-          <div class="product-image">💎</div>
+          ${imageUrl ? `<div class="product-image"><img src="${imageUrl}" alt="${prod.name}"></div>` : '<div class="product-image">💎</div>'}
           <div class="product-info">
             <h3>${prod.name}</h3>
             <p>${prod.description || ''}</p>
@@ -218,7 +226,7 @@ app.get('/products', (req, res) => {
             <a href="/product/${prod.id}" class="btn">View Details</a>
           </div>
         </div>
-      `).join('')}
+      `}).join('')}
     </div>
   </main>
 </body>
@@ -316,7 +324,8 @@ app.get('/product/:id', (req, res) => {
     .container { max-width: 1000px; margin: 0 auto; padding: 2rem; }
     .product-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
     @media (max-width: 768px) { .product-detail { grid-template-columns: 1fr; } }
-    .product-image { width: 100%; height: 400px; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; color: #999; font-size: 6rem; border-radius: 10px; }
+    .product-image { width: 100%; height: 400px; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; color: #999; font-size: 6rem; border-radius: 10px; overflow: hidden; }
+    .product-image img { width: 100%; height: 100%; object-fit: cover; }
     .product-info h1 { color: #8B0000; margin-bottom: 0.5rem; }
     .category { color: #D4AF37; font-size: 0.9rem; margin-bottom: 1rem; }
     .price { font-size: 2rem; color: #D4AF37; font-weight: bold; margin: 1rem 0; }
@@ -352,18 +361,19 @@ app.get('/product/:id', (req, res) => {
     <a href="/products" class="back-link">← Back to Products</a>
     
     <div class="product-detail">
-      <div class="product-image">💎</div>
+      ${product.images && product.images.length > 0 ? `<div class="product-image"><img src="${product.images[0]}" alt="${product.name}"></div>` : '<div class="product-image">💎</div>'}
       <div class="product-info">
         <p class="category">${category ? category.name : 'Uncategorized'}</p>
         <h1>${product.name}</h1>
         <p class="price">₹${product.price?.toLocaleString() || 'Contact for price'}</p>
         <p class="description">${product.description || 'No description available.'}</p>
-        ${product.cutwise_url ? `<div class="cutwise-widget" style="margin: 1.5rem 0; padding: 1rem; background: #f9f9f9; border-radius: 10px;">
-          <p style="margin-bottom: 1rem; color: #666; font-weight: 500;">View this piece on Cutwise:</p>
-          <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
-            <a href="${product.cutwise_url}" target="_blank" style="display: inline-block; padding: 0.8rem 1.5rem; background: #D4AF37; color: white; text-decoration: none; border-radius: 5px;">View on Cutwise 💎</a>
-            <iframe src="https://cutwise.com/widget${product.cutwise_url.replace('https://cutwise.com', '')}" style="width: 100%; height: 350px; border: none; border-radius: 10px; margin-top: 1rem;" scrolling="no"></iframe>
-          </div>
+        ${product.cutwise_url ? `<div class="cutwise-widget" style="margin: 1.5rem 0; padding: 1rem; background: linear-gradient(135deg, #f5f7fa 0%, #e4e8ec 100%); border-radius: 10px; border: 1px solid #e0e0e0;">
+          <p style="margin-bottom: 1rem; color: #444; font-weight: 600; font-size: 1.1rem;">💎 View this piece on Cutwise</p>
+          <a href="${product.cutwise_url}" target="_blank" style="display: inline-flex; align-items: center; gap: 0.5rem; padding: 1rem 2rem; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 500; transition: transform 0.2s, box-shadow 0.2s;">
+            <span>View Details on Cutwise</span>
+            <span style="font-size: 1.2rem;">→</span>
+          </a>
+          <p style="margin-top: 0.8rem; font-size: 0.85rem; color: #666;">Opens in a new tab • View certified details and pricing</p>
         </div>` : ''}
         <button class="btn" onclick="openQuoteModal()">Request Quote</button>
       </div>
@@ -737,6 +747,7 @@ app.get('/admin/products', requireAdmin, (req, res) => {
         <thead>
           <tr>
             <th>ID</th>
+            <th>Image</th>
             <th>Name</th>
             <th>Category</th>
             <th>Price</th>
@@ -747,14 +758,17 @@ app.get('/admin/products', requireAdmin, (req, res) => {
         <tbody>
           ${products.map(p => {
             const cat = categories.find(c => c.id === p.category_id);
+            const images = p.images && p.images.length > 0 ? p.images : [];
+            const imageUrl = images.length > 0 ? images[0] : '';
             return `<tr>
               <td>${p.id}</td>
+              <td>${imageUrl ? `<img src="${imageUrl}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 5px;">` : '<span style="color: #999;">No image</span>'}</td>
               <td>${p.name}</td>
               <td>${cat?.name || '-'}</td>
               <td>₹${p.price?.toLocaleString() || '-'}</td>
               <td>${p.is_active ? 'Active' : 'Inactive'}</td>
               <td class="actions">
-                <button class="btn-sm btn-edit" onclick="editProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', '${(p.description || '').replace(/'/g, "\\'")}', ${p.category_id}, ${p.price}, '${(p.cutwise_url || '').replace(/'/g, "\\'")}')">Edit</button>
+                <button class="btn-sm btn-edit" onclick="editProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', '${(p.description || '').replace(/'/g, "\\'")}', ${p.category_id}, ${p.price}, '${(p.cutwise_url || '').replace(/'/g, "\\'")}', '${imageUrl.replace(/'/g, "\\'")}')">Edit</button>
                 <button class="btn-sm btn-delete" onclick="deleteProduct(${p.id})">Delete</button>
               </td>
             </tr>`;
@@ -790,6 +804,20 @@ app.get('/admin/products', requireAdmin, (req, res) => {
           <input type="number" id="productPrice">
         </div>
         <div class="form-group">
+          <label>Product Image</label>
+          <div id="imageUploadArea" style="border: 2px dashed #ccc; padding: 20px; text-align: center; border-radius: 8px; cursor: pointer;" onclick="document.getElementById('productImage').click()">
+            <input type="file" id="productImage" accept="image/*" style="display: none;" onchange="handleImageUpload(this)">
+            <div id="imagePreview" style="display: none;">
+              <img id="previewImg" src="" style="max-width: 200px; max-height: 150px; border-radius: 5px;">
+              <p style="margin-top: 10px; color: #666;">Click to change image</p>
+            </div>
+            <div id="imagePlaceholder">
+              <p style="font-size: 2rem; margin: 0;">📷</p>
+              <p>Click to upload product image</p>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
           <label>Cutwise Widget URL</label>
           <input type="text" id="productCutwise" placeholder="https://cutwise.com/jewelry/1816063">
           <small>Paste a Cutwise product URL to embed the widget</small>
@@ -810,10 +838,17 @@ app.get('/admin/products', requireAdmin, (req, res) => {
       document.getElementById('modalTitle').textContent = 'Add Product';
       document.getElementById('productForm').reset();
       document.getElementById('productId').value = '';
+      // Reset image preview
+      document.getElementById('imagePreview').style.display = 'none';
+      document.getElementById('imagePlaceholder').style.display = 'block';
+      document.getElementById('productImage').value = '';
+      currentImage = '';
       document.getElementById('productModal').classList.add('active');
     }
     
-    function editProduct(id, name, desc, catId, price, cutwiseUrl) {
+    let currentImage = '';
+    
+    function editProduct(id, name, desc, catId, price, cutwiseUrl, imageUrl) {
       editingId = id;
       document.getElementById('modalTitle').textContent = 'Edit Product';
       document.getElementById('productId').value = id;
@@ -822,7 +857,46 @@ app.get('/admin/products', requireAdmin, (req, res) => {
       document.getElementById('productCategory').value = catId || '';
       document.getElementById('productPrice').value = price || '';
       document.getElementById('productCutwise').value = cutwiseUrl || '';
+      
+      // Handle image
+      currentImage = imageUrl || '';
+      if (currentImage) {
+        document.getElementById('previewImg').src = currentImage;
+        document.getElementById('imagePreview').style.display = 'block';
+        document.getElementById('imagePlaceholder').style.display = 'none';
+      } else {
+        document.getElementById('imagePreview').style.display = 'none';
+        document.getElementById('imagePlaceholder').style.display = 'block';
+      }
+      document.getElementById('productImage').value = '';
+      
       document.getElementById('productModal').classList.add('active');
+    }
+    
+    async function handleImageUpload(input) {
+      const file = input.files[0];
+      if (!file) return;
+      
+      const formData = new FormData();
+      formData.append('image', file);
+      
+      try {
+        const res = await fetch('/api/admin/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+          currentImage = data.filename;
+          document.getElementById('previewImg').src = currentImage;
+          document.getElementById('imagePreview').style.display = 'block';
+          document.getElementById('imagePlaceholder').style.display = 'none';
+        } else {
+          alert('Error uploading image');
+        }
+      } catch (err) {
+        alert('Error uploading image');
+      }
     }
     
     function closeModal() {
@@ -836,7 +910,8 @@ app.get('/admin/products', requireAdmin, (req, res) => {
         description: document.getElementById('productDescription').value,
         categoryId: document.getElementById('productCategory').value,
         price: document.getElementById('productPrice').value,
-        cutwiseUrl: document.getElementById('productCutwise').value
+        cutwiseUrl: document.getElementById('productCutwise').value,
+        image: currentImage
       };
       
       const url = editingId ? '/api/admin/products/' + editingId : '/api/admin/products';
@@ -1265,14 +1340,16 @@ app.get('/api/products/:id', (req, res) => {
 });
 
 app.post('/api/admin/products', requireAdmin, (req, res) => {
-  const { name, description, categoryId, price, cutwiseUrl } = req.body;
-  const id = createProduct(name, description, categoryId ? parseInt(categoryId) : null, price ? parseFloat(price) : null, [], cutwiseUrl);
+  const { name, description, categoryId, price, cutwiseUrl, image } = req.body;
+  const images = image ? [image] : [];
+  const id = createProduct(name, description, categoryId ? parseInt(categoryId) : null, price ? parseFloat(price) : null, images, cutwiseUrl);
   res.json({ success: true, id });
 });
 
 app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
-  const { name, description, categoryId, price, cutwiseUrl } = req.body;
-  updateProduct(req.params.id, name, description, categoryId ? parseInt(categoryId) : null, price ? parseFloat(price) : null, [], cutwiseUrl);
+  const { name, description, categoryId, price, cutwiseUrl, image } = req.body;
+  const images = image ? [image] : [];
+  updateProduct(req.params.id, name, description, categoryId ? parseInt(categoryId) : null, price ? parseFloat(price) : null, images, cutwiseUrl);
   res.json({ success: true });
 });
 
@@ -1375,10 +1452,23 @@ app.put('/api/admin/settings', requireAdmin, (req, res) => {
 // Image upload
 app.post('/api/admin/upload', requireAdmin, upload.single('image'), (req, res) => {
   if (req.file) {
-    res.json({ success: true, filename: '/uploads/' + req.file.filename });
+    const filename = '/uploads/' + req.file.filename;
+    res.json({ success: true, filename: filename });
   } else {
     res.status(400).json({ error: 'No file uploaded' });
   }
+});
+
+// Serve uploaded files
+app.get('/uploads/:filename', (req, res) => {
+  const filename = req.params.filename;
+  const filepath = path.join(__dirname, 'data', 'uploads', 'products', filename);
+  res.sendFile(filepath, (err) => {
+    if (err) {
+      console.error('Error serving file:', err);
+      res.status(404).send('File not found');
+    }
+  });
 });
 
 // Start server
