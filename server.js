@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 const express = require('express');
 const session = require('express-session');
 const multer = require('multer');
@@ -5,6 +7,20 @@ const path = require('path');
 const fs = require('fs');
 const { v4: uuidv4 } = require('uuid');
 const nodemailer = require('nodemailer');
+
+// Initialize Stripe (will fail gracefully if no key)
+let stripe;
+try {
+  if (process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY !== 'sk_test_your_secret_key') {
+    stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+  } else {
+    console.log('⚠️  Stripe not configured. Set STRIPE_SECRET_KEY in .env to enable payments.');
+    stripe = null;
+  }
+} catch (e) {
+  console.log('⚠️  Stripe not configured:', e.message);
+  stripe = null;
+}
 
 const {
   initDatabase,
@@ -45,7 +61,22 @@ const storage = multer.diskStorage({
     cb(null, uuidv4() + ext);
   }
 });
-const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
+
+// Allow images and videos
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/webm', 'video/quicktime'];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Invalid file type. Only images and videos are allowed.'), false);
+  }
+};
+
+const upload = multer({ 
+  storage, 
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit for videos
+  fileFilter
+});
 
 // Auth middleware
 function requireAdmin(req, res, next) {
@@ -155,6 +186,39 @@ app.get('/', (req, res) => {
   <footer class="footer">
     <p>&copy; ${new Date().getFullYear()} Mahita Jewelry. All rights reserved.</p>
   </footer>
+</body>
+</html>`;
+  res.send(html);
+});
+
+// Payment success page
+app.get('/payment-success', (req, res) => {
+  const sessionId = req.query.session_id;
+  
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Payment Successful - Mahita Jewelry</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #FFFEF5; color: #333; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .success-card { background: white; padding: 3rem; border-radius: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.1); text-align: center; max-width: 500px; }
+    .success-icon { font-size: 4rem; margin-bottom: 1rem; }
+    h1 { color: #28a745; margin-bottom: 1rem; }
+    p { color: #666; margin-bottom: 2rem; line-height: 1.6; }
+    .btn { display: inline-block; padding: 1rem 2rem; background: #8B0000; color: white; text-decoration: none; border-radius: 5px; font-size: 1.1rem; }
+    .btn:hover { background: #DC143C; }
+  </style>
+</head>
+<body>
+  <div class="success-card">
+    <div class="success-icon">✅</div>
+    <h1>Payment Successful!</h1>
+    <p>Thank you for your purchase. We'll send you a confirmation email with tracking details shortly.</p>
+    <a href="/" class="btn">Continue Shopping</a>
+  </div>
 </body>
 </html>`;
   res.send(html);
@@ -324,8 +388,22 @@ app.get('/product/:id', (req, res) => {
     .container { max-width: 1000px; margin: 0 auto; padding: 2rem; }
     .product-detail { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
     @media (max-width: 768px) { .product-detail { grid-template-columns: 1fr; } }
-    .product-image { width: 100%; height: 400px; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; color: #999; font-size: 6rem; border-radius: 10px; overflow: hidden; }
+    .product-image { width: 100%; height: 400px; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; color: #999; font-size: 6rem; border-radius: 10px; overflow: hidden; position: relative; }
     .product-image img { width: 100%; height: 100%; object-fit: cover; }
+    /* Carousel styles */
+    .carousel { position: relative; width: 100%; height: 400px; border-radius: 10px; overflow: hidden; background: #f5f5f5; }
+    .carousel-track { display: flex; transition: transform 0.5s ease; height: 100%; }
+    .carousel-slide { min-width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+    .carousel-slide img, .carousel-slide video { width: 100%; height: 100%; object-fit: contain; background: #1a1a1a; }
+    .carousel-slide video { object-fit: contain; }
+    .carousel-nav { position: absolute; top: 50%; transform: translateY(-50%); background: rgba(0,0,0,0.5); color: white; border: none; width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 1.2rem; display: flex; align-items: center; justify-content: center; z-index: 10; }
+    .carousel-nav:hover { background: rgba(0,0,0,0.8); }
+    .carousel-prev { left: 10px; }
+    .carousel-next { right: 10px; }
+    .carousel-indicators { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; z-index: 10; }
+    .carousel-indicator { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,0.5); border: none; cursor: pointer; }
+    .carousel-indicator.active { background: rgba(255,255,255,1); }
+    .product-placeholder { width: 100%; height: 400px; background: linear-gradient(135deg, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; color: #999; font-size: 6rem; border-radius: 10px; }
     .product-info h1 { color: #8B0000; margin-bottom: 0.5rem; }
     .category { color: #D4AF37; font-size: 0.9rem; margin-bottom: 1rem; }
     .price { font-size: 2rem; color: #D4AF37; font-weight: bold; margin: 1rem 0; }
@@ -361,7 +439,46 @@ app.get('/product/:id', (req, res) => {
     <a href="/products" class="back-link">← Back to Products</a>
     
     <div class="product-detail">
-      ${product.images && product.images.length > 0 ? `<div class="product-image"><img src="${product.images[0]}" alt="${product.name}"></div>` : '<div class="product-image">💎</div>'}
+      ${(function() {
+        if (!product.images || product.images.length === 0) return '<div class="product-placeholder">💎</div>';
+        let html = '<div class="carousel" id="productCarousel"><div class="carousel-track" id="carouselTrack">';
+        product.images.forEach(function(img) {
+          var isVideo = img.isVideo || (img.mimetype && img.mimetype.startsWith('video/'));
+          var src = img.filename || img.url || img;
+          if (isVideo) {
+            html += '<div class="carousel-slide"><video src="' + src + '" controls></video></div>';
+          } else {
+            html += '<div class="carousel-slide"><img src="' + src + '" alt="' + product.name + '"></div>';
+          }
+        });
+        html += '</div>';
+        if (product.images.length > 1) {
+          html += '<button class="carousel-nav carousel-prev" onclick="changeSlide(-1)">‹</button>';
+          html += '<button class="carousel-nav carousel-next" onclick="changeSlide(1)">›</button>';
+          html += '<div class="carousel-indicators">';
+          product.images.forEach(function(_, i) {
+            html += '<button class="carousel-indicator ' + (i === 0 ? 'active' : '') + '" onclick="goToSlide(' + i + ')"></button>';
+          });
+          html += '</div>';
+        }
+        html += '</div>';
+        return html;
+      })()}
+      <script>
+        let currentSlide = 0;
+        const track = document.getElementById('carouselTrack');
+        const slides = document.querySelectorAll('.carousel-slide');
+        const totalSlides = slides.length;
+        function updateCarousel() { if (track) track.style.transform = 'translateX(-' + (currentSlide * 100) + '%)'; }
+        function changeSlide(dir) { currentSlide = (currentSlide + dir + totalSlides) % totalSlides; updateCarousel(); updateIndicators(); }
+        function goToSlide(index) { currentSlide = index; updateCarousel(); updateIndicators(); }
+        function updateIndicators() {
+          document.querySelectorAll('.carousel-indicator').forEach(function(ind, i) {
+            ind.classList.toggle('active', i === currentSlide);
+          });
+        }
+        if (totalSlides > 1) setInterval(function() { changeSlide(1); }, 5000);
+      </script>
       <div class="product-info">
         <p class="category">${category ? category.name : 'Uncategorized'}</p>
         <h1>${product.name}</h1>
@@ -375,7 +492,16 @@ app.get('/product/:id', (req, res) => {
           </a>
           <p style="margin-top: 0.8rem; font-size: 0.85rem; color: #666;">Opens in a new tab • View certified details and pricing</p>
         </div>` : ''}
-        <button class="btn" onclick="openQuoteModal()">Request Quote</button>
+        ${(function() {
+          if (product.price && product.price > 0) {
+            return '<div style="display: flex; gap: 1rem; margin-top: 1rem;">' +
+              '<button class="btn btn-buy" onclick="buyNow()" style="flex: 1;">Buy Now</button>' +
+              '<button class="btn" onclick="openQuoteModal()" style="flex: 1;">Request Quote</button>' +
+              '</div>';
+          } else {
+            return '<button class="btn" onclick="openQuoteModal()">Request Quote</button>';
+          }
+        })()}
       </div>
     </div>
   </main>
@@ -459,6 +585,26 @@ app.get('/product/:id', (req, res) => {
         }
       } catch (e) {
         alert('Error submitting quote. Please try again.');
+      }
+    }
+    
+    async function buyNow() {
+      try {
+        const res = await fetch('/api/create-checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ productId: productId })
+        });
+        
+        const data = await res.json();
+        
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          alert('Error initiating checkout. Please try again.');
+        }
+      } catch (e) {
+        alert('Error initiating checkout. Please try again.');
       }
     }
   </script>
@@ -759,7 +905,7 @@ app.get('/admin/products', requireAdmin, (req, res) => {
           ${products.map(p => {
             const cat = categories.find(c => c.id === p.category_id);
             const images = p.images && p.images.length > 0 ? p.images : [];
-            const imageUrl = images.length > 0 ? images[0] : '';
+            const imageUrl = images.length > 0 ? images[0].url : '';
             return `<tr>
               <td>${p.id}</td>
               <td>${imageUrl ? `<img src="${imageUrl}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 5px;">` : '<span style="color: #999;">No image</span>'}</td>
@@ -768,7 +914,7 @@ app.get('/admin/products', requireAdmin, (req, res) => {
               <td>₹${p.price?.toLocaleString() || '-'}</td>
               <td>${p.is_active ? 'Active' : 'Inactive'}</td>
               <td class="actions">
-                <button class="btn-sm btn-edit" onclick="editProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', '${(p.description || '').replace(/'/g, "\\'")}', ${p.category_id}, ${p.price}, '${(p.cutwise_url || '').replace(/'/g, "\\'")}', '${imageUrl.replace(/'/g, "\\'")}')">Edit</button>
+                <button class="btn-sm btn-edit" onclick="editProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', '${(p.description || '').replace(/'/g, "\\'")}', ${p.category_id}, ${p.price}, '${(p.cutwise_url || '').replace(/'/g, "\\'")}', '${JSON.stringify(images).replace(/'/g, "\\'")}')">Edit</button>
                 <button class="btn-sm btn-delete" onclick="deleteProduct(${p.id})">Delete</button>
               </td>
             </tr>`;
@@ -804,18 +950,13 @@ app.get('/admin/products', requireAdmin, (req, res) => {
           <input type="number" id="productPrice">
         </div>
         <div class="form-group">
-          <label>Product Image</label>
-          <div id="imageUploadArea" style="border: 2px dashed #ccc; padding: 20px; text-align: center; border-radius: 8px; cursor: pointer;" onclick="document.getElementById('productImage').click()">
-            <input type="file" id="productImage" accept="image/*" style="display: none;" onchange="handleImageUpload(this)">
-            <div id="imagePreview" style="display: none;">
-              <img id="previewImg" src="" style="max-width: 200px; max-height: 150px; border-radius: 5px;">
-              <p style="margin-top: 10px; color: #666;">Click to change image</p>
-            </div>
-            <div id="imagePlaceholder">
-              <p style="font-size: 2rem; margin: 0;">📷</p>
-              <p>Click to upload product image</p>
-            </div>
+          <label>Product Media (Images & Videos)</label>
+          <div id="mediaUploadArea" style="border: 2px dashed #ccc; padding: 20px; text-align: center; border-radius: 8px; cursor: pointer; margin-bottom: 10px;" onclick="document.getElementById('productMedia').click()">
+            <input type="file" id="productMedia" accept="image/*,video/*" multiple style="display: none;" onchange="handleMediaUpload(this)">
+            <div style="font-size: 2rem; margin: 0;">📷🎥</div>
+            <p>Click to upload images & videos (max 10)</p>
           </div>
+          <div id="mediaGallery" style="display: flex; flex-wrap: wrap; gap: 10px;"></div>
         </div>
         <div class="form-group">
           <label>Cutwise Widget URL</label>
@@ -838,17 +979,16 @@ app.get('/admin/products', requireAdmin, (req, res) => {
       document.getElementById('modalTitle').textContent = 'Add Product';
       document.getElementById('productForm').reset();
       document.getElementById('productId').value = '';
-      // Reset image preview
-      document.getElementById('imagePreview').style.display = 'none';
-      document.getElementById('imagePlaceholder').style.display = 'block';
-      document.getElementById('productImage').value = '';
-      currentImage = '';
+      // Reset media gallery
+      document.getElementById('mediaGallery').innerHTML = '';
+      document.getElementById('productMedia').value = '';
+      currentMedia = [];
       document.getElementById('productModal').classList.add('active');
     }
     
-    let currentImage = '';
+    let currentMedia = [];
     
-    function editProduct(id, name, desc, catId, price, cutwiseUrl, imageUrl) {
+    function editProduct(id, name, desc, catId, price, cutwiseUrl, images) {
       editingId = id;
       document.getElementById('modalTitle').textContent = 'Edit Product';
       document.getElementById('productId').value = id;
@@ -858,27 +998,37 @@ app.get('/admin/products', requireAdmin, (req, res) => {
       document.getElementById('productPrice').value = price || '';
       document.getElementById('productCutwise').value = cutwiseUrl || '';
       
-      // Handle image
-      currentImage = imageUrl || '';
-      if (currentImage) {
-        document.getElementById('previewImg').src = currentImage;
-        document.getElementById('imagePreview').style.display = 'block';
-        document.getElementById('imagePlaceholder').style.display = 'none';
-      } else {
-        document.getElementById('imagePreview').style.display = 'none';
-        document.getElementById('imagePlaceholder').style.display = 'block';
-      }
-      document.getElementById('productImage').value = '';
+      // Handle media gallery
+      currentMedia = images || [];
+      renderMediaGallery();
+      document.getElementById('productMedia').value = '';
       
       document.getElementById('productModal').classList.add('active');
     }
     
-    async function handleImageUpload(input) {
-      const file = input.files[0];
-      if (!file) return;
+    function renderMediaGallery() {
+      const gallery = document.getElementById('mediaGallery');
+      gallery.innerHTML = currentMedia.map(function(media, index) {
+        var mediaHtml = media.isVideo 
+          ? '<video src="' + media.url + '" style="width: 100%; height: 100%; object-fit: cover;"></video>'
+          : '<img src="' + media.url + '" style="width: 100%; height: 100%; object-fit: cover;">';
+        return '<div style="position: relative; width: 100px; height: 100px; border-radius: 8px; overflow: hidden; border: 2px solid #ddd;">' + mediaHtml + '<button onclick="removeMedia(' + index + ')" style="position: absolute; top: 2px; right: 2px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px;">×</button></div>';
+      }).join('');
+    }
+    
+    function removeMedia(index) {
+      currentMedia.splice(index, 1);
+      renderMediaGallery();
+    }
+    
+    async function handleMediaUpload(input) {
+      const files = input.files;
+      if (!files || files.length === 0) return;
       
       const formData = new FormData();
-      formData.append('image', file);
+      for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+      }
       
       try {
         const res = await fetch('/api/admin/upload', {
@@ -886,16 +1036,19 @@ app.get('/admin/products', requireAdmin, (req, res) => {
           body: formData
         });
         const data = await res.json();
-        if (data.success) {
-          currentImage = data.filename;
-          document.getElementById('previewImg').src = currentImage;
-          document.getElementById('imagePreview').style.display = 'block';
-          document.getElementById('imagePlaceholder').style.display = 'none';
+        if (data.success && data.files) {
+          data.files.forEach(file => {
+            currentMedia.push({
+              url: file.filename,
+              isVideo: file.isVideo
+            });
+          });
+          renderMediaGallery();
         } else {
-          alert('Error uploading image');
+          alert('Error uploading files');
         }
       } catch (err) {
-        alert('Error uploading image');
+        alert('Error uploading files');
       }
     }
     
@@ -911,7 +1064,7 @@ app.get('/admin/products', requireAdmin, (req, res) => {
         categoryId: document.getElementById('productCategory').value,
         price: document.getElementById('productPrice').value,
         cutwiseUrl: document.getElementById('productCutwise').value,
-        image: currentImage
+        images: currentMedia
       };
       
       const url = editingId ? '/api/admin/products/' + editingId : '/api/admin/products';
@@ -1340,16 +1493,14 @@ app.get('/api/products/:id', (req, res) => {
 });
 
 app.post('/api/admin/products', requireAdmin, (req, res) => {
-  const { name, description, categoryId, price, cutwiseUrl, image } = req.body;
-  const images = image ? [image] : [];
-  const id = createProduct(name, description, categoryId ? parseInt(categoryId) : null, price ? parseFloat(price) : null, images, cutwiseUrl);
+  const { name, description, categoryId, price, cutwiseUrl, images } = req.body;
+  const id = createProduct(name, description, categoryId ? parseInt(categoryId) : null, price ? parseFloat(price) : null, images || [], cutwiseUrl);
   res.json({ success: true, id });
 });
 
 app.put('/api/admin/products/:id', requireAdmin, (req, res) => {
-  const { name, description, categoryId, price, cutwiseUrl, image } = req.body;
-  const images = image ? [image] : [];
-  updateProduct(req.params.id, name, description, categoryId ? parseInt(categoryId) : null, price ? parseFloat(price) : null, images, cutwiseUrl);
+  const { name, description, categoryId, price, cutwiseUrl, images } = req.body;
+  updateProduct(req.params.id, name, description, categoryId ? parseInt(categoryId) : null, price ? parseFloat(price) : null, images || [], cutwiseUrl);
   res.json({ success: true });
 });
 
@@ -1449,13 +1600,18 @@ app.put('/api/admin/settings', requireAdmin, (req, res) => {
   res.json({ success: true });
 });
 
-// Image upload
-app.post('/api/admin/upload', requireAdmin, upload.single('image'), (req, res) => {
-  if (req.file) {
-    const filename = '/uploads/' + req.file.filename;
-    res.json({ success: true, filename: filename });
+// Media upload (multiple images/videos)
+app.post('/api/admin/upload', requireAdmin, upload.array('files', 10), (req, res) => {
+  if (req.files && req.files.length > 0) {
+    const files = req.files.map(file => ({
+      filename: '/uploads/' + file.filename,
+      originalName: file.originalname,
+      mimetype: file.mimetype,
+      isVideo: file.mimetype.startsWith('video/')
+    }));
+    res.json({ success: true, files: files });
   } else {
-    res.status(400).json({ error: 'No file uploaded' });
+    res.status(400).json({ error: 'No files uploaded' });
   }
 });
 
@@ -1468,6 +1624,89 @@ app.get('/uploads/:filename', (req, res) => {
       console.error('Error serving file:', err);
       res.status(404).send('File not found');
     }
+  });
+});
+
+// Stripe checkout endpoint
+app.post('/api/create-checkout-session', async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ error: 'Payments not configured. Please contact the administrator.' });
+  }
+  
+  try {
+    const { productId, quantity = 1 } = req.body;
+    const product = getProductById(productId);
+    
+    if (!product || !product.price || product.price <= 0) {
+      return res.status(400).json({ error: 'Product not available for purchase' });
+    }
+
+    // Create Stripe checkout session
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'inr',
+          product_data: {
+            name: product.name,
+            description: product.description ? product.description.substring(0, 500) : 'Mahita Jewelry',
+            images: product.images && product.images.length > 0 
+              ? [product.images[0].filename ? 'http://localhost:3000' + product.images[0].filename : product.images[0].url]
+              : []
+          },
+          unit_amount: Math.round(product.price * 100) // Stripe uses paise
+        },
+        quantity: parseInt(quantity)
+      }],
+      mode: 'payment',
+      success_url: req.headers.origin + '/payment-success?session_id={CHECKOUT_SESSION_ID}',
+      cancel_url: req.headers.origin + '/products/' + productId,
+      metadata: {
+        productId: product.id,
+        productName: product.name
+      }
+    });
+
+    res.json({ sessionId: session.id, url: session.url });
+  } catch (error) {
+    console.error('Stripe error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Stripe webhook endpoint (for handling payment success)
+app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, res) => {
+  if (!stripe) {
+    return res.status(503).json({ error: 'Payments not configured' });
+  }
+  
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET || 'whsec_your_webhook_secret');
+  } catch (err) {
+    console.error('Webhook signature verification failed:', err.message);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // Handle the event
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+    console.log('Payment successful for:', session.metadata.productName);
+    // TODO: Send confirmation email, update inventory, etc.
+  }
+
+  res.json({ received: true });
+});
+
+// Get Stripe publishable key
+app.get('/api/stripe-config', (req, res) => {
+  if (!stripe) {
+    return res.json({ publishableKey: null });
+  }
+  res.json({ 
+    publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null
   });
 });
 
