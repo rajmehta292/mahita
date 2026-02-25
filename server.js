@@ -110,7 +110,7 @@ app.get('/', (req, res) => {
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo">
-        <img src="/vectorized.svg" alt="Mahita" style="height: 42px;">
+        <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 250px;">
       </a>
       <nav class="nav">
         <a href="/">Home</a>
@@ -197,7 +197,7 @@ app.get('/', (req, res) => {
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <img src="/vectorized.svg" alt="Mahita" style="height: 36px; filter: brightness(0) invert(1);">
+          <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 150px; filter: brightness(0) invert(1);">
           <p>Exquisite Indian jewelry crafted with traditional artistry and modern elegance.</p>
         </div>
         <div>
@@ -286,7 +286,7 @@ app.get('/products', (req, res) => {
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo">
-        <img src="/vectorized.svg" alt="Mahita" style="height: 42px;">
+        <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 250px;">
       </a>
       <nav class="nav">
         <a href="/">Home</a>
@@ -334,7 +334,7 @@ app.get('/products', (req, res) => {
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <img src="/vectorized.svg" alt="Mahita" style="height: 36px; filter: brightness(0) invert(1);">
+          <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 150px; filter: brightness(0) invert(1);">
           <p>Exquisite Indian jewelry crafted with traditional artistry.</p>
         </div>
         <div>
@@ -390,7 +390,7 @@ app.get('/category/:slug', (req, res) => {
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo">
-        <img src="/vectorized.svg" alt="Mahita" style="height: 42px;">
+        <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 250px;">
       </a>
       <nav class="nav">
         <a href="/">Home</a>
@@ -433,7 +433,7 @@ app.get('/category/:slug', (req, res) => {
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <img src="/vectorized.svg" alt="Mahita" style="height: 36px; filter: brightness(0) invert(1);">
+          <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 150px; filter: brightness(0) invert(1);">
           <p>Exquisite Indian jewelry crafted with traditional artistry.</p>
         </div>
         <div>
@@ -495,7 +495,7 @@ app.get('/product/:id', (req, res) => {
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo">
-        <img src="/vectorized.svg" alt="Mahita" style="height: 42px;">
+        <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 250px;">
       </a>
       <nav class="nav">
         <a href="/">Home</a>
@@ -690,7 +690,7 @@ app.get('/product/:id', (req, res) => {
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <img src="/vectorized.svg" alt="Mahita" style="height: 36px; filter: brightness(0) invert(1);">
+          <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 150px; filter: brightness(0) invert(1);">
           <p>Exquisite Indian jewelry crafted with traditional artistry.</p>
         </div>
         <div>
@@ -744,7 +744,7 @@ app.get('/search', (req, res) => {
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo">
-        <img src="/vectorized.svg" alt="Mahita" style="height: 42px;">
+        <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 250px;">
       </a>
       <nav class="nav">
         <a href="/">Home</a>
@@ -789,7 +789,7 @@ app.get('/search', (req, res) => {
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <img src="/vectorized.svg" alt="Mahita" style="height: 36px; filter: brightness(0) invert(1);">
+          <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 150px; filter: brightness(0) invert(1);">
           <p>Exquisite Indian jewelry crafted with traditional artistry.</p>
         </div>
         <div>
@@ -1010,7 +1010,7 @@ app.get('/admin/products', requireAdmin, (req, res) => {
     .form-group { margin-bottom: 1rem; }
     .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
     .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 0.8rem; border: 2px solid #ddd; border-radius: 5px; font-size: 1rem; }
-    .form-group textarea { min-height: 100px; }
+    .form-group textarea { min-height: 150px; }
     .modal-buttons { display: flex; gap: 1rem; margin-top: 1.5rem; }
     .btn-secondary { background: #666; }
   </style>
@@ -1158,7 +1158,7 @@ app.get('/admin/products', requireAdmin, (req, res) => {
         var mediaHtml = media.isVideo 
           ? '<video src="' + media.url + '" style="width: 100%; height: 100%; object-fit: cover;"></video>'
           : '<img src="' + media.url + '" style="width: 100%; height: 100%; object-fit: cover;">';
-        return '<div style="position: relative; width: 100px; height: 100px; border-radius: 8px; overflow: hidden; border: 2px solid #ddd;">' + mediaHtml + '<button onclick="removeMedia(' + index + ')" style="position: absolute; top: 2px; right: 2px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px;">×</button></div>';
+        return '<div style="position: relative; width: 100px; height: 150px; border-radius: 8px; overflow: hidden; border: 2px solid #ddd;">' + mediaHtml + '<button onclick="removeMedia(' + index + ')" style="position: absolute; top: 2px; right: 2px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px;">×</button></div>';
       }).join('');
     }
     
