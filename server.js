@@ -110,16 +110,20 @@ app.get('/', (req, res) => {
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo">
-        <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 250px;">
+        <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 60px;">
       </a>
       <nav class="nav">
         <a href="/">Home</a>
         <a href="/products">Collection</a>
         <a href="/about">About</a>
         <a href="/contact">Contact</a>
+        <a href="/admin" class="admin-link" title="Admin">⚙️</a>
       </nav>
       <div class="nav-actions">
-        <a href="/search" aria-label="Search">🔍</a>
+        <form class="search-form" action="/search" method="GET">
+        <input type="text" name="q" placeholder="Search..." aria-label="Search">
+        <button type="submit"><svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
+      </form>
       </div>
     </div>
   </header>
@@ -197,7 +201,7 @@ app.get('/', (req, res) => {
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 150px; filter: brightness(0) invert(1);">
+          <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 40px; filter: brightness(0) invert(1);">
           <p>Exquisite Indian jewelry crafted with traditional artistry and modern elegance.</p>
         </div>
         <div>
@@ -286,16 +290,21 @@ app.get('/products', (req, res) => {
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo">
-        <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 250px;">
+        <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 60px;">
       </a>
       <nav class="nav">
         <a href="/">Home</a>
         <a href="/products">Collection</a>
         <a href="/about">About</a>
         <a href="/contact">Contact</a>
+        <a href="/admin" class="admin-link" title="Admin">⚙️</a>
       </nav>
       <div class="nav-actions">
-        <a href="/search" aria-label="Search">🔍</a>
+        <form class="search-form" action="/search" method="GET">
+        <input type="text" name="q" placeholder="Search..." aria-label="Search">
+        <button type="submit"><svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
+      </form>
+         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>
       </div>
     </div>
   </header>
@@ -334,7 +343,7 @@ app.get('/products', (req, res) => {
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 150px; filter: brightness(0) invert(1);">
+          <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 40px; filter: brightness(0) invert(1);">
           <p>Exquisite Indian jewelry crafted with traditional artistry.</p>
         </div>
         <div>
@@ -390,16 +399,21 @@ app.get('/category/:slug', (req, res) => {
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo">
-        <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 250px;">
+        <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 60px;">
       </a>
       <nav class="nav">
         <a href="/">Home</a>
         <a href="/products">Collection</a>
         <a href="/about">About</a>
         <a href="/contact">Contact</a>
+        <a href="/admin" class="admin-link" title="Admin">⚙️</a>
       </nav>
       <div class="nav-actions">
-        <a href="/search" aria-label="Search">🔍</a>
+        <form class="search-form" action="/search" method="GET">
+        <input type="text" name="q" placeholder="Search..." aria-label="Search">
+        <button type="submit"><svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
+      </form>
+         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>
       </div>
     </div>
   </header>
@@ -433,7 +447,7 @@ app.get('/category/:slug', (req, res) => {
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 150px; filter: brightness(0) invert(1);">
+          <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 40px; filter: brightness(0) invert(1);">
           <p>Exquisite Indian jewelry crafted with traditional artistry.</p>
         </div>
         <div>
@@ -495,16 +509,21 @@ app.get('/product/:id', (req, res) => {
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo">
-        <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 250px;">
+        <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 60px;">
       </a>
       <nav class="nav">
         <a href="/">Home</a>
         <a href="/products">Collection</a>
         <a href="/about">About</a>
         <a href="/contact">Contact</a>
+        <a href="/admin" class="admin-link" title="Admin">⚙️</a>
       </nav>
       <div class="nav-actions">
-        <a href="/search" aria-label="Search">🔍</a>
+        <form class="search-form" action="/search" method="GET">
+        <input type="text" name="q" placeholder="Search..." aria-label="Search">
+        <button type="submit"><svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
+      </form>
+         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>
       </div>
     </div>
   </header>
@@ -690,7 +709,7 @@ app.get('/product/:id', (req, res) => {
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 150px; filter: brightness(0) invert(1);">
+          <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 40px; filter: brightness(0) invert(1);">
           <p>Exquisite Indian jewelry crafted with traditional artistry.</p>
         </div>
         <div>
@@ -744,21 +763,34 @@ app.get('/search', (req, res) => {
   <header class="header">
     <div class="header-inner">
       <a href="/" class="logo">
-        <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 250px;">
+        <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 60px;">
       </a>
       <nav class="nav">
         <a href="/">Home</a>
         <a href="/products">Collection</a>
         <a href="/about">About</a>
         <a href="/contact">Contact</a>
+        <a href="/admin" class="admin-link" title="Admin">⚙️</a>
       </nav>
       <div class="nav-actions">
-        <a href="/search" aria-label="Search">🔍</a>
+        <form class="search-form" action="/search" method="GET">
+        <input type="text" name="q" placeholder="Search..." aria-label="Search">
+        <button type="submit"><svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg></button>
+      </form>
+         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>
       </div>
     </div>
   </header>
 
-  <main class="container" style="padding-top: var(--space-2xl);">
+  <main class="container search-page" style="padding-top: var(--space-2xl);">
+    <form class="search-bar-large" action="/search" method="GET">
+      <input type="text" name="q" placeholder="Search for jewelry..." value="${query}" aria-label="Search">
+      <button type="submit">
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </button>
+    </form>
+         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>
+    
     <div class="section-header">
       <h1>Search Results</h1>
       <p>${query ? 'Showing results for "' + query + '"' : 'Enter a search term to find products'}</p>
@@ -789,7 +821,7 @@ app.get('/search', (req, res) => {
     <div class="container">
       <div class="footer-grid">
         <div class="footer-brand">
-          <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 150px; filter: brightness(0) invert(1);">
+          <img src="/vectorized_nobg.svg" alt="Mahita" style="height: 40px; filter: brightness(0) invert(1);">
           <p>Exquisite Indian jewelry crafted with traditional artistry.</p>
         </div>
         <div>
@@ -864,6 +896,7 @@ app.get('/admin/login', (req, res) => {
       </div>
       <button type="submit" class="btn">Login</button>
     </form>
+         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>
     <a href="/" class="back-link">Back to Home</a>
   </div>
   <script>
@@ -894,74 +927,77 @@ app.get('/admin', requireAdmin, (req, res) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Dashboard - Mahita Jewelry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
-    .header { background: linear-gradient(135deg, #8B0000 0%, #DC143C 100%); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
-    .logo { font-size: 1.5rem; font-weight: bold; color: #fff; }
-    .nav { display: flex; gap: 1.5rem; }
-    .nav a { color: #fff; text-decoration: none; opacity: 0.9; }
-    .nav a:hover { opacity: 1; }
-    .logout { background: rgba(255,255,255,0.2); padding: 0.5rem 1rem; border-radius: 5px; color: white; text-decoration: none; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-    h1 { color: #333; margin-bottom: 2rem; }
-    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
-    .stat-card { background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; }
-    .stat-card h3 { color: #D4AF37; font-size: 2.5rem; margin-bottom: 0.5rem; }
-    .stat-card p { color: #666; }
-    .menu { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
-    .menu-card { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); text-align: center; cursor: pointer; transition: transform 0.3s; }
-    .menu-card:hover { transform: translateY(-5px); }
-    .menu-card h3 { color: #8B0000; margin-bottom: 0.5rem; }
-    .menu-card p { color: #666; }
-    .menu-card a { display: block; color: inherit; text-decoration: none; }
+    .admin-body { background: var(--color-paper); }
+    .admin-header { background: var(--color-brand); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+    .admin-logo { font-family: var(--font-serif); font-size: 1.5rem; font-weight: bold; color: #fff; }
+    .admin-nav { display: flex; gap: 1.5rem; }
+    .admin-nav a { color: #fff; text-decoration: none; opacity: 0.9; font-size: 0.9rem; }
+    .admin-nav a:hover { opacity: 1; }
+    .admin-logout { background: rgba(255,255,255,0.2); padding: 0.5rem 1rem; border-radius: 5px; color: white; text-decoration: none; }
+    .admin-container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    .admin-title { color: var(--color-brand); margin-bottom: 2rem; font-size: 2rem; }
+    .admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+    .admin-stat-card { background: white; padding: 1.5rem; border-radius: var(--radius-md); box-shadow: var(--shadow-soft); text-align: center; }
+    .admin-stat-card h3 { color: var(--color-gold); font-size: 2.5rem; margin-bottom: 0.5rem; }
+    .admin-stat-card p { color: var(--color-muted); }
+    .admin-menu { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
+    .admin-menu-card { background: white; padding: 2rem; border-radius: var(--radius-md); box-shadow: var(--shadow-soft); text-align: center; cursor: pointer; transition: transform 0.3s, box-shadow 0.3s; }
+    .admin-menu-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-hover); }
+    .admin-menu-card h3 { color: var(--color-brand); margin-bottom: 0.5rem; }
+    .admin-menu-card p { color: var(--color-muted); }
+    .admin-menu-card a { display: block; color: inherit; text-decoration: none; }
   </style>
 </head>
-<body>
-  <header class="header">
-    <div class="logo">Mahita Admin</div>
-    <nav class="nav">
+<body class="admin-body">
+  <header class="admin-header">
+    <div class="admin-logo">Mahita Admin</div>
+    <nav class="admin-nav">
       <a href="/">View Site</a>
       <a href="/admin/products">Products</a>
       <a href="/admin/categories">Categories</a>
       <a href="/admin/quotes">Quotes</a>
       <a href="/admin/settings">Settings</a>
-      <a href="/api/admin/logout" class="logout">Logout</a>
+      <a href="/api/admin/logout" class="admin-logout">Logout</a>
     </nav>
   </header>
   
-  <main class="container">
-    <h1>Dashboard</h1>
+  <main class="admin-container">
+    <h1 class="admin-title">Dashboard</h1>
     
-    <div class="stats">
-      <div class="stat-card">
+    <div class="admin-stats">
+      <div class="admin-stat-card">
         <h3>${stats.productsCount}</h3>
         <p>Products</p>
       </div>
-      <div class="stat-card">
+      <div class="admin-stat-card">
         <h3>${stats.quotesCount}</h3>
         <p>Pending Quotes</p>
       </div>
-      <div class="stat-card">
+      <div class="admin-stat-card">
         <h3>${stats.categoriesCount}</h3>
         <p>Categories</p>
       </div>
     </div>
     
-    <div class="menu">
-      <a href="/admin/products" class="menu-card">
+    <div class="admin-menu">
+      <a href="/admin/products" class="admin-menu-card">
         <h3>📦 Products</h3>
         <p>Manage your jewelry products</p>
       </a>
-      <a href="/admin/categories" class="menu-card">
+      <a href="/admin/categories" class="admin-menu-card">
         <h3>📁 Categories</h3>
         <p>Manage product categories</p>
       </a>
-      <a href="/admin/quotes" class="menu-card">
+      <a href="/admin/quotes" class="admin-menu-card">
         <h3>📝 Quotes</h3>
         <p>View quote requests</p>
       </a>
-      <a href="/admin/settings" class="menu-card">
+      <a href="/admin/settings" class="admin-menu-card">
         <h3>⚙️ Settings</h3>
         <p>Configure email and site</p>
       </a>
@@ -1010,7 +1046,7 @@ app.get('/admin/products', requireAdmin, (req, res) => {
     .form-group { margin-bottom: 1rem; }
     .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
     .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 0.8rem; border: 2px solid #ddd; border-radius: 5px; font-size: 1rem; }
-    .form-group textarea { min-height: 150px; }
+    .form-group textarea { min-height: 40px; }
     .modal-buttons { display: flex; gap: 1rem; margin-top: 1.5rem; }
     .btn-secondary { background: #666; }
   </style>
@@ -1158,7 +1194,7 @@ app.get('/admin/products', requireAdmin, (req, res) => {
         var mediaHtml = media.isVideo 
           ? '<video src="' + media.url + '" style="width: 100%; height: 100%; object-fit: cover;"></video>'
           : '<img src="' + media.url + '" style="width: 100%; height: 100%; object-fit: cover;">';
-        return '<div style="position: relative; width: 100px; height: 150px; border-radius: 8px; overflow: hidden; border: 2px solid #ddd;">' + mediaHtml + '<button onclick="removeMedia(' + index + ')" style="position: absolute; top: 2px; right: 2px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px;">×</button></div>';
+        return '<div style="position: relative; width: 100px; height: 40px; border-radius: 8px; overflow: hidden; border: 2px solid #ddd;">' + mediaHtml + '<button onclick="removeMedia(' + index + ')" style="position: absolute; top: 2px; right: 2px; background: red; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; cursor: pointer; font-size: 12px;">×</button></div>';
       }).join('');
     }
     
@@ -1327,6 +1363,7 @@ app.get('/admin/categories', requireAdmin, (req, res) => {
           <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
         </div>
       </form>
+         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>
     </div>
   </div>
   
@@ -1572,6 +1609,7 @@ app.get('/admin/settings', requireAdmin, (req, res) => {
         
         <button type="submit" class="btn">Save Settings</button>
       </form>
+         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></a>
     </div>
   </main>
   

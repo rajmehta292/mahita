@@ -205,6 +205,16 @@ section {
   color: #FFFFFF;
 }
 
+.admin-link {
+  font-size: 1.1rem;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+
+.admin-link:hover {
+  opacity: 1;
+}
+
 .nav a:hover::after {
   width: 100%;
 }
@@ -224,6 +234,116 @@ section {
 .nav-actions a:hover {
   opacity: 1;
   color: #FFFFFF;
+}
+
+.admin-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+  transition: all 0.2s;
+  margin-left: var(--space-md);
+}
+
+.admin-btn:hover {
+  background: rgba(255,255,255,0.25);
+  transform: rotate(30deg);
+}
+
+.admin-btn svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Search Bar - Compact Header */
+.search-form {
+  display: flex;
+  align-items: center;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 20px;
+  padding: 3px 8px 3px 12px;
+  gap: 6px;
+}
+
+.search-form input {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 0.8rem;
+  width: 80px;
+  outline: none;
+}
+
+.search-form input::placeholder {
+  color: rgba(255,255,255,0.4);
+}
+
+.search-form button {
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.2s;
+}
+
+.search-form button:hover {
+  color: #fff;
+}
+
+.search-icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Search Page */
+.search-page {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.search-page .search-bar-large {
+  display: flex;
+  align-items: center;
+  background: var(--color-ivory);
+  border: 2px solid var(--color-border);
+  border-radius: 50px;
+  padding: 12px 24px;
+  gap: 12px;
+  margin-bottom: var(--space-xl);
+}
+
+.search-page .search-bar-large:focus-within {
+  border-color: var(--color-brand);
+}
+
+.search-page .search-bar-large input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 1.1rem;
+  color: var(--color-ink);
+  outline: none;
+}
+
+.search-page .search-bar-large button {
+  background: var(--color-brand);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ============================================
