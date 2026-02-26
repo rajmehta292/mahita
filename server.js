@@ -862,18 +862,24 @@ app.get('/admin/login', (req, res) => {
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin Login - Mahita Jewelry</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #D4AF37 0%, #B8860B 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-    .login-container { background: white; padding: 2rem; border-radius: 15px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); width: 100%; max-width: 400px; }
-    h1 { color: #8B0000; margin-bottom: 1.5rem; text-align: center; }
+    body { font-family: var(--font-sans); background: var(--color-paper); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .login-container { background: white; padding: 2.5rem; border-radius: var(--radius-md); box-shadow: var(--shadow-soft); width: 100%; max-width: 400px; }
+    h1 { color: var(--color-brand); margin-bottom: 1.5rem; text-align: center; font-family: var(--font-serif); }
     .form-group { margin-bottom: 1rem; }
-    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
-    .form-group input { width: 100%; padding: 0.8rem; border: 2px solid #ddd; border-radius: 5px; font-size: 1rem; }
-    .btn { width: 100%; padding: 1rem; background: #8B0000; color: white; border: none; border-radius: 5px; font-size: 1rem; cursor: pointer; }
-    .btn:hover { background: #DC143C; }
-    .error { color: red; margin-bottom: 1rem; display: none; }
-    .back-link { display: block; text-align: center; margin-top: 1rem; color: #666; text-decoration: none; }
+    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--color-ink); }
+    .form-group input { width: 100%; padding: 0.8rem; border: 2px solid var(--color-border); border-radius: var(--radius-sm); font-size: 1rem; }
+    .form-group input:focus { border-color: var(--color-brand); outline: none; }
+    .btn { width: 100%; padding: 1rem; background: var(--color-brand); color: white; border: none; border-radius: var(--radius-sm); font-size: 1rem; cursor: pointer; transition: background var(--transition-fast); }
+    .btn:hover { background: var(--color-brand-dark); }
+    .error { color: var(--color-error); margin-bottom: 1rem; display: none; }
+    .back-link { display: block; text-align: center; margin-top: 1rem; color: var(--color-muted); text-decoration: none; }
+    .back-link:hover { color: var(--color-brand); }
   </style>
 </head>
 <body>
@@ -1104,7 +1110,10 @@ app.get('/admin/products', requireAdmin, (req, res) => {
   
   <div class="modal" id="productModal">
     <div class="modal-content">
-      <h2 id="modalTitle">Add Product</h2>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 id="modalTitle">Add Product</h2>
+        <button type="button" onclick="closeModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666;">&times;</button>
+      </div>
       <form id="productForm">
         <input type="hidden" id="productId">
         <div class="form-group">
@@ -1175,8 +1184,12 @@ app.get('/admin/products', requireAdmin, (req, res) => {
       document.getElementById('productPrice').value = price || '';
       document.getElementById('productCutwise').value = cutwiseUrl || '';
       
-      // Handle media gallery
-      currentMedia = images || [];
+      // Handle media gallery - images may be a JSON string or array
+      try {
+        currentMedia = typeof images === 'string' ? JSON.parse(images) : (images || []);
+      } catch(e) {
+        currentMedia = [];
+      }
       renderMediaGallery();
       document.getElementById('productMedia').value = '';
       
@@ -1342,7 +1355,10 @@ app.get('/admin/categories', requireAdmin, (req, res) => {
   
   <div class="modal" id="categoryModal">
     <div class="modal-content">
-      <h2 id="modalTitle">Add Category</h2>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 id="modalTitle">Add Category</h2>
+        <button type="button" onclick="closeModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666;">&times;</button>
+      </div>
       <form id="categoryForm">
         <input type="hidden" id="categoryId">
         <div class="form-group">
