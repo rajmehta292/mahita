@@ -72,8 +72,8 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-const upload = multer({ 
-  storage, 
+const upload = multer({
+  storage,
   limits: { fileSize: 50 * 1024 * 1024 }, // 50MB limit for videos
   fileFilter
 });
@@ -94,7 +94,7 @@ function requireAdmin(req, res, next) {
 app.get('/', (req, res) => {
   const products = getAllProducts().slice(0, 8);
   const categories = getAllCategories();
-  
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -158,9 +158,9 @@ app.get('/', (req, res) => {
 
       <div class="products-grid">
         ${products.length > 0 ? products.map(prod => {
-          const images = prod.images && prod.images.length > 0 ? prod.images : [];
-          const imageUrl = images.length > 0 ? (images[0].filename || images[0].url || images[0]) : '';
-          return `
+    const images = prod.images && prod.images.length > 0 ? prod.images : [];
+    const imageUrl = images.length > 0 ? (images[0].filename || images[0].url || images[0]) : '';
+    return `
           <a href="/product/${prod.id}" class="product-card">
             <div class="product-card-image">
               ${imageUrl ? `<img src="${imageUrl}" alt="${prod.name}" loading="lazy">` : '<div class="product-card-placeholder">💎</div>'}
@@ -171,7 +171,7 @@ app.get('/', (req, res) => {
             </div>
           </a>
           `;
-        }).join('') : '<p style="text-align: center; grid-column: 1/-1; color: var(--color-muted);">No products available yet.</p>'}
+  }).join('') : '<p style="text-align: center; grid-column: 1/-1; color: var(--color-muted);">No products available yet.</p>'}
       </div>
       
       ${products.length > 0 ? `<div style="text-align: center; margin-top: var(--space-xl);">
@@ -239,7 +239,7 @@ app.get('/', (req, res) => {
 // Payment success page
 app.get('/payment-success', (req, res) => {
   const sessionId = req.query.session_id;
-  
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -273,7 +273,7 @@ app.get('/payment-success', (req, res) => {
 app.get('/products', (req, res) => {
   const products = getAllProducts();
   const categories = getAllCategories();
-  
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -320,9 +320,9 @@ app.get('/products', (req, res) => {
     
     <div class="products-grid">
       ${products.length > 0 ? products.map(prod => {
-        const images = prod.images && prod.images.length > 0 ? prod.images : [];
-        const imageUrl = images.length > 0 ? (images[0].filename || images[0].url || images[0]) : '';
-        return `
+    const images = prod.images && prod.images.length > 0 ? prod.images : [];
+    const imageUrl = images.length > 0 ? (images[0].filename || images[0].url || images[0]) : '';
+    return `
         <a href="/product/${prod.id}" class="product-card">
           <div class="product-card-image">
             ${imageUrl ? `<img src="${imageUrl}" alt="${prod.name}" loading="lazy">` : '<div class="product-card-placeholder">💎</div>'}
@@ -333,7 +333,7 @@ app.get('/products', (req, res) => {
           </div>
         </a>
         `;
-      }).join('') : '<p style="text-align: center; grid-column: 1/-1; color: var(--color-muted);">No products available.</p>'}
+  }).join('') : '<p style="text-align: center; grid-column: 1/-1; color: var(--color-muted);">No products available.</p>'}
     </div>
   </main>
 
@@ -379,9 +379,9 @@ app.get('/products', (req, res) => {
 app.get('/category/:slug', (req, res) => {
   const category = getCategoryBySlug(req.params.slug);
   if (!category) return res.redirect('/products');
-  
+
   const products = getProductsByCategory(category.id);
-  
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -423,9 +423,9 @@ app.get('/category/:slug', (req, res) => {
     
     <div class="products-grid">
       ${products.length > 0 ? products.map(prod => {
-        const images = prod.images && prod.images.length > 0 ? prod.images : [];
-        const imageUrl = images.length > 0 ? (images[0].filename || images[0].url || images[0]) : '';
-        return `
+    const images = prod.images && prod.images.length > 0 ? prod.images : [];
+    const imageUrl = images.length > 0 ? (images[0].filename || images[0].url || images[0]) : '';
+    return `
         <a href="/product/${prod.id}" class="product-card">
           <div class="product-card-image">
             ${imageUrl ? `<img src="${imageUrl}" alt="${prod.name}" loading="lazy">` : '<div class="product-card-placeholder">💎</div>'}
@@ -436,7 +436,7 @@ app.get('/category/:slug', (req, res) => {
           </div>
         </a>
         `;
-      }).join('') : '<p style="text-align: center; grid-column: 1/-1; color: var(--color-muted);">No products in this category yet.</p>'}
+  }).join('') : '<p style="text-align: center; grid-column: 1/-1; color: var(--color-muted);">No products in this category yet.</p>'}
     </div>
   </main>
 
@@ -482,9 +482,9 @@ app.get('/category/:slug', (req, res) => {
 app.get('/product/:id', (req, res) => {
   const product = getProductById(req.params.id);
   if (!product) return res.redirect('/products');
-  
+
   const category = product.category_id ? getAllCategories().find(c => c.id === product.category_id) : null;
-  
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -531,31 +531,31 @@ app.get('/product/:id', (req, res) => {
     
     <div class="product-detail">
       <div class="product-gallery">
-        ${(function() {
-          if (!product.images || product.images.length === 0) return '<div class="product-placeholder" style="aspect-ratio: 4/5; background: var(--color-ivory); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 6rem; color: var(--color-muted);">💎</div>';
-          let html = '<div class="carousel" id="productCarousel"><div class="carousel-track" id="carouselTrack">';
-          product.images.forEach(function(img) {
-            var isVideo = img.isVideo || (img.mimetype && img.mimetype.startsWith('video/'));
-            var src = img.filename || img.url || img;
-            if (isVideo) {
-              html += '<div class="carousel-slide"><video src="' + src + '" controls></video></div>';
-            } else {
-              html += '<div class="carousel-slide"><img src="' + src + '" alt="' + product.name + '"></div>';
-            }
-          });
-          html += '</div>';
-          if (product.images.length > 1) {
-            html += '<button class="carousel-nav carousel-prev" onclick="changeSlide(-1)">‹</button>';
-            html += '<button class="carousel-nav carousel-next" onclick="changeSlide(1)">›</button>';
-            html += '<div class="carousel-indicators">';
-            product.images.forEach(function(_, i) {
-              html += '<button class="carousel-indicator ' + (i === 0 ? 'active' : '') + '" onclick="goToSlide(' + i + ')"></button>';
-            });
-            html += '</div>';
-          }
-          html += '</div>';
-          return html;
-        })()}
+        ${(function () {
+      if (!product.images || product.images.length === 0) return '<div class="product-placeholder" style="aspect-ratio: 4/5; background: var(--color-ivory); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 6rem; color: var(--color-muted);">💎</div>';
+      let html = '<div class="carousel" id="productCarousel"><div class="carousel-track" id="carouselTrack">';
+      product.images.forEach(function (img) {
+        var isVideo = img.isVideo || (img.mimetype && img.mimetype.startsWith('video/'));
+        var src = img.filename || img.url || img;
+        if (isVideo) {
+          html += '<div class="carousel-slide"><video src="' + src + '" controls></video></div>';
+        } else {
+          html += '<div class="carousel-slide"><img src="' + src + '" alt="' + product.name + '"></div>';
+        }
+      });
+      html += '</div>';
+      if (product.images.length > 1) {
+        html += '<button class="carousel-nav carousel-prev" onclick="changeSlide(-1)">‹</button>';
+        html += '<button class="carousel-nav carousel-next" onclick="changeSlide(1)">›</button>';
+        html += '<div class="carousel-indicators">';
+        product.images.forEach(function (_, i) {
+          html += '<button class="carousel-indicator ' + (i === 0 ? 'active' : '') + '" onclick="goToSlide(' + i + ')"></button>';
+        });
+        html += '</div>';
+      }
+      html += '</div>';
+      return html;
+    })()}
         <script>
           var currentSlide = 0;
           var track = document.getElementById('carouselTrack');
@@ -585,14 +585,14 @@ app.get('/product/:id', (req, res) => {
         </div>` : ''}
         
         <div class="product-actions">
-          ${(function() {
-            if (product.price && product.price > 0) {
-              return '<button class="btn btn-primary" onclick="buyNow()">Buy Now</button>' +
-                     '<button class="btn btn-secondary" onclick="openQuoteModal()">Request Quote</button>';
-            } else {
-              return '<button class="btn btn-primary" onclick="openQuoteModal()">Request Quote</button>';
-            }
-          })()}
+          ${(function () {
+      if (product.price && product.price > 0) {
+        return '<button class="btn btn-primary" onclick="buyNow()">Buy Now</button>' +
+          '<button class="btn btn-secondary" onclick="openQuoteModal()">Request Quote</button>';
+      } else {
+        return '<button class="btn btn-primary" onclick="openQuoteModal()">Request Quote</button>';
+      }
+    })()}
         </div>
       </div>
     </div>
@@ -743,7 +743,7 @@ app.get('/product/:id', (req, res) => {
 app.get('/search', (req, res) => {
   const query = req.query.q || '';
   const products = query ? searchProducts(query) : [];
-  
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -794,9 +794,9 @@ app.get('/search', (req, res) => {
     ${products.length > 0 ? `
     <div class="products-grid">
       ${products.map(prod => {
-        const images = prod.images && prod.images.length > 0 ? prod.images : [];
-        const imageUrl = images.length > 0 ? (images[0].filename || images[0].url || images[0]) : '';
-        return `
+    const images = prod.images && prod.images.length > 0 ? prod.images : [];
+    const imageUrl = images.length > 0 ? (images[0].filename || images[0].url || images[0]) : '';
+    return `
         <a href="/product/${prod.id}" class="product-card">
           <div class="product-card-image">
             ${imageUrl ? `<img src="${imageUrl}" alt="${prod.name}" loading="lazy">` : '<div class="product-card-placeholder">💎</div>'}
@@ -807,7 +807,7 @@ app.get('/search', (req, res) => {
           </div>
         </a>
         `;
-      }).join('')}
+  }).join('')}
     </div>
     ` : query ? '<p style="text-align: center; color: var(--color-muted);">No products found. Try a different search term.</p>' : ''}
   </main>
@@ -867,19 +867,112 @@ app.get('/admin/login', (req, res) => {
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <style>
+    :root {
+      --admin-bg: #f8f9fa;
+      --admin-surface: rgba(255, 255, 255, 0.85);
+      --admin-border: rgba(255, 255, 255, 0.4);
+      --admin-shadow: 0 8px 32px rgba(139, 0, 0, 0.08);
+      --admin-primary: #8B0000;
+      --admin-primary-hover: #DC143C;
+      --admin-text: #2d3748;
+      --admin-text-muted: #718096;
+      --admin-radius: 16px;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: var(--font-sans); background: var(--color-paper); min-height: 100vh; display: flex; align-items: center; justify-content: center; }
-    .login-container { background: white; padding: 2.5rem; border-radius: var(--radius-md); box-shadow: var(--shadow-soft); width: 100%; max-width: 400px; }
-    h1 { color: var(--color-brand); margin-bottom: 1.5rem; text-align: center; font-family: var(--font-serif); }
-    .form-group { margin-bottom: 1rem; }
-    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; color: var(--color-ink); }
-    .form-group input { width: 100%; padding: 0.8rem; border: 2px solid var(--color-border); border-radius: var(--radius-sm); font-size: 1rem; }
-    .form-group input:focus { border-color: var(--color-brand); outline: none; }
-    .btn { width: 100%; padding: 1rem; background: var(--color-brand); color: white; border: none; border-radius: var(--radius-sm); font-size: 1rem; cursor: pointer; transition: background var(--transition-fast); }
-    .btn:hover { background: var(--color-brand-dark); }
-    .error { color: var(--color-error); margin-bottom: 1rem; display: none; }
-    .back-link { display: block; text-align: center; margin-top: 1rem; color: var(--color-muted); text-decoration: none; }
-    .back-link:hover { color: var(--color-brand); }
+    body { 
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+      background: var(--admin-bg);
+      background-image: radial-gradient(circle at top right, rgba(220, 20, 60, 0.05), transparent 400px),
+                        radial-gradient(circle at bottom left, rgba(212, 175, 55, 0.05), transparent 400px);
+      min-height: 100vh; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+    }
+    .login-container { 
+      background: var(--admin-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 3rem; 
+      border-radius: var(--admin-radius); 
+      border: 1px solid var(--admin-border);
+      box-shadow: var(--admin-shadow); 
+      width: 100%; 
+      max-width: 420px; 
+      animation: fadeIn 0.5s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    h1 { 
+      color: var(--admin-primary); 
+      margin-bottom: 2rem; 
+      text-align: center; 
+      font-family: 'Cormorant Garamond', serif; 
+      font-size: 2.5rem;
+      font-weight: 600;
+    }
+    .form-group { margin-bottom: 1.5rem; }
+    .form-group label { 
+      display: block; 
+      margin-bottom: 0.5rem; 
+      font-weight: 500; 
+      font-size: 0.9rem;
+      color: var(--admin-text); 
+    }
+    .form-group input { 
+      width: 100%; 
+      padding: 0.85rem 1rem; 
+      border: 1px solid rgba(0,0,0,0.1); 
+      border-radius: 8px; 
+      font-size: 1rem; 
+      background: white;
+      transition: all 0.2s;
+    }
+    .form-group input:focus { 
+      border-color: var(--admin-primary); 
+      box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.1);
+      outline: none; 
+    }
+    .btn { 
+      width: 100%; 
+      padding: 1rem; 
+      background: var(--admin-primary); 
+      color: white; 
+      border: none; 
+      border-radius: 8px; 
+      font-size: 1rem; 
+      font-weight: 500;
+      cursor: pointer; 
+      transition: all 0.2s; 
+      margin-top: 0.5rem;
+    }
+    .btn:hover { 
+      background: var(--admin-primary-hover); 
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(220, 20, 60, 0.2);
+    }
+    .error { 
+      color: #e53e3e; 
+      background: #fed7d7;
+      padding: 0.75rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem; 
+      display: none; 
+      text-align: center;
+    }
+    .back-link { 
+      display: block; 
+      text-align: center; 
+      margin-top: 1.5rem; 
+      color: var(--admin-text-muted); 
+      text-decoration: none; 
+      font-size: 0.9rem;
+      transition: color 0.2s;
+    }
+    .back-link:hover { color: var(--admin-primary); }
   </style>
 </head>
 <body>
@@ -921,7 +1014,7 @@ app.get('/admin/login', (req, res) => {
 // Admin dashboard
 app.get('/admin', requireAdmin, (req, res) => {
   const stats = getDashboardStats();
-  
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -933,25 +1026,100 @@ app.get('/admin', requireAdmin, (req, res) => {
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/styles.css">
   <style>
-    .admin-body { background: var(--color-paper); }
-    .admin-header { background: var(--color-brand); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
-    .admin-logo { font-family: var(--font-serif); font-size: 1.5rem; font-weight: bold; color: #fff; }
-    .admin-nav { display: flex; gap: 1.5rem; }
-    .admin-nav a { color: #fff; text-decoration: none; opacity: 0.9; font-size: 0.9rem; }
-    .admin-nav a:hover { opacity: 1; }
-    .admin-logout { background: rgba(255,255,255,0.2); padding: 0.5rem 1rem; border-radius: 5px; color: white; text-decoration: none; }
-    .admin-container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-    .admin-title { color: var(--color-brand); margin-bottom: 2rem; font-size: 2rem; }
-    .admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
-    .admin-stat-card { background: white; padding: 1.5rem; border-radius: var(--radius-md); box-shadow: var(--shadow-soft); text-align: center; }
-    .admin-stat-card h3 { color: var(--color-gold); font-size: 2.5rem; margin-bottom: 0.5rem; }
-    .admin-stat-card p { color: var(--color-muted); }
+    :root {
+      --admin-bg: #f8f9fa;
+      --admin-surface: rgba(255, 255, 255, 0.85);
+      --admin-border: rgba(255, 255, 255, 0.4);
+      --admin-shadow: 0 8px 32px rgba(139, 0, 0, 0.08);
+      --admin-primary: #8B0000;
+      --admin-primary-hover: #DC143C;
+      --admin-text: #2d3748;
+      --admin-text-muted: #718096;
+      --admin-radius: 16px;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { 
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+      background: var(--admin-bg);
+      background-image: radial-gradient(circle at top right, rgba(220, 20, 60, 0.05), transparent 400px),
+                        radial-gradient(circle at bottom left, rgba(212, 175, 55, 0.05), transparent 400px);
+      color: var(--admin-text);
+      min-height: 100vh;
+    }
+    .admin-header { 
+      background: var(--admin-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 1rem 2rem; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      border-bottom: 1px solid var(--admin-border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .admin-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.75rem; font-weight: 600; color: var(--admin-primary); }
+    .admin-nav { display: flex; gap: 1.5rem; align-items: center; }
+    .admin-nav a { color: var(--admin-text); text-decoration: none; font-size: 0.95rem; font-weight: 500; transition: color 0.2s; }
+    .admin-nav a:hover { color: var(--admin-primary); }
+    .admin-nav a.active { color: var(--admin-primary); font-weight: 600; }
+    .admin-logout { 
+      background: rgba(139, 0, 0, 0.1); 
+      color: var(--admin-primary) !important; 
+      padding: 0.5rem 1rem; 
+      border-radius: 8px; 
+      text-decoration: none; 
+      transition: all 0.2s !important;
+    }
+    .admin-logout:hover {
+      background: var(--admin-primary);
+      color: white !important;
+    }
+    .admin-container { max-width: 1200px; margin: 0 auto; padding: 3rem 2rem; animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .admin-title { color: var(--admin-text); margin-bottom: 2.5rem; font-size: 2.25rem; font-weight: 600; }
+    
+    .admin-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-bottom: 3rem; }
+    .admin-stat-card { 
+      background: var(--admin-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 2rem; 
+      border-radius: var(--admin-radius); 
+      border: 1px solid var(--admin-border);
+      box-shadow: var(--admin-shadow); 
+      text-align: center; 
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .admin-stat-card:hover { transform: translateY(-5px); }
+    .admin-stat-card h3 { color: var(--admin-primary); font-size: 3rem; margin-bottom: 0.5rem; font-weight: 700; line-height: 1; }
+    .admin-stat-card p { color: var(--admin-text-muted); font-weight: 500; font-size: 1.1rem; }
+    
     .admin-menu { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; }
-    .admin-menu-card { background: white; padding: 2rem; border-radius: var(--radius-md); box-shadow: var(--shadow-soft); text-align: center; cursor: pointer; transition: transform 0.3s, box-shadow 0.3s; }
-    .admin-menu-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-hover); }
-    .admin-menu-card h3 { color: var(--color-brand); margin-bottom: 0.5rem; }
-    .admin-menu-card p { color: var(--color-muted); }
-    .admin-menu-card a { display: block; color: inherit; text-decoration: none; }
+    .admin-menu-card { 
+      background: var(--admin-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 2.5rem 2rem; 
+      border-radius: var(--admin-radius); 
+      border: 1px solid var(--admin-border);
+      box-shadow: var(--admin-shadow); 
+      text-align: center; 
+      cursor: pointer; 
+      transition: all 0.3s ease; 
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-decoration: none;
+    }
+    .admin-menu-card:hover { 
+      transform: translateY(-5px); 
+      box-shadow: 0 12px 40px rgba(139, 0, 0, 0.12); 
+      border-color: rgba(139, 0, 0, 0.2);
+    }
+    .admin-menu-card h3 { color: var(--admin-text); margin-bottom: 0.75rem; font-size: 1.4rem; font-weight: 600; display: flex; align-items: center; gap: 0.5rem;}
+    .admin-menu-card p { color: var(--admin-text-muted); font-size: 0.95rem; line-height: 1.5; }
   </style>
 </head>
 <body class="admin-body">
@@ -1013,7 +1181,7 @@ app.get('/admin', requireAdmin, (req, res) => {
 app.get('/admin/products', requireAdmin, (req, res) => {
   const products = getAllProducts(false);
   const categories = getAllCategories();
-  
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1021,35 +1189,95 @@ app.get('/admin/products', requireAdmin, (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Products - Mahita Admin</title>
   <style>
+    :root {
+      --admin-bg: #f8f9fa;
+      --admin-surface: rgba(255, 255, 255, 0.85);
+      --admin-border: rgba(255, 255, 255, 0.4);
+      --admin-shadow: 0 8px 32px rgba(139, 0, 0, 0.08);
+      --admin-primary: #8B0000;
+      --admin-primary-hover: #DC143C;
+      --admin-text: #2d3748;
+      --admin-text-muted: #718096;
+      --admin-radius: 16px;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
-    .header { background: linear-gradient(135deg, #8B0000 0%, #DC143C 100%); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
-    .logo { font-size: 1.5rem; font-weight: bold; color: #fff; }
-    .nav { display: flex; gap: 1.5rem; }
-    .nav a { color: #fff; text-decoration: none; opacity: 0.9; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+    body { 
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+      background: var(--admin-bg);
+      background-image: radial-gradient(circle at top right, rgba(220, 20, 60, 0.05), transparent 400px),
+                        radial-gradient(circle at bottom left, rgba(212, 175, 55, 0.05), transparent 400px);
+      color: var(--admin-text);
+      min-height: 100vh;
+    }
+    .header { 
+      background: var(--admin-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 1rem 2rem; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      border-bottom: 1px solid var(--admin-border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { font-family: 'Cormorant Garamond', serif; font-size: 1.75rem; font-weight: 600; color: var(--admin-primary); text-decoration: none;}
+    .nav { display: flex; gap: 1.5rem; align-items: center; }
+    .nav a { color: var(--admin-text); text-decoration: none; font-size: 0.95rem; font-weight: 500; transition: color 0.2s; }
+    .nav a:hover { color: var(--admin-primary); }
+    .nav a.active { color: var(--admin-primary); font-weight: 600; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 3rem 2rem; animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
-    h1 { color: #333; }
-    .btn { padding: 0.8rem 1.5rem; background: #8B0000; color: white; text-decoration: none; border-radius: 5px; border: none; cursor: pointer; }
-    .table-container { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    h1 { color: var(--admin-text); font-size: 2.25rem; font-weight: 600; }
+    .btn { padding: 0.8rem 1.5rem; background: var(--admin-primary); color: white; text-decoration: none; border-radius: 8px; border: none; cursor: pointer; font-weight: 500; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;}
+    .btn:hover { background: var(--admin-primary-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(220, 20, 60, 0.2);}
+    .table-container { 
+      background: var(--admin-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-radius: var(--admin-radius); 
+      overflow: hidden; 
+      box-shadow: var(--admin-shadow);
+      border: 1px solid var(--admin-border);
+    }
     table { width: 100%; border-collapse: collapse; }
-    th { background: #D4AF37; color: white; padding: 1rem; text-align: left; }
-    td { padding: 1rem; border-bottom: 1px solid #eee; }
+    th { background: rgba(0,0,0,0.02); color: var(--admin-text-muted); font-weight: 600; text-transform: uppercase; font-size: 0.85rem; padding: 1.25rem 1.5rem; text-align: left; border-bottom: 1px solid var(--admin-border);}
+    td { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--admin-border); vertical-align: middle;}
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(0,0,0,0.01); }
     .actions { display: flex; gap: 0.5rem; }
-    .btn-sm { padding: 0.5rem 1rem; font-size: 0.9rem; }
-    .btn-edit { background: #D4AF37; }
-    .btn-delete { background: #dc3545; }
-    .empty { text-align: center; padding: 3rem; color: #666; }
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
-    .modal.active { display: flex; }
-    .modal-content { background: white; padding: 2rem; border-radius: 15px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; }
-    .modal h2 { color: #8B0000; margin-bottom: 1.5rem; }
-    .form-group { margin-bottom: 1rem; }
-    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
-    .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 0.8rem; border: 2px solid #ddd; border-radius: 5px; font-size: 1rem; }
-    .form-group textarea { min-height: 40px; }
-    .modal-buttons { display: flex; gap: 1rem; margin-top: 1.5rem; }
-    .btn-secondary { background: #666; }
+    .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.85rem; border-radius: 6px; border: none; cursor: pointer; font-weight: 500; transition: all 0.2s; }
+    .btn-edit { background: rgba(212, 175, 55, 0.1); color: #B8860B; }
+    .btn-edit:hover { background: rgba(212, 175, 55, 0.2); }
+    .btn-delete { background: rgba(220, 53, 69, 0.1); color: #dc3545; }
+    .btn-delete:hover { background: rgba(220, 53, 69, 0.2); }
+    .empty { text-align: center; padding: 4rem 2rem; color: var(--admin-text-muted); font-size: 1.1rem; }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }
+    .modal.active { display: flex; opacity: 1;}
+    .modal-content { 
+      background: white; 
+      padding: 2.5rem; 
+      border-radius: var(--admin-radius); 
+      max-width: 600px; 
+      width: 90%; 
+      max-height: 90vh; 
+      overflow-y: auto; 
+      box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+      transform: scale(0.95);
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .modal.active .modal-content { transform: scale(1); }
+    .modal h2 { color: var(--admin-text); margin-bottom: 1.5rem; font-weight: 600; }
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.95rem;}
+    .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 0.85rem 1rem; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: 1rem; transition: all 0.2s; font-family: inherit;}
+    .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--admin-primary); box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.1); outline: none; }
+    .form-group textarea { min-height: 80px; resize: vertical; }
+    .modal-buttons { display: flex; gap: 1rem; margin-top: 2rem; }
+    .btn-secondary { background: rgba(0,0,0,0.05); color: var(--admin-text); }
+    .btn-secondary:hover { background: rgba(0,0,0,0.1); box-shadow: none; transform: none;}
   </style>
 </head>
 <body>
@@ -1086,10 +1314,10 @@ app.get('/admin/products', requireAdmin, (req, res) => {
         </thead>
         <tbody>
           ${products.map(p => {
-            const cat = categories.find(c => c.id === p.category_id);
-            const images = p.images && p.images.length > 0 ? p.images : [];
-            const imageUrl = images.length > 0 ? images[0].url : '';
-            return `<tr>
+    const cat = categories.find(c => c.id === p.category_id);
+    const images = p.images && p.images.length > 0 ? p.images : [];
+    const imageUrl = images.length > 0 ? images[0].url : '';
+    return `<tr>
               <td>${p.id}</td>
               <td>${imageUrl ? `<img src="${imageUrl}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 5px;">` : '<span style="color: #999;">No image</span>'}</td>
               <td>${p.name}</td>
@@ -1097,11 +1325,11 @@ app.get('/admin/products', requireAdmin, (req, res) => {
               <td>₹${p.price?.toLocaleString() || '-'}</td>
               <td>${p.is_active ? 'Active' : 'Inactive'}</td>
               <td class="actions">
-                <button class="btn-sm btn-edit" onclick="editProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', '${(p.description || '').replace(/'/g, "\\'")}', ${p.category_id}, ${p.price}, '${(p.cutwise_url || '').replace(/'/g, "\\'")}', '${JSON.stringify(images).replace(/'/g, "\\'")}')">Edit</button>
+                <button class="btn-sm btn-edit" onclick="editProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}', '${(p.description || '').replace(/'/g, "\\'")}', ${p.category_id}, ${p.price}, '${(p.cutwise_url || '').replace(/'/g, "\\'")}', '${JSON.stringify(images).replace(/'/g, "\\'").replace(/"/g, "&quot;")}')">Edit</button>
                 <button class="btn-sm btn-delete" onclick="deleteProduct(${p.id})">Delete</button>
               </td>
             </tr>`;
-          }).join('')}
+  }).join('')}
         </tbody>
       </table>
       ` : '<div class="empty">No products yet. Add your first product!</div>'}
@@ -1285,7 +1513,7 @@ app.get('/admin/products', requireAdmin, (req, res) => {
 // Admin categories page
 app.get('/admin/categories', requireAdmin, (req, res) => {
   const categories = getAllCategories();
-  
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1293,31 +1521,95 @@ app.get('/admin/categories', requireAdmin, (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Categories - Mahita Admin</title>
   <style>
+    :root {
+      --admin-bg: #f8f9fa;
+      --admin-surface: rgba(255, 255, 255, 0.85);
+      --admin-border: rgba(255, 255, 255, 0.4);
+      --admin-shadow: 0 8px 32px rgba(139, 0, 0, 0.08);
+      --admin-primary: #8B0000;
+      --admin-primary-hover: #DC143C;
+      --admin-text: #2d3748;
+      --admin-text-muted: #718096;
+      --admin-radius: 16px;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
-    .header { background: linear-gradient(135deg, #8B0000 0%, #DC143C 100%); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
-    .logo { font-size: 1.5rem; font-weight: bold; color: #fff; }
-    .nav { display: flex; gap: 1.5rem; }
-    .nav a { color: #fff; text-decoration: none; opacity: 0.9; }
-    .container { max-width: 800px; margin: 0 auto; padding: 2rem; }
+    body { 
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+      background: var(--admin-bg);
+      background-image: radial-gradient(circle at top right, rgba(220, 20, 60, 0.05), transparent 400px),
+                        radial-gradient(circle at bottom left, rgba(212, 175, 55, 0.05), transparent 400px);
+      color: var(--admin-text);
+      min-height: 100vh;
+    }
+    .header { 
+      background: var(--admin-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 1rem 2rem; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      border-bottom: 1px solid var(--admin-border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { font-family: 'Cormorant Garamond', serif; font-size: 1.75rem; font-weight: 600; color: var(--admin-primary); text-decoration: none;}
+    .nav { display: flex; gap: 1.5rem; align-items: center; }
+    .nav a { color: var(--admin-text); text-decoration: none; font-size: 0.95rem; font-weight: 500; transition: color 0.2s; }
+    .nav a:hover { color: var(--admin-primary); }
+    .nav a.active { color: var(--admin-primary); font-weight: 600; }
+    .container { max-width: 900px; margin: 0 auto; padding: 3rem 2rem; animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     .toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
-    h1 { color: #333; }
-    .btn { padding: 0.8rem 1.5rem; background: #8B0000; color: white; text-decoration: none; border-radius: 5px; border: none; cursor: pointer; }
-    .card { background: white; padding: 1.5rem; border-radius: 10px; margin-bottom: 1rem; box-shadow: 0 2px 10px rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
-    .card h3 { color: #8B0000; }
-    .card p { color: #666; }
+    h1 { color: var(--admin-text); font-size: 2.25rem; font-weight: 600; }
+    .btn { padding: 0.8rem 1.5rem; background: var(--admin-primary); color: white; text-decoration: none; border-radius: 8px; border: none; cursor: pointer; font-weight: 500; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;}
+    .btn:hover { background: var(--admin-primary-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(220, 20, 60, 0.2);}
+    .card { 
+      background: var(--admin-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 1.5rem 2rem; 
+      border-radius: var(--admin-radius); 
+      margin-bottom: 1.25rem; 
+      box-shadow: var(--admin-shadow); 
+      border: 1px solid var(--admin-border);
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .card:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(139, 0, 0, 0.1); }
+    .card h3 { color: var(--admin-text); margin-bottom: 0.25rem; font-size: 1.25rem; font-weight: 600;}
+    .card p { color: var(--admin-text-muted); font-size: 0.95rem; line-height: 1.5; margin-bottom: 0.5rem;}
     .actions { display: flex; gap: 0.5rem; }
-    .btn-sm { padding: 0.5rem 1rem; font-size: 0.9rem; }
-    .btn-edit { background: #D4AF37; }
-    .btn-delete { background: #dc3545; }
-    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
-    .modal.active { display: flex; }
-    .modal-content { background: white; padding: 2rem; border-radius: 15px; max-width: 500px; width: 90%; }
-    .form-group { margin-bottom: 1rem; }
-    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
-    .form-group input, .form-group textarea { width: 100%; padding: 0.8rem; border: 2px solid #ddd; border-radius: 5px; }
-    .modal-buttons { display: flex; gap: 1rem; margin-top: 1.5rem; }
-    .btn-secondary { background: #666; }
+    .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.85rem; border-radius: 6px; border: none; cursor: pointer; font-weight: 500; transition: all 0.2s; }
+    .btn-edit { background: rgba(212, 175, 55, 0.1); color: #B8860B; }
+    .btn-edit:hover { background: rgba(212, 175, 55, 0.2); }
+    .btn-delete { background: rgba(220, 53, 69, 0.1); color: #dc3545; }
+    .btn-delete:hover { background: rgba(220, 53, 69, 0.2); }
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }
+    .modal.active { display: flex; opacity: 1;}
+    .modal-content { 
+      background: white; 
+      padding: 2.5rem; 
+      border-radius: var(--admin-radius); 
+      max-width: 500px; 
+      width: 90%; 
+      box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+      transform: scale(0.95);
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    .modal.active .modal-content { transform: scale(1); }
+    .modal h2 { color: var(--admin-text); margin-bottom: 1.5rem; font-weight: 600; }
+    .form-group { margin-bottom: 1.25rem; }
+    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.95rem;}
+    .form-group input, .form-group textarea { width: 100%; padding: 0.85rem 1rem; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: 1rem; transition: all 0.2s; font-family: inherit;}
+    .form-group input:focus, .form-group textarea:focus { border-color: var(--admin-primary); box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.1); outline: none; }
+    .form-group textarea { min-height: 80px; resize: vertical; }
+    .modal-buttons { display: flex; gap: 1rem; margin-top: 2rem; }
+    .btn-secondary { background: rgba(0,0,0,0.05); color: var(--admin-text); }
+    .btn-secondary:hover { background: rgba(0,0,0,0.1); box-shadow: none; transform: none;}
   </style>
 </head>
 <body>
@@ -1437,7 +1729,7 @@ app.get('/admin/categories', requireAdmin, (req, res) => {
 // Admin quotes page
 app.get('/admin/quotes', requireAdmin, (req, res) => {
   const quotes = getAllQuotes();
-  
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1445,32 +1737,81 @@ app.get('/admin/quotes', requireAdmin, (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Quotes - Mahita Admin</title>
   <style>
+    :root {
+      --admin-bg: #f8f9fa;
+      --admin-surface: rgba(255, 255, 255, 0.85);
+      --admin-border: rgba(255, 255, 255, 0.4);
+      --admin-shadow: 0 8px 32px rgba(139, 0, 0, 0.08);
+      --admin-primary: #8B0000;
+      --admin-primary-hover: #DC143C;
+      --admin-text: #2d3748;
+      --admin-text-muted: #718096;
+      --admin-radius: 16px;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
-    .header { background: linear-gradient(135deg, #8B0000 0%, #DC143C 100%); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
-    .logo { font-size: 1.5rem; font-weight: bold; color: #fff; }
-    .nav { display: flex; gap: 1.5rem; }
-    .nav a { color: #fff; text-decoration: none; opacity: 0.9; }
-    .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
-    h1 { color: #333; margin-bottom: 2rem; }
+    body { 
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+      background: var(--admin-bg);
+      background-image: radial-gradient(circle at top right, rgba(220, 20, 60, 0.05), transparent 400px),
+                        radial-gradient(circle at bottom left, rgba(212, 175, 55, 0.05), transparent 400px);
+      color: var(--admin-text);
+      min-height: 100vh;
+    }
+    .header { 
+      background: var(--admin-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 1rem 2rem; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      border-bottom: 1px solid var(--admin-border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { font-family: 'Cormorant Garamond', serif; font-size: 1.75rem; font-weight: 600; color: var(--admin-primary); text-decoration: none;}
+    .nav { display: flex; gap: 1.5rem; align-items: center; }
+    .nav a { color: var(--admin-text); text-decoration: none; font-size: 0.95rem; font-weight: 500; transition: color 0.2s; }
+    .nav a:hover { color: var(--admin-primary); }
+    .nav a.active { color: var(--admin-primary); font-weight: 600; }
+    .container { max-width: 1200px; margin: 0 auto; padding: 3rem 2rem; animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    h1 { color: var(--admin-text); font-size: 2.25rem; font-weight: 600; margin-bottom: 2.5rem; }
     .quotes-grid { display: grid; gap: 1.5rem; }
-    .quote-card { background: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-    .quote-header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem; }
-    .quote-header h3 { color: #8B0000; }
-    .status { padding: 0.3rem 0.8rem; border-radius: 20px; font-size: 0.85rem; }
-    .status.pending { background: #fff3cd; color: #856404; }
-    .status.contacted { background: #cce5ff; color: #004085; }
-    .status.completed { background: #d4edda; color: #155724; }
-    .status.cancelled { background: #f8d7da; color: #721c24; }
-    .quote-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
-    .detail label { color: #999; font-size: 0.85rem; }
-    .detail p { margin-top: 0.2rem; }
-    .quote-message { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee; }
-    .actions { margin-top: 1rem; display: flex; gap: 0.5rem; }
-    .btn { padding: 0.5rem 1rem; border: none; border-radius: 5px; cursor: pointer; font-size: 0.9rem; }
-    .btn-contacted { background: #cce5ff; color: #004085; }
-    .btn-completed { background: #d4edda; color: #155724; }
-    .empty { text-align: center; padding: 3rem; color: #666; }
+    .quote-card { 
+      background: var(--admin-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 2rem; 
+      border-radius: var(--admin-radius); 
+      box-shadow: var(--admin-shadow); 
+      border: 1px solid var(--admin-border);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .quote-card:hover { transform: translateY(-3px); box-shadow: 0 16px 32px rgba(139, 0, 0, 0.1); }
+    .quote-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
+    .quote-header h3 { color: var(--admin-text); font-size: 1.35rem; font-weight: 600; margin-bottom: 0.25rem;}
+    .status { padding: 0.35rem 0.85rem; border-radius: 20px; font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;}
+    .status.pending { background: rgba(133, 100, 4, 0.1); color: #856404; }
+    .status.contacted { background: rgba(0, 64, 133, 0.1); color: #004085; }
+    .status.completed { background: rgba(21, 87, 36, 0.1); color: #155724; }
+    .status.cancelled { background: rgba(114, 28, 36, 0.1); color: #721c24; }
+    .quote-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; }
+    .detail label { color: var(--admin-text-muted); font-size: 0.85rem; font-weight: 500;}
+    .detail p { margin-top: 0.35rem; font-size: 1rem; color: var(--admin-text);}
+    .detail p a { color: var(--admin-primary); text-decoration: none; }
+    .detail p a:hover { text-decoration: underline; }
+    .quote-message { margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px dashed var(--admin-border); }
+    .quote-message label { color: var(--admin-text-muted); font-size: 0.85rem; font-weight: 500;}
+    .quote-message p { margin-top: 0.5rem; font-style: italic; color: var(--admin-text); line-height: 1.5;}
+    .actions { margin-top: 1.5rem; display: flex; gap: 0.75rem; }
+    .btn { padding: 0.6rem 1.25rem; border: none; border-radius: 8px; cursor: pointer; font-size: 0.9rem; font-weight: 500; transition: all 0.2s; }
+    .btn-contacted { background: rgba(0, 64, 133, 0.1); color: #004085; }
+    .btn-contacted:hover { background: rgba(0, 64, 133, 0.2); }
+    .btn-completed { background: rgba(21, 87, 36, 0.1); color: #155724; }
+    .btn-completed:hover { background: rgba(21, 87, 36, 0.2); }
+    .empty { text-align: center; padding: 4rem 2rem; color: var(--admin-text-muted); font-size: 1.1rem; }
   </style>
 </head>
 <body>
@@ -1547,7 +1888,7 @@ app.get('/admin/quotes', requireAdmin, (req, res) => {
 // Admin settings page
 app.get('/admin/settings', requireAdmin, (req, res) => {
   const settings = getAllSettings();
-  
+
   const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1555,21 +1896,64 @@ app.get('/admin/settings', requireAdmin, (req, res) => {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Settings - Mahita Admin</title>
   <style>
+    :root {
+      --admin-bg: #f8f9fa;
+      --admin-surface: rgba(255, 255, 255, 0.85);
+      --admin-border: rgba(255, 255, 255, 0.4);
+      --admin-shadow: 0 8px 32px rgba(139, 0, 0, 0.08);
+      --admin-primary: #8B0000;
+      --admin-primary-hover: #DC143C;
+      --admin-text: #2d3748;
+      --admin-text-muted: #718096;
+      --admin-radius: 16px;
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f5f5f5; }
-    .header { background: linear-gradient(135deg, #8B0000 0%, #DC143C 100%); padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
-    .logo { font-size: 1.5rem; font-weight: bold; color: #fff; }
-    .nav { display: flex; gap: 1.5rem; }
-    .nav a { color: #fff; text-decoration: none; opacity: 0.9; }
-    .container { max-width: 600px; margin: 0 auto; padding: 2rem; }
-    h1 { color: #333; margin-bottom: 2rem; }
-    .card { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    body { 
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; 
+      background: var(--admin-bg);
+      background-image: radial-gradient(circle at top right, rgba(220, 20, 60, 0.05), transparent 400px),
+                        radial-gradient(circle at bottom left, rgba(212, 175, 55, 0.05), transparent 400px);
+      color: var(--admin-text);
+      min-height: 100vh;
+    }
+    .header { 
+      background: var(--admin-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 1rem 2rem; 
+      display: flex; 
+      justify-content: space-between; 
+      align-items: center; 
+      border-bottom: 1px solid var(--admin-border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .logo { font-family: 'Cormorant Garamond', serif; font-size: 1.75rem; font-weight: 600; color: var(--admin-primary); text-decoration: none;}
+    .nav { display: flex; gap: 1.5rem; align-items: center; }
+    .nav a { color: var(--admin-text); text-decoration: none; font-size: 0.95rem; font-weight: 500; transition: color 0.2s; }
+    .nav a:hover { color: var(--admin-primary); }
+    .nav a.active { color: var(--admin-primary); font-weight: 600; }
+    .container { max-width: 600px; margin: 0 auto; padding: 3rem 2rem; animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    h1 { color: var(--admin-text); font-size: 2.25rem; font-weight: 600; margin-bottom: 2rem; text-align: center; }
+    .card { 
+      background: var(--admin-surface);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      padding: 2.5rem; 
+      border-radius: var(--admin-radius); 
+      box-shadow: var(--admin-shadow); 
+      border: 1px solid var(--admin-border);
+    }
     .form-group { margin-bottom: 1.5rem; }
-    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; }
-    .form-group input { width: 100%; padding: 0.8rem; border: 2px solid #ddd; border-radius: 5px; font-size: 1rem; }
-    .form-group small { color: #666; display: block; margin-top: 0.3rem; }
-    .btn { padding: 1rem 2rem; background: #8B0000; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 1rem; }
-    .success { background: #d4edda; color: #155724; padding: 1rem; border-radius: 5px; margin-bottom: 1rem; display: none; }
+    .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 500; font-size: 0.95rem; color: var(--admin-text);}
+    .form-group input { width: 100%; padding: 0.85rem 1rem; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; font-size: 1rem; transition: all 0.2s; font-family: inherit;}
+    .form-group input:focus { border-color: var(--admin-primary); box-shadow: 0 0 0 3px rgba(139, 0, 0, 0.1); outline: none; }
+    .form-group small { color: var(--admin-text-muted); display: block; margin-top: 0.4rem; font-size: 0.85rem;}
+    .btn { width: 100%; padding: 1rem; background: var(--admin-primary); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 1rem; font-weight: 600; transition: all 0.2s; margin-top: 1rem;}
+    .btn:hover { background: var(--admin-primary-hover); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(220, 20, 60, 0.2);}
+    .success { background: rgba(21, 87, 36, 0.1); color: #155724; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; display: none; text-align: center; font-weight: 500;}
   </style>
 </head>
 <body>
@@ -1730,9 +2114,9 @@ app.delete('/api/admin/categories/:id', requireAdmin, (req, res) => {
 // Quotes API
 app.post('/api/quotes', async (req, res) => {
   const { productId, name, email, phone, message } = req.body;
-  
+
   const id = createQuote(productId ? parseInt(productId) : null, name, email, phone, message);
-  
+
   // Send email notification
   const settings = getAllSettings();
   if (settings.notification_email && settings.smtp_host) {
@@ -1746,9 +2130,9 @@ app.post('/api/quotes', async (req, res) => {
           pass: settings.smtp_pass
         }
       });
-      
+
       const product = productId ? getProductById(productId) : null;
-      
+
       await transporter.sendMail({
         from: settings.smtp_user,
         to: settings.notification_email,
@@ -1766,7 +2150,7 @@ app.post('/api/quotes', async (req, res) => {
       console.error('Email error:', e.message);
     }
   }
-  
+
   res.json({ success: true, id });
 });
 
@@ -1827,11 +2211,11 @@ app.post('/api/create-checkout-session', async (req, res) => {
   if (!stripe) {
     return res.status(503).json({ error: 'Payments not configured. Please contact the administrator.' });
   }
-  
+
   try {
     const { productId, quantity = 1 } = req.body;
     const product = getProductById(productId);
-    
+
     if (!product || !product.price || product.price <= 0) {
       return res.status(400).json({ error: 'Product not available for purchase' });
     }
@@ -1845,7 +2229,7 @@ app.post('/api/create-checkout-session', async (req, res) => {
           product_data: {
             name: product.name,
             description: product.description ? product.description.substring(0, 500) : 'Mahita Jewelry',
-            images: product.images && product.images.length > 0 
+            images: product.images && product.images.length > 0
               ? [product.images[0].filename ? 'http://localhost:3000' + product.images[0].filename : product.images[0].url]
               : []
           },
@@ -1870,11 +2254,11 @@ app.post('/api/create-checkout-session', async (req, res) => {
 });
 
 // Stripe webhook endpoint (for handling payment success)
-app.post('/api/webhook', express.raw({type: 'application/json'}), async (req, res) => {
+app.post('/api/webhook', express.raw({ type: 'application/json' }), async (req, res) => {
   if (!stripe) {
     return res.status(503).json({ error: 'Payments not configured' });
   }
-  
+
   const sig = req.headers['stripe-signature'];
   let event;
 
@@ -1900,7 +2284,7 @@ app.get('/api/stripe-config', (req, res) => {
   if (!stripe) {
     return res.json({ publishableKey: null });
   }
-  res.json({ 
+  res.json({
     publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || null
   });
 });
@@ -1909,7 +2293,7 @@ app.get('/api/stripe-config', (req, res) => {
 async function start() {
   await initDatabase();
   console.log('Database initialized');
-  
+
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Mahita Jewelry server running on http://localhost:${PORT}`);
     console.log(`Admin panel: http://localhost:${PORT}/admin`);
