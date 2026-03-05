@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import dynamic from 'next/dynamic'
 import { StrategyAST, BacktestResult } from '../services/trading-engine/types'
 import { MarketDataPoint } from '../services/market-data/types'
@@ -12,6 +12,33 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(false)
     const [data, setData] = useState<MarketDataPoint[]>([])
     const [results, setResults] = useState<BacktestResult | null>(null)
+    const [inventory, setInventory] = useState<any[]>([])
+    const [selectedSymbol, setSelectedSymbol] = useState("AAPL")
+    const [selectedTimeframe, setSelectedTimeframe] = useState("1d")
+
+    // Fetch Inventory and initial Market Data
+    useEffect(() => {
+        const fetchInventory = async () => {
+            const res = await fetch('/api/trading/inventory')
+            if (res.ok) {
+                const json = await res.json()
+                setInventory(json)
+            }
+        }
+        fetchInventory()
+    }, [])
+
+    useEffect(() => {
+        const fetchMarketData = async () => {
+            if (!selectedSymbol) return
+            const res = await fetch(`/api/trading/market-data?symbol=${selectedSymbol}&timeframe=${selectedTimeframe}`)
+            if (res.ok) {
+                const json = await res.json()
+                setData(json)
+            }
+        }
+        fetchMarketData()
+    }, [selectedSymbol, selectedTimeframe])
 
     // Dummy Strategy for MVP 
     // In a full build, this comes from the StrategyBuilder component
@@ -38,17 +65,25 @@ export default function Dashboard() {
     const runBacktest = async () => {
         setLoading(true)
         try {
-            // Create arbitrary historical window
-            const now = Math.floor(Date.now() / 1000)
-            const oneYearAgo = now - (365 * 24 * 60 * 60)
+            if (data.length === 0) {
+                alert("No data available for this symbol/timeframe. Please run the sync script.")
+                return
+            }
+
+            const startTime = data[0].time as number
+            const endTime = data[data.length - 1].time as number
 
             const res = await fetch('/api/trading/backtest', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    strategy: defaultStrategy,
-                    startTime: oneYearAgo,
-                    endTime: now,
+                    strategy: {
+                        ...defaultStrategy,
+                        asset: selectedSymbol,
+                        timeframe: selectedTimeframe
+                    },
+                    startTime,
+                    endTime,
                     initialCapital: 100000
                 })
             })
@@ -56,12 +91,6 @@ export default function Dashboard() {
             const json = await res.json()
             if (res.ok) {
                 setResults(json)
-
-                // In a real app, the backend would also return the marketdata array it generated
-                // For right now, let's fetch it from a separate generic endpoint
-                // To save time, we'll just mock it on frontend too for chart display wrapper
-                const dummyChartData = generateDummyChartData(oneYearAgo, now)
-                setData(dummyChartData)
             } else {
                 alert("Error: " + json.error)
             }
@@ -97,29 +126,70 @@ export default function Dashboard() {
             </header>
 
             <div className="flex gap-6 h-full min-h-0">
-                {/* Left Sidebar - Strategy Settings */}
-                <div className="w-1/4 glass-panel p-5 flex flex-col gap-4 overflow-y-auto">
-                    <h2 className="text-lg font-semibold text-white">Strategy Configuration</h2>
+                <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
+                    <div className="glass-panel p-5 flex flex-col gap-4">
+                        <h2 className="text-lg font-semibold text-white">Market Data</h2>
 
-                    <div className="flex flex-col gap-2">
-                        <label className="text-xs text-gray-400 uppercase tracking-wider">Asset</label>
-                        <input type="text" value={defaultStrategy.asset} readOnly className="glass-panel px-3 py-2 text-white bg-black/20" />
+                        <div className="flex flex-col gap-2">
+                            <label className="text-xs text-gray-400 uppercase tracking-wider">Asset</label>
+                            <select
+                                value={selectedSymbol}
+                                onChange={(e) => setSelectedSymbol(e.target.value)}
+                                className="glass-panel px-3 py-2 text-white bg-black/40 border border-white/10 outline-none focus:border-primary transition-colors"
+                            >
+                                {inventory.length === 0 && <option value="">Loading symbols...</option>}
+                                {inventory.map((item) => (
+                                    <option key={item.symbol} value={item.symbol}>{item.symbol}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                            <label className="text-xs text-gray-400 uppercase tracking-wider">Timeframe</label>
+                            <div className="flex gap-2">
+                                {['1d', '1w', '1m'].map((tf) => (
+                                    <button
+                                        key={tf}
+                                        onClick={() => setSelectedTimeframe(tf)}
+                                        className={`flex-1 py-1 rounded text-xs font-bold border transition-all ${selectedTimeframe === tf
+                                            ? 'bg-primary border-primary text-white'
+                                            : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                                            }`}
+                                    >
+                                        {tf.toUpperCase()}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="flex flex-col gap-2">
-                        <label className="text-xs text-gray-400 uppercase tracking-wider">Timeframe</label>
-                        <input type="text" value={defaultStrategy.timeframe} readOnly className="glass-panel px-3 py-2 text-white bg-black/20" />
+                    <div className="glass-panel p-5 flex flex-col gap-4 flex-1 overflow-hidden">
+                        <h2 className="text-lg font-semibold text-white">Strategy Engine</h2>
+
+                        <div className="flex flex-col gap-1 text-sm bg-black/20 p-3 rounded border border-white/5">
+                            <div className="flex justify-between">
+                                <span className="text-gray-400">Name:</span>
+                                <span className="text-white">{defaultStrategy.name}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-400">Rules:</span>
+                                <span className="text-white">RSI(14) &lt; 30</span>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={runBacktest}
+                            disabled={loading || data.length === 0}
+                            className="w-full py-3 bg-primary hover:bg-primary-hover text-white font-bold rounded shadow-lg transition-colors cursor-pointer disabled:opacity-30 flex items-center justify-center gap-2"
+                        >
+                            {loading ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                                    Running...
+                                </>
+                            ) : 'Run Backtest'}
+                        </button>
                     </div>
-
-                    <div className="border-t border-white/10 my-2"></div>
-
-                    <button
-                        onClick={runBacktest}
-                        disabled={loading}
-                        className="w-full py-3 bg-primary hover:bg-primary-hover text-white font-bold rounded shadow-lg transition-colors cursor-pointer disabled:opacity-50"
-                    >
-                        {loading ? 'Running Engine...' : 'Run Backtest'}
-                    </button>
 
                     {/* Metrics Panel */}
                     {results && (
