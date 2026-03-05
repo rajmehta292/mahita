@@ -22,7 +22,7 @@ export default function Chart({ data, trades }: ChartProps) {
             chartRef.current?.applyOptions({ width: chartContainerRef.current?.clientWidth })
         }
 
-        chartRef.current = createChart(chartContainerRef.current, {
+        const chart = createChart(chartContainerRef.current, {
             layout: {
                 background: { color: '#1a1b1e' },
                 textColor: '#C3C2D4',
@@ -35,15 +35,19 @@ export default function Chart({ data, trades }: ChartProps) {
             height: 500,
         })
 
-        chartRef.current.timeScale().fitContent()
+        chartRef.current = chart
 
-        seriesRef.current = (chartRef.current as any).addCandlestickSeries({
+        chart.timeScale().fitContent()
+
+        const series = (chart as any).addCandlestickSeries({
             upColor: '#26a69a',
             downColor: '#ef5350',
             borderVisible: false,
             wickUpColor: '#26a69a',
             wickDownColor: '#ef5350',
         })
+
+        seriesRef.current = series
 
         window.addEventListener('resize', handleResize)
 
