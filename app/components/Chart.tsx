@@ -37,7 +37,7 @@ export default function Chart({ data, trades }: ChartProps) {
 
         chartRef.current.timeScale().fitContent()
 
-        seriesRef.current = chartRef.current.addCandlestickSeries({
+        seriesRef.current = (chartRef.current as any).addCandlestickSeries({
             upColor: '#26a69a',
             downColor: '#ef5350',
             borderVisible: false,
@@ -95,7 +95,7 @@ export default function Chart({ data, trades }: ChartProps) {
 
             // Sort markers chronologically required by lightweight-charts
             markers.sort((a, b) => (a.time as number) - (b.time as number))
-            seriesRef.current.setMarkers(markers)
+                ; (seriesRef.current as any).setMarkers(markers)
         }
 
     }, [data, trades])

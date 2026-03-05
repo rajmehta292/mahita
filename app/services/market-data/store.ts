@@ -53,8 +53,7 @@ export class MarketDataStore {
                     low: d.low,
                     close: d.close,
                     volume: d.volume
-                })),
-                skipDuplicates: true // Important to avoid unique constraint errors
+                }))
             })
         }
 
