@@ -13,26 +13,30 @@ export const authOptions: NextAuthOptions = {
             clientSecret: process.env.GOOGLE_CLIENT_SECRET || "MOCK_CLIENT_SECRET",
         }),
     ],
+    session: {
+        strategy: "jwt",
+    },
     callbacks: {
-        async signIn({ user, account, profile }) {
+        async signIn({ user }) {
             if (!ALLOWED_EMAIL || user.email !== ALLOWED_EMAIL) {
-                // Reject login if email is not the single owner
                 console.warn(`Unauthorized login attempt by: ${user.email}`)
                 return false
             }
             return true
         },
-        async session({ session, user }) {
-            // Pass the user id to the session for relations
+        async jwt({ token, user }) {
+            if (user) {
+                token.id = user.id
+            }
+            return token
+        },
+        async session({ session, token }) {
             if (session.user) {
-                ; (session.user as any).id = (user as any).id
+                ; (session.user as any).id = token.id
             }
             return session
         }
-    },
-    session: {
-        strategy: "database",
-    },
+    }
 }
 
 const handler = NextAuth(authOptions)
