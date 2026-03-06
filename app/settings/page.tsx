@@ -52,13 +52,16 @@ export default function SettingsPage() {
         setMessage(null)
 
         try {
+            console.log('Saving Schwab credentials...')
             const response = await fetch('/api/user/schwab-config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ clientId, clientSecret })
             })
 
+            console.log('Response status:', response.status)
             const data = await response.json()
+            console.log('Response data:', data)
 
             if (data.success) {
                 setMessage({ type: 'success', text: 'Schwab credentials saved successfully!' })
@@ -69,8 +72,9 @@ export default function SettingsPage() {
             } else {
                 setMessage({ type: 'error', text: data.error || 'Failed to save credentials' })
             }
-        } catch (error) {
-            setMessage({ type: 'error', text: 'Failed to save credentials' })
+        } catch (error: any) {
+            console.error('Save error:', error)
+            setMessage({ type: 'error', text: `Failed to save credentials: ${error.message}` })
         } finally {
             setSaving(false)
         }

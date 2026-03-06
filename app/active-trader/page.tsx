@@ -3,11 +3,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '../components/Layout/MainLayout'
-import { 
-    Zap, 
-    TrendingUp, 
-    TrendingDown, 
-    DollarSign, 
+import {
+    Zap,
+    TrendingUp,
+    TrendingDown,
+    DollarSign,
     Activity,
     Settings,
     Play,
@@ -57,19 +57,29 @@ export default function ActiveTraderPage() {
     const [positions, setPositions] = useState<Position[]>([])
     const [balance, setBalance] = useState<AccountBalance | null>(null)
     const [liveStrategies, setLiveStrategies] = useState<LiveStrategy[]>([])
+    const [savedStrategies, setSavedStrategies] = useState<any[]>([])
+    const [showDeployModal, setShowDeployModal] = useState(false)
 
     useEffect(() => {
         checkSchwabConfig()
+        loadSavedStrategies()
     }, [])
+
+    const loadSavedStrategies = () => {
+        const saved = localStorage.getItem('strategies')
+        if (saved) {
+            setSavedStrategies(JSON.parse(saved))
+        }
+    }
 
     const checkSchwabConfig = async () => {
         try {
             const response = await fetch('/api/user/schwab-config')
             const data = await response.json()
-            
+
             if (data.success && data.config) {
                 setHasCredentials(data.config.hasClientId && data.config.hasClientSecret)
-                
+
                 // Check if we have tokens
                 if (data.config.hasAccessToken && data.config.hasRefreshToken) {
                     setConnected(true)
@@ -116,14 +126,14 @@ export default function ActiveTraderPage() {
                     })
 
                     const tokenData = await tokenResponse.json()
-                    
+
                     if (tokenData.success) {
                         setConnected(true)
                         await fetchAccounts()
                     } else {
                         alert(tokenData.error || 'Failed to authenticate')
                     }
-                    
+
                     window.removeEventListener('message', handleCallback)
                     setConnecting(false)
                 }
@@ -141,7 +151,7 @@ export default function ActiveTraderPage() {
         try {
             const response = await fetch('/api/schwab/accounts')
             const data = await response.json()
-            
+
             if (data.success && data.accounts.length > 0) {
                 setAccountId(data.accounts[0].securitiesAccount.accountId)
             }
@@ -156,7 +166,7 @@ export default function ActiveTraderPage() {
         try {
             const response = await fetch(`/api/schwab/positions?accountId=${accountId}`)
             const data = await response.json()
-            
+
             if (data.success) {
                 setPositions(data.positions)
                 setBalance(data.balance)
@@ -224,7 +234,7 @@ export default function ActiveTraderPage() {
                         <h1 className="text-white font-semibold text-lg">Active Trader</h1>
                         <span className="text-xs text-gray-400">Live Trading with Schwab API</span>
                     </div>
-                    
+
                     <div className="flex items-center gap-4">
                         {connected ? (
                             <>
@@ -277,7 +287,7 @@ export default function ActiveTraderPage() {
                                 <LinkIcon className="w-5 h-5" />
                                 {connecting ? 'Connecting...' : 'Connect Schwab Account'}
                             </button>
-                            
+
                             <div className="mt-8 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
                                 <div className="flex items-start gap-3">
                                     <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
@@ -396,8 +406,11 @@ export default function ActiveTraderPage() {
                             <div className="bg-[#1E222D] border border-[#2A2E39] rounded-lg">
                                 <div className="p-4 border-b border-[#2A2E39] flex items-center justify-between">
                                     <h3 className="text-white font-semibold">Live Strategies</h3>
-                                    <button className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded transition-colors">
-                                        + New Strategy
+                                    <button
+                                        onClick={() => setShowDeployModal(true)}
+                                        className="px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-sm rounded transition-colors"
+                                    >
+                                        + Deploy Strategy
                                     </button>
                                 </div>
                                 <div className="p-4">
@@ -450,6 +463,66 @@ export default function ActiveTraderPage() {
                                         </div>
                                     )}
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Strategy Deployment Modal */}
+                {showDeployModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-[#1E222D] border border-[#2A2E39] rounded-xl p-6 w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-200">
+                            <h3 className="text-xl font-bold text-white mb-2">Deploy Live Strategy</h3>
+                            <p className="text-gray-400 text-sm mb-6">Select one of your saved strategies to execute live through Schwab.</p>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[400px] overflow-auto mb-6 pr-2 custom-scrollbar">
+                                {savedStrategies.length === 0 ? (
+                                    <div className="col-span-2 py-10 text-center border-2 border-dashed border-[#2A2E39] rounded-lg">
+                                        <p className="text-gray-500 text-sm mb-4">No saved strategies found</p>
+                                        <button
+                                            onClick={() => router.push('/backtest')}
+                                            className="text-blue-500 hover:text-blue-400 text-sm font-medium"
+                                        >
+                                            Go to Backtest to create one →
+                                        </button>
+                                    </div>
+                                ) : (
+                                    savedStrategies.map(strat => (
+                                        <div
+                                            key={strat.id}
+                                            className="p-4 bg-[#131722] border border-[#2A2E39] rounded-lg hover:border-blue-500/50 transition-all cursor-pointer group"
+                                            onClick={() => {
+                                                alert(`Deployment of "${strat.name}" is coming in Milestone B. Verifying connection...`)
+                                                setShowDeployModal(false)
+                                            }}
+                                        >
+                                            <div className="flex justify-between items-start mb-2">
+                                                <h4 className="text-white font-semibold group-hover:text-blue-400 transition-colors">{strat.name}</h4>
+                                                <span className="px-2 py-0.5 bg-blue-500/10 text-blue-500 text-[10px] font-bold rounded uppercase">{strat.symbol}</span>
+                                            </div>
+                                            <p className="text-gray-500 text-xs line-clamp-2 mb-3">{strat.description || 'No description provided.'}</p>
+                                            <div className="flex items-center gap-3 text-[10px] text-gray-500 border-t border-[#2A2E39] pt-3">
+                                                <span>TF: {strat.timeframe}</span>
+                                                <span>Modified: {new Date(strat.updatedAt).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setShowDeployModal(false)}
+                                    className="flex-1 py-3 border border-[#2A2E39] text-white rounded-lg hover:bg-white/5 transition-colors font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    disabled={savedStrategies.length === 0}
+                                    className="flex-1 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium disabled:opacity-50"
+                                >
+                                    Deploy to Live
+                                </button>
                             </div>
                         </div>
                     </div>

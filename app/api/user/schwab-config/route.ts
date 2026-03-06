@@ -72,20 +72,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Upsert Schwab config
-    const schwabConfig = await prisma.schwabConfig.upsert({
-      where: { userId: user.id },
-      update: {
-        clientId,
-        clientSecret,
-        updatedAt: new Date(),
-      },
-      create: {
-        userId: user.id,
-        clientId,
-        clientSecret,
-      }
+    // Check if config exists
+    const existingConfig = await prisma.schwabConfig.findUnique({
+      where: { userId: user.id }
     })
+
+    let schwabConfig
+    if (existingConfig) {
+      // Update existing
+      schwabConfig = await prisma.schwabConfig.update({
+        where: { userId: user.id },
+        data: {
+          clientId,
+          clientSecret,
+          updatedAt: new Date(),
+        }
+      })
+    } else {
+      // Create new
+      schwabConfig = await prisma.schwabConfig.create({
+        data: {
+          userId: user.id,
+          clientId,
+          clientSecret,
+        }
+      })
+    }
 
     return NextResponse.json({
       success: true,

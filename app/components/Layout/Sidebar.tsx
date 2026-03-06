@@ -12,7 +12,8 @@ import {
     List,
     ChevronLeft,
     ChevronRight,
-    Zap
+    Zap,
+    BookOpen
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -23,6 +24,7 @@ const menuItems = [
     { icon: Activity, label: 'Screener', href: '/screener' },
     { icon: BarChart3, label: 'Backtest', href: '/backtest' },
     { icon: Zap, label: 'Active Trader', href: '/active-trader' },
+    { icon: BookOpen, label: 'Learn', href: '/learn' },
     { icon: Clock, label: 'History', href: '/history' },
     { icon: Star, label: 'Watchlist', href: '/watchlist' },
     { icon: List, label: 'Orders', href: '/orders' },
