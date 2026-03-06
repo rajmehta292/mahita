@@ -124,6 +124,24 @@ if (ema_fast < ema_slow || rsi > 70) {
         }
     }
 
+    const verifyScript = async () => {
+        setLoading(true)
+        try {
+            const json = await safeFetchJson('/api/trading/compile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ script })
+            })
+            if (json && json.success) {
+                alert("✅ Script verified successfully!")
+            }
+        } catch (e) {
+            // Error handling is inside safeFetchJson
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const runBacktest = async () => {
         setLoading(true)
         try {
@@ -216,6 +234,13 @@ if (ema_fast < ema_slow || rsi > 70) {
                     <h1 className="text-2xl font-bold tracking-wider text-accent">MAHITA <span className="text-white">TERMINAL</span></h1>
                 </div>
                 <div className="flex items-center gap-4">
+                    <a
+                        href="/data-health"
+                        className="text-xs px-3 py-1 bg-white/5 rounded-full border border-white/10 hover:bg-white/10 transition-colors flex items-center gap-2"
+                    >
+                        <Activity className="w-3 h-3 text-success" />
+                        Data Health
+                    </a>
                     <div className="text-sm px-3 py-1 bg-white/5 rounded-full border border-white/10">Connected to Mock Broker</div>
                 </div>
             </header>
@@ -241,20 +266,32 @@ if (ema_fast < ema_slow || rsi > 70) {
 
                         <div className="flex flex-col gap-2">
                             <label className="text-xs text-gray-400 uppercase tracking-wider">Timeframe</label>
-                            <div className="flex gap-2">
-                                {['1d', '1w', '1m'].map((tf) => (
-                                    <button
-                                        key={tf}
-                                        onClick={() => setSelectedTimeframe(tf)}
-                                        className={`flex-1 py-1 rounded text-xs font-bold border transition-all ${selectedTimeframe === tf
-                                            ? 'bg-primary border-primary text-white'
-                                            : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
-                                            }`}
-                                    >
-                                        {tf.toUpperCase()}
-                                    </button>
-                                ))}
-                            </div>
+                            <select
+                                value={selectedTimeframe}
+                                onChange={(e) => setSelectedTimeframe(e.target.value)}
+                                className="glass-panel px-3 py-2 text-white bg-black/40 border border-white/10 outline-none focus:border-primary transition-colors"
+                            >
+                                <optgroup label="Minutes" className="bg-[#0d0e12]">
+                                    <option value="1m">1 minute</option>
+                                    <option value="3m">3 minutes</option>
+                                    <option value="5m">5 minutes</option>
+                                    <option value="10m">10 minutes</option>
+                                    <option value="15m">15 minutes</option>
+                                    <option value="30m">30 minutes</option>
+                                    <option value="45m">45 minutes</option>
+                                </optgroup>
+                                <optgroup label="Hours" className="bg-[#0d0e12]">
+                                    <option value="1h">1 hour</option>
+                                    <option value="2h">2 hours</option>
+                                    <option value="3h">3 hours</option>
+                                    <option value="4h">4 hours</option>
+                                </optgroup>
+                                <optgroup label="Days" className="bg-[#0d0e12]">
+                                    <option value="1d">1 day</option>
+                                    <option value="1w">1 week</option>
+                                    <option value="1M">1 month</option>
+                                </optgroup>
+                            </select>
                         </div>
 
                         <div className="flex flex-col gap-2">
@@ -347,17 +384,30 @@ if (ema_fast < ema_slow || rsi > 70) {
                                 </div>
                             </div>
 
-                            <button
-                                onClick={runBacktest}
-                                disabled={loading || data.length === 0}
-                                className={`w-full py-4 rounded-xl font-bold text-sm tracking-widest uppercase transition-all duration-300 flex items-center justify-center space-x-2 ${loading || data.length === 0
-                                    ? 'bg-white/5 text-white/20 cursor-not-allowed'
-                                    : 'bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white shadow-lg shadow-indigo-500/20'
-                                    }`}
-                            >
-                                <Play className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                                <span>{loading ? 'Running Engine...' : 'Add to Chart'}</span>
-                            </button>
+                            <div className="grid grid-cols-2 gap-4">
+                                <button
+                                    onClick={verifyScript}
+                                    disabled={loading}
+                                    className={`py-4 rounded-xl font-bold text-sm tracking-widest uppercase transition-all duration-300 flex items-center justify-center space-x-2 border border-white/10 ${loading
+                                        ? 'bg-white/5 text-white/20 cursor-not-allowed'
+                                        : 'bg-white/5 text-white hover:bg-white/10'
+                                        }`}
+                                >
+                                    <Target className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                                    <span>Verify</span>
+                                </button>
+                                <button
+                                    onClick={runBacktest}
+                                    disabled={loading || data.length === 0}
+                                    className={`py-4 rounded-xl font-bold text-sm tracking-widest uppercase transition-all duration-300 flex items-center justify-center space-x-2 ${loading || data.length === 0
+                                        ? 'bg-white/5 text-white/20 cursor-not-allowed'
+                                        : 'bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white shadow-lg shadow-indigo-500/20'
+                                        }`}
+                                >
+                                    <Play className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                                    <span>{loading ? 'Running...' : 'Run'}</span>
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

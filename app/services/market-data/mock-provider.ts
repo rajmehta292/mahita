@@ -6,10 +6,19 @@ export class MockDataProvider implements IDataProvider {
 
         // Determine step based on timeframe
         let stepMs = 60000 // 1m
+        if (timeframe === '3m') stepMs = 180000
         if (timeframe === '5m') stepMs = 300000
+        if (timeframe === '10m') stepMs = 600000
         if (timeframe === '15m') stepMs = 900000
+        if (timeframe === '30m') stepMs = 1800000
+        if (timeframe === '45m') stepMs = 2700000
         if (timeframe === '1h') stepMs = 3600000
+        if (timeframe === '2h') stepMs = 7200000
+        if (timeframe === '3h') stepMs = 10800000
+        if (timeframe === '4h') stepMs = 14400000
         if (timeframe === '1d') stepMs = 86400000
+        if (timeframe === '1w') stepMs = 604800000
+        if (timeframe === '1M') stepMs = 2592000000 // Approx 30 days
 
         const data: MarketDataPoint[] = []
         let currentPrice = 150.0 // Starting dummy price
