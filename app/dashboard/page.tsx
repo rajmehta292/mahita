@@ -15,6 +15,8 @@ export default function Dashboard() {
     const [inventory, setInventory] = useState<any[]>([])
     const [selectedSymbol, setSelectedSymbol] = useState("AAPL")
     const [selectedTimeframe, setSelectedTimeframe] = useState("1d")
+    const [chartType, setChartType] = useState<'Standard' | 'HeikinAshi'>('Standard')
+    const [activeIndicators, setActiveIndicators] = useState<string[]>(['Volume', 'MACD'])
 
     // Fetch Inventory and initial Market Data
     useEffect(() => {
@@ -161,6 +163,44 @@ export default function Dashboard() {
                                 ))}
                             </div>
                         </div>
+
+                        <div className="flex flex-col gap-2">
+                            <label className="text-xs text-gray-400 uppercase tracking-wider">Chart View</label>
+                            <div className="flex gap-2">
+                                {['Standard', 'HeikinAshi'].map((type) => (
+                                    <button
+                                        key={type}
+                                        onClick={() => setChartType(type as any)}
+                                        className={`flex-1 py-1 rounded text-[10px] font-bold border transition-all ${chartType === type
+                                            ? 'bg-accent border-accent text-white'
+                                            : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                                            }`}
+                                    >
+                                        {type === 'Standard' ? 'CANDLES' : 'HEIKIN ASHI'}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-2 border-t border-white/5 pt-4">
+                            <label className="text-xs text-gray-400 uppercase tracking-wider">Indicators</label>
+                            <div className="flex flex-wrap gap-2">
+                                {['Volume', 'MACD'].map((ind) => (
+                                    <button
+                                        key={ind}
+                                        onClick={() => setActiveIndicators(prev =>
+                                            prev.includes(ind) ? prev.filter(i => i !== ind) : [...prev, ind]
+                                        )}
+                                        className={`px-3 py-1 rounded text-[10px] font-bold border transition-all ${activeIndicators.includes(ind)
+                                            ? 'bg-success/20 border-success text-success'
+                                            : 'bg-white/5 border-white/10 text-gray-400'
+                                            }`}
+                                    >
+                                        {ind}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     <div className="glass-panel p-5 flex flex-col gap-4 flex-1 overflow-hidden">
@@ -223,7 +263,12 @@ export default function Dashboard() {
                                 Run backtest to visualize historical execution
                             </div>
                         ) : (
-                            <Chart data={data} trades={results?.trades} />
+                            <Chart
+                                data={data}
+                                trades={results?.trades}
+                                chartType={chartType}
+                                indicators={activeIndicators}
+                            />
                         )}
                     </div>
 

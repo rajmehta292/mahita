@@ -37,3 +37,6 @@ graph TD
 *   **MarketDataStore**: Proxy caching service handling all external ticker HTTP REST requests and WebSockets.
 *   **TradingEngine**: Evaluates JSON-structured logic ASTs to issue synchronous buy/sell events.
 *   **BrokerageProvider**: Interface standard allowing the engine to seamlessly switch between Paper/Mock and Schwab/Live accounts.
+*   **AnalyticsLayer**: Client-side computation engine for technical indicators (MACD, RSI) and alternative price representations (Heikin-Ashi).
+*   **ChartSynchronizer**: Coordinated orchestration of multiple `lightweight-charts` instances for synced oscillator/price panels.
+
