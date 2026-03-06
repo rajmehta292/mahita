@@ -255,11 +255,11 @@ export default function Chart({
     }, [data, trades, chartType, macdParams])
 
     return (
-        <div className="flex flex-col w-full min-h-[650px]">
-            <div ref={mainContainerRef} className="w-full h-full flex-grow min-h-[400px]" />
+        <div className="flex flex-col w-full h-full min-h-[400px] lg:min-h-[600px]">
+            <div ref={mainContainerRef} className="w-full flex-grow relative" style={{ minHeight: '300px' }} />
             <div
                 ref={oscillatorContainerRef}
-                className={`w-full overflow-hidden transition-all duration-300 ${indicators.includes('MACD') ? 'h-[200px] mt-6' : 'h-0'}`}
+                className={`w-full overflow-hidden transition-all duration-300 ${indicators.includes('MACD') ? 'h-[180px] mt-4' : 'h-0'}`}
                 style={{ borderTop: indicators.includes('MACD') ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
             />
         </div>

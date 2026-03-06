@@ -23,8 +23,9 @@ export interface StrategyAST {
     name: string
     asset: string
     timeframe: string
+    script?: string // Optional Pine-like JS script
     riskManagement: RiskManagement
-    entryConditions: ConditionSet
+    entryConditions?: ConditionSet
     exitConditions?: ConditionSet
 }
 
@@ -40,15 +41,26 @@ export interface CompletedTrade {
     exitPrice: number
     quantity: number
     pnl: number
+    pnlPercent: number
+    durationBars: number
+}
+
+export interface EquityPoint {
+    time: number
+    value: number
 }
 
 export interface BacktestResult {
     trades: CompletedTrade[]
+    equityCurve: EquityPoint[]
     metrics: {
         netProfit: number
+        netProfitPercent: number
         winRate: number
         totalTrades: number
         maxDrawdown: number
         profitFactor: number
+        sharpeRatio: number
+        benchmarkReturnPercent: number
     }
 }

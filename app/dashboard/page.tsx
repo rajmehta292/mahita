@@ -1,14 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { useSession, signIn } from 'next-auth/react'
 import dynamic from 'next/dynamic'
 import { StrategyAST, BacktestResult } from '../services/trading-engine/types'
 import { MarketDataPoint } from '../services/market-data/types'
+import StrategyTester from '../components/StrategyTester'
+import { LayoutGrid, TrendingUp, History, Activity, Settings, Sliders, Play, Plus, Trash2, ShieldCheck, Target } from 'lucide-react'
 
-// Dynamic import for Chart because lightweight-charts uses browser/window APIs
+// Dynamic imports for Chart and Editor
 const Chart = dynamic(() => import('../components/Chart'), { ssr: false })
+const Editor = dynamic(() => import('@monaco-editor/react'), { ssr: false })
 
 export default function Dashboard() {
+    const { data: session, status } = useSession()
     const [loading, setLoading] = useState(false)
     const [data, setData] = useState<MarketDataPoint[]>([])
     const [results, setResults] = useState<BacktestResult | null>(null)
@@ -18,48 +23,103 @@ export default function Dashboard() {
     const [chartType, setChartType] = useState<'Standard' | 'HeikinAshi'>('Standard')
     const [activeIndicators, setActiveIndicators] = useState<string[]>(['Volume', 'MACD'])
 
-    // Fetch Inventory and initial Market Data
-    useEffect(() => {
-        const fetchInventory = async () => {
-            const res = await fetch('/api/trading/inventory')
-            if (res.ok) {
-                const json = await res.json()
-                setInventory(json)
+    // Strategy Parameters
+    const [stopLoss, setStopLoss] = useState(2.0)
+    const [takeProfit, setTakeProfit] = useState(5.0)
+    const [script, setScript] = useState(`// Professional Scalping Strategy
+// @version=1
+
+const ema_fast = ta.ema(9)
+const ema_slow = ta.ema(21)
+const rsi = ta.rsi(14)
+
+// Entry Conditions
+if (ema_fast > ema_slow && rsi < 70) {
+    strategy.entry("Long", "long")
+}
+
+// Exit Logic
+if (ema_fast < ema_slow || rsi > 70) {
+    strategy.entry("Short", "short")
+}
+`)
+
+    const safeFetchJson = useCallback(async (url: string, options?: RequestInit) => {
+        try {
+            const res = await fetch(url, options)
+
+            // Handle redirects (NextAuth middleware often redirects to signin)
+            if (res.redirected) {
+                window.location.href = res.url
+                return null
             }
+
+            if (!res.ok) {
+                const text = await res.text()
+                // Check if it's HTML (likely a 404 or error page)
+                if (text.trim().startsWith('<!DOCTYPE') || text.trim().startsWith('<html')) {
+                    throw new Error(`Server returned HTML instead of JSON (Status ${res.status}).`)
+                }
+                const errorData = JSON.parse(text)
+                throw new Error(errorData.error || `Request failed with status ${res.status}`)
+            }
+
+            const contentType = res.headers.get('content-type')
+            if (!contentType || !contentType.includes('application/json')) {
+                throw new Error('Server did not return a JSON response.')
+            }
+
+            return await res.json()
+        } catch (error: any) {
+            console.error(`[API Error] ${url}:`, error)
+            alert(`API Error: ${error.message}`)
+            return null
         }
-        fetchInventory()
     }, [])
 
+    // Fetch Inventory and initial Market Data
     useEffect(() => {
+        if (status !== 'authenticated') return
+
+        const fetchInventory = async () => {
+            const json = await safeFetchJson('/api/trading/inventory')
+            if (json) setInventory(json)
+        }
+        fetchInventory()
+    }, [status, safeFetchJson])
+
+    useEffect(() => {
+        if (status !== 'authenticated' || !selectedSymbol) return
+
         const fetchMarketData = async () => {
-            if (!selectedSymbol) return
-            const res = await fetch(`/api/trading/market-data?symbol=${selectedSymbol}&timeframe=${selectedTimeframe}`)
-            if (res.ok) {
-                const json = await res.json()
-                setData(json)
-            }
+            const json = await safeFetchJson(`/api/trading/market-data?symbol=${selectedSymbol}&timeframe=${selectedTimeframe}`)
+            if (json) setData(json)
         }
         fetchMarketData()
-    }, [selectedSymbol, selectedTimeframe])
+    }, [selectedSymbol, selectedTimeframe, status, safeFetchJson])
 
     // Dummy Strategy for MVP 
     // In a full build, this comes from the StrategyBuilder component
     const defaultStrategy: StrategyAST = {
         id: "test-1",
         name: "RSI Oversold Bounce",
-        asset: "AAPL",
-        timeframe: "1d",
-        riskManagement: { positionSizingPercent: 100 },
+        asset: selectedSymbol,
+        timeframe: selectedTimeframe,
+        riskManagement: {
+            positionSizingPercent: 100,
+            stopLossPercent: stopLoss,
+            takeProfitPercent: takeProfit
+        },
         entryConditions: {
             logic: 'AND',
             rules: [
-                { indicator: 'RSI', parameter: 14, operator: '<', value: 30 }
+                { indicator: 'RSI', parameter: 14, operator: 'crosses_below', value: 30 }
             ]
         },
         exitConditions: {
-            logic: 'OR',
+            logic: 'AND',
             rules: [
-                { indicator: 'RSI', parameter: 14, operator: '>', value: 60 }
+                { indicator: 'RSI', parameter: 14, operator: 'crosses_above', value: 70 }
             ]
         }
     }
@@ -75,14 +135,21 @@ export default function Dashboard() {
             const startTime = data[0].time as number
             const endTime = data[data.length - 1].time as number
 
-            const res = await fetch('/api/trading/backtest', {
+            const json = await safeFetchJson('/api/trading/backtest', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     strategy: {
-                        ...defaultStrategy,
+                        id: "script-1",
+                        name: "Custom Script Strategy",
                         asset: selectedSymbol,
-                        timeframe: selectedTimeframe
+                        timeframe: selectedTimeframe,
+                        script: script,
+                        riskManagement: {
+                            positionSizingPercent: 100,
+                            stopLossPercent: stopLoss,
+                            takeProfitPercent: takeProfit
+                        }
                     },
                     startTime,
                     endTime,
@@ -90,11 +157,8 @@ export default function Dashboard() {
                 })
             })
 
-            const json = await res.json()
-            if (res.ok) {
+            if (json) {
                 setResults(json)
-            } else {
-                alert("Error: " + json.error)
             }
 
         } catch (e) {
@@ -114,8 +178,37 @@ export default function Dashboard() {
         return arr
     }
 
+    if (status === 'loading') {
+        return (
+            <div className="min-h-screen bg-[#0d0e12] flex items-center justify-center p-6">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="w-12 h-12 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+                    <p className="text-white/40 text-sm font-medium animate-pulse uppercase tracking-widest">Warming Engine...</p>
+                </div>
+            </div>
+        )
+    }
+
+    if (status === 'unauthenticated') {
+        return (
+            <div className="min-h-screen bg-[#0d0e12] flex items-center justify-center p-6 text-center">
+                <div className="glass-panel p-12 max-w-sm">
+                    <History className="w-12 h-12 text-white/10 mx-auto mb-6" />
+                    <h2 className="text-2xl font-bold text-white mb-4">Session Required</h2>
+                    <p className="text-white/40 text-sm mb-8">Your session has expired or you are not authorized to view this terminal.</p>
+                    <button
+                        onClick={() => signIn()}
+                        className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-white/90 transition-all"
+                    >
+                        Sign In to Mahita
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
     return (
-        <div className="p-6 h-screen flex flex-col gap-6">
+        <div className="min-h-screen bg-[#0d0e12] text-white p-4 md:p-6 flex flex-col gap-6">
 
             <header className="flex justify-between items-center pb-4 border-b border-white/10">
                 <div className="flex items-center gap-3">
@@ -127,8 +220,8 @@ export default function Dashboard() {
                 </div>
             </header>
 
-            <div className="flex gap-6 h-full min-h-0">
-                <div className="w-1/4 flex flex-col gap-6 overflow-hidden">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
+                <div className="lg:col-span-1 flex flex-col gap-6 overflow-visible lg:overflow-hidden">
                     <div className="glass-panel p-5 flex flex-col gap-4">
                         <h2 className="text-lg font-semibold text-white">Market Data</h2>
 
@@ -203,61 +296,75 @@ export default function Dashboard() {
                         </div>
                     </div>
 
-                    <div className="glass-panel p-5 flex flex-col gap-4 flex-1 overflow-hidden">
-                        <h2 className="text-lg font-semibold text-white">Strategy Engine</h2>
-
-                        <div className="flex flex-col gap-1 text-sm bg-black/20 p-3 rounded border border-white/5">
-                            <div className="flex justify-between">
-                                <span className="text-gray-400">Name:</span>
-                                <span className="text-white">{defaultStrategy.name}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-gray-400">Rules:</span>
-                                <span className="text-white">RSI(14) &lt; 30</span>
+                    <div className="glass-panel p-0 flex flex-col flex-1 overflow-hidden min-h-[500px]">
+                        <div className="p-5 border-b border-white/5 flex justify-between items-center bg-white/5">
+                            <h2 className="text-lg font-semibold text-white">Pine Editor</h2>
+                            <div className="flex items-center gap-2">
+                                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                                <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">v1.0</span>
                             </div>
                         </div>
 
-                        <button
-                            onClick={runBacktest}
-                            disabled={loading || data.length === 0}
-                            className="w-full py-3 bg-primary hover:bg-primary-hover text-white font-bold rounded shadow-lg transition-colors cursor-pointer disabled:opacity-30 flex items-center justify-center gap-2"
-                        >
-                            {loading ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                                    Running...
-                                </>
-                            ) : 'Run Backtest'}
-                        </button>
+                        <div className="flex-1 min-h-0">
+                            <Editor
+                                height="100%"
+                                defaultLanguage="javascript"
+                                theme="vs-dark"
+                                value={script}
+                                onChange={(value) => setScript(value || '')}
+                                options={{
+                                    minimap: { enabled: false },
+                                    fontSize: 12,
+                                    lineNumbers: 'on',
+                                    roundedSelection: false,
+                                    scrollBeyondLastLine: false,
+                                    readOnly: false,
+                                    automaticLayout: true,
+                                    padding: { top: 20 }
+                                }}
+                            />
+                        </div>
+
+                        <div className="p-5 bg-black/40 border-t border-white/5">
+                            <div className="grid grid-cols-2 gap-4 mb-6">
+                                <div>
+                                    <label className="text-[10px] text-white/40 uppercase mb-1.5 block">Stop Loss %</label>
+                                    <input
+                                        type="number"
+                                        value={stopLoss}
+                                        onChange={(e) => setStopLoss(parseFloat(e.target.value))}
+                                        className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] text-white/40 uppercase mb-1.5 block">Take Profit %</label>
+                                    <input
+                                        type="number"
+                                        value={takeProfit}
+                                        onChange={(e) => setTakeProfit(parseFloat(e.target.value))}
+                                        className="w-full bg-black/40 border border-white/5 rounded-xl px-4 py-2 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={runBacktest}
+                                disabled={loading || data.length === 0}
+                                className={`w-full py-4 rounded-xl font-bold text-sm tracking-widest uppercase transition-all duration-300 flex items-center justify-center space-x-2 ${loading || data.length === 0
+                                    ? 'bg-white/5 text-white/20 cursor-not-allowed'
+                                    : 'bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white shadow-lg shadow-indigo-500/20'
+                                    }`}
+                            >
+                                <Play className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                                <span>{loading ? 'Running Engine...' : 'Add to Chart'}</span>
+                            </button>
+                        </div>
                     </div>
-
-                    {/* Metrics Panel */}
-                    {results && (
-                        <div className="mt-4 flex flex-col gap-4">
-                            <div className="p-4 bg-black/30 rounded border border-white/5 flex flex-col items-center">
-                                <span className="text-xs text-gray-400 uppercase">Net Profit</span>
-                                <span className={`text-2xl font-bold ${results.metrics.netProfit >= 0 ? 'text-success' : 'text-danger'}`}>
-                                    ${results.metrics.netProfit.toFixed(2)}
-                                </span>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="p-3 bg-black/30 rounded text-center">
-                                    <div className="text-[10px] text-gray-400 uppercase">Win Rate</div>
-                                    <div className="text-lg font-bold">{results.metrics.winRate.toFixed(1)}%</div>
-                                </div>
-                                <div className="p-3 bg-black/30 rounded text-center">
-                                    <div className="text-[10px] text-gray-400 uppercase">Max DD</div>
-                                    <div className="text-lg font-bold text-danger">{results.metrics.maxDrawdown.toFixed(2)}%</div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                 </div>
 
-                {/* Main Chart Area */}
-                <div className="w-3/4 flex flex-col gap-6">
-                    <div className="glass-panel p-1 min-h-[700px] overflow-hidden relative">
+                {/* Main Content Area */}
+                <div className="lg:col-span-3 flex flex-col gap-6">
+                    <div className="glass-panel p-1 min-h-[400px] lg:min-h-[600px] flex-grow overflow-hidden relative">
                         {data.length === 0 ? (
                             <div className="absolute inset-0 flex items-center justify-center text-gray-500">
                                 Run backtest to visualize historical execution
@@ -272,36 +379,18 @@ export default function Dashboard() {
                         )}
                     </div>
 
-                    {/* Trades Grid View */}
-                    <div className="glass-panel h-1/3 p-4 flex flex-col gap-2">
-                        <h3 className="text-sm font-semibold uppercase tracking-wider text-gray-400">Execution Log</h3>
-                        <div className="flex-1 overflow-y-auto w-full">
-                            {results?.trades.length === 0 && <div className="text-gray-500 text-sm">No trades generated.</div>}
-                            {results?.trades && results.trades.length > 0 && (
-                                <table className="w-full text-left text-sm text-gray-300">
-                                    <thead className="bg-white/5 border-b border-white/10">
-                                        <tr>
-                                            <th className="p-2">Side</th>
-                                            <th className="p-2">Entry Price</th>
-                                            <th className="p-2">Exit Price</th>
-                                            <th className="p-2">Quantity</th>
-                                            <th className="p-2">PnL</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {results.trades.map((t, i) => (
-                                            <tr key={i} className="border-b border-white/5 hover:bg-white/5">
-                                                <td className={`p-2 font-bold ${t.side === 'Long' ? 'text-success' : 'text-danger'}`}>{t.side}</td>
-                                                <td className="p-2">${t.entryPrice.toFixed(2)}</td>
-                                                <td className="p-2">{t.exitPrice ? `$${t.exitPrice.toFixed(2)}` : 'Open'}</td>
-                                                <td className="p-2">{t.quantity.toFixed(2)}</td>
-                                                <td className={`p-2 font-bold ${t.pnl >= 0 ? 'text-success' : 'text-danger'}`}>{t.pnl.toFixed(2)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            )}
-                        </div>
+                    {/* Professional Strategy Tester Area */}
+                    <div className="w-full">
+                        <StrategyTester results={results} />
+                        {!results && !loading && (
+                            <div className="mt-8 p-12 glass-panel border-dashed border-white/10 flex flex-col items-center justify-center text-center">
+                                <Activity className="w-12 h-12 text-white/10 mb-4" />
+                                <h3 className="text-lg font-medium text-white/40">No Simulation Data</h3>
+                                <p className="text-sm text-white/20 max-w-xs mt-2">
+                                    Configure your strategy and execute a backtest to view performance metrics and equity curves.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

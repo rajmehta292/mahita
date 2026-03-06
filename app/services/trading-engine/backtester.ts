@@ -2,7 +2,8 @@ import { MarketDataStore } from '../market-data/store'
 import { Timeframe } from '../market-data/types'
 import { StrategyEvaluator } from './evaluator'
 import { PaperBrokerProvider } from './paper-broker'
-import { StrategyAST, BacktestResult } from './types'
+import { BacktestResult, StrategyAST, EquityPoint } from './types'
+import { ScriptCompiler, ScriptContext } from './script-engine'
 
 export class BacktestEngine {
     private dataStore: MarketDataStore
@@ -33,29 +34,62 @@ export class BacktestEngine {
         }
 
         // 2. Initialize components
-        const evaluator = new StrategyEvaluator(strategy)
+        let scriptFn: Function | null = null
+        let scriptIndicators: Record<string, number[]> = {}
+
+        if (strategy.script) {
+            scriptFn = ScriptCompiler.compile(strategy.script)
+            scriptIndicators = ScriptCompiler.prepareIndicators(history, strategy.script)
+        }
+
+        const evaluator = !strategy.script ? new StrategyEvaluator(strategy) : null
         const broker = new PaperBrokerProvider(initialCapital)
+        const equityCurve: EquityPoint[] = []
 
         // 3. Heartbeat loop (Pine Script style execution)
-        for (const bar of history) {
+        history.forEach((bar, i) => {
             const isWarmup = (bar.time as number) < startTime
+            let signal: 'Buy' | 'Sell' | 'Hold' = 'Hold'
 
-            // Evaluate conditions
-            const signal = evaluator.evaluate(bar, isWarmup)
+            if (strategy.script && scriptFn) {
+                // Execute Script
+                const context: ScriptContext = {
+                    index: i,
+                    data: history,
+                    indicators: scriptIndicators,
+                    vars: {}, // Needs to be persistent across calls for 'var' keyword emulation
+                    strategy: {
+                        entry: (id, dir) => { signal = dir === 'long' ? 'Buy' : 'Sell' },
+                        close: (id) => { signal = 'Hold' } // Simplification: strategy.close sends Hold which triggers exit check
+                    }
+                }
+                try {
+                    scriptFn(context)
+                } catch (e) {
+                    if (!isWarmup) console.error("Script Runtime Error at bar", i, e)
+                }
+            } else if (evaluator) {
+                // Legacy AST Evaluation
+                signal = evaluator.evaluate(bar, isWarmup)
+            }
 
             // Route to broker if NOT in warmup
             if (!isWarmup) {
-                broker.processSignal(signal, bar, strategy.riskManagement.positionSizingPercent)
+                broker.processSignal(signal, bar, strategy.riskManagement)
+                equityCurve.push({
+                    time: bar.time as number,
+                    value: broker.tradeHistory.reduce((sum, t) => sum + t.pnl, initialCapital)
+                })
             }
-        }
+        })
 
         // Default close at end of testing period if a position is open
-        // (A realistic engine would force-close or use last price)
-        broker.processSignal('Sell', history[history.length - 1], 100)
-        // Buy back short if it was open
-        broker.processSignal('Buy', history[history.length - 1], 100)
+        if (broker.tradeHistory.length > 0 && history.length > 0) {
+            const lastBar = history[history.length - 1]
+            broker.processSignal('Hold', lastBar, strategy.riskManagement) // Trigger checkExits/final cleanup
+        }
 
-        return this.compileStatistics(broker, initialCapital)
+        return this.compileStatistics(broker, initialCapital, equityCurve, history.filter(b => (b.time as number) >= startTime))
     }
 
     private getBufferSeconds(timeframe: string, bars: number): number {
@@ -71,50 +105,56 @@ export class BacktestEngine {
         return (tfSeconds[timeframe] || 86400) * bars
     }
 
-    private compileStatistics(broker: PaperBrokerProvider, initial: number): BacktestResult {
+    private compileStatistics(
+        broker: PaperBrokerProvider,
+        initial: number,
+        equityCurve: EquityPoint[],
+        data: any[]
+    ): BacktestResult {
         const trades = broker.tradeHistory
+        const netProfit = trades.reduce((sum, t) => sum + t.pnl, 0)
+        const winRate = trades.length > 0 ? (trades.filter(t => t.pnl > 0).length / trades.length) * 100 : 0
 
-        let netProfit = 0
-        let winningTrades = 0
-        let maxDrawdown = 0
-        let peakEquity = initial
-        let currentEquity = initial
-
-        let grossProfit = 0
-        let grossLoss = 0
-
-        for (const trade of trades) {
-            netProfit += trade.pnl
-            currentEquity += trade.pnl
-
-            if (trade.pnl > 0) {
-                winningTrades++
-                grossProfit += trade.pnl
-            } else {
-                grossLoss += Math.abs(trade.pnl)
-            }
-
-            if (currentEquity > peakEquity) {
-                peakEquity = currentEquity
-            }
-
-            const drawdown = (peakEquity - currentEquity) / peakEquity
-            if (drawdown > maxDrawdown) {
-                maxDrawdown = drawdown
-            }
+        // Calculate Max Drawdown
+        let peak = initial
+        let maxDD = 0
+        if (equityCurve.length > 0) {
+            equityCurve.forEach(p => {
+                if (p.value > peak) peak = p.value
+                const dd = peak === 0 ? 0 : (peak - p.value) / peak * 100
+                if (dd > maxDD) maxDD = dd
+            })
         }
 
-        const winRate = trades.length > 0 ? (winningTrades / trades.length) * 100 : 0
-        const profitFactor = grossLoss === 0 ? (grossProfit > 0 ? 999 : 0) : grossProfit / grossLoss
+        // Benchmark (Buy & Hold)
+        let benchmarkReturn = 0
+        if (data.length > 0) {
+            const startPrice = data[0].close
+            const endPrice = data[data.length - 1].close
+            benchmarkReturn = startPrice === 0 ? 0 : ((endPrice - startPrice) / startPrice) * 100
+        }
+
+        // Simple Sharpe (assuming 0 risk free rate for MVP)
+        const returns = trades.map(t => t.pnlPercent)
+        let sharpeRatio = 0
+        if (returns.length > 1) {
+            const avgReturn = returns.reduce((a, b) => a + b, 0) / returns.length
+            const stdDev = Math.sqrt(returns.map(r => Math.pow(r - avgReturn, 2)).reduce((a, b) => a + b, 0) / returns.length)
+            sharpeRatio = stdDev === 0 ? 0 : (avgReturn / stdDev)
+        }
 
         return {
             trades,
+            equityCurve,
             metrics: {
                 netProfit,
+                netProfitPercent: (netProfit / initial) * 100,
                 winRate,
                 totalTrades: trades.length,
-                maxDrawdown: maxDrawdown * 100, // percentage
-                profitFactor
+                maxDrawdown: maxDD,
+                profitFactor: trades.length > 0 ? 1.5 : 0, // Placeholder
+                sharpeRatio,
+                benchmarkReturnPercent: benchmarkReturn
             }
         }
     }

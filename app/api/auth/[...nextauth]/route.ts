@@ -16,8 +16,10 @@ export const authOptions: NextAuthOptions = {
     session: {
         strategy: "jwt",
     },
+    secret: process.env.NEXTAUTH_SECRET,
     callbacks: {
         async signIn({ user }) {
+            console.log(`SignIn attempt: email=${user.email}, allowed=${ALLOWED_EMAIL}`)
             if (!ALLOWED_EMAIL || user.email !== ALLOWED_EMAIL) {
                 console.warn(`Unauthorized login attempt by: ${user.email}`)
                 return false
@@ -36,6 +38,10 @@ export const authOptions: NextAuthOptions = {
             }
             return session
         }
+    },
+    pages: {
+        signIn: '/auth/signin',
+        error: '/auth/error',
     }
 }
 

@@ -1,0 +1,46 @@
+# Backtesting Overhaul (Phase 13)
+
+Transform Mahita from a simple simulator into a professional-grade Quant Platform with scriptable strategies, high-performance charting, and institutional analytics.
+
+## 1. Professional IDE (Pine Editor Clone)
+### Feature: Script-to-AST
+Instead of manual JSON inputs, provide a **Monaco Editor** interface.
+- **Language**: Custom JavaScript-based DSL (e.g., `StrategyJS`) with financial primitives (`ta.rsi`, `strategy.entry`).
+- **Memory Model**: Implementation of a `Series` object that handles historical indexing (`close[1]`) natively.
+- **State Management**: Persist `var` variables across the historical bar loop.
+
+## 2. Event-Driven Matching Engine
+Transition from a simple "Condition Checker" to a true **Event Loop**.
+- **The Event Stack**:
+    - `DataEvent`: New OHLCV bar processed.
+    - `SignalEvent`: Script-generated intent (Market/Limit/Stop).
+    - `OrderEvent`: Brokerage intent.
+    - `FillEvent`: Execution confirmed based on bar High/Low/Open/Close assumptions.
+- **Intrabar Routing**: Implement the "Open-High-Low-Close" assumption for 1D candles to accurately handle SL/TP collisions within a single bar.
+
+## 3. High-Performance Multi-Pane Charting
+Extend the [Chart.tsx](file:///Users/rmehta01/Sites/mahita/app/components/Chart.tsx) component to support professional dashboard layouts.
+- **Pane Synchronization**: Orchestrate multiple `lightweight-charts` instances for synchronized crosshairs, time ranges, and scroll/zoom events.
+- **Indicator Sub-Panes**: Dedicated canvases for non-overlay indicators (MACD Histogram, RSI, Volume).
+- **Execution Overlays**: Render trade entry/exit markers (pips/arrows) and Stop-Loss/Take-Profit target lines.
+
+## 4. Institutional Strategy Report
+Enhance [StrategyTester.tsx](file:///Users/rmehta01/Sites/mahita/app/components/StrategyTester.tsx) into a performance nerve center.
+- **Advanced Metrics**: Win Rate, Profit Factor, Max Drawdown (MDD), Sharpe Ratio, Sortino Ratio.
+- **Visualization**:
+    - **Equity Curve**: Account balance vs. Benchmark (Buy & Hold).
+    - **Underwater Chart**: Visualizing the duration and depth of drawdowns.
+    - **Trade Histogram**: Distribution of wins and losses.
+- **Trade Ledger**: A virtualized list (for performance) showing every fill with execution timestamps and slippage costs.
+
+## Technical Stack Expansion
+- **Editor**: `@monaco-editor/react`
+- **Math**: `technicalindicators` + custom vectorized wrappers.
+- **Rendering**: Enhanced `lightweight-charts` orchestration.
+- **State**: Redux/Zustand for high-frequency engine-to-UI updates.
+
+## Roadmap
+1. [ ] **Milestone A**: Monaco Editor Integration & Theme.
+2. [ ] **Milestone B**: Event-Driven Engine Refactor (Brokerage Emulator).
+3. [ ] **Milestone C**: Sub-Pane Charting (MACD/RSI dedicated panels).
+4. [ ] **Milestone D**: Advanced Metrics & Underwater Charts.

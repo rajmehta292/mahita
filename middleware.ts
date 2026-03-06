@@ -11,6 +11,7 @@ export default withAuth({
 
 export const config = {
     matcher: [
+        "/dashboard",
         "/dashboard/:path*",
         "/api/trading/:path*"
     ]
