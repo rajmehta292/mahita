@@ -31,6 +31,36 @@ export default function Chart({ data, trades }: ChartProps) {
                 vertLines: { color: '#2B2B43' },
                 horzLines: { color: '#2B2B43' },
             },
+            crosshair: {
+                mode: 0, // Normal mode
+                vertLine: {
+                    width: 1,
+                    color: '#C3C2D4',
+                    style: 2, // Dashed
+                    labelBackgroundColor: '#26a69a',
+                },
+                horzLine: {
+                    width: 1,
+                    color: '#C3C2D4',
+                    style: 2, // Dashed
+                    labelBackgroundColor: '#26a69a',
+                },
+            },
+            handleScale: {
+                mouseWheel: true,
+                pinch: true,
+                axisPressedMouseMove: true,
+            },
+            handleScroll: {
+                mouseWheel: true,
+                pressedMouseMove: true,
+                horzTouchDrag: true,
+                vertTouchDrag: true,
+            },
+            kineticScroll: {
+                touch: true,
+                mouse: true,
+            },
             width: chartContainerRef.current.clientWidth,
             height: 500,
         })
