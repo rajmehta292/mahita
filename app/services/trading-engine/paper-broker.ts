@@ -34,8 +34,7 @@ export class PaperBrokerProvider {
             if (signal === 'Buy') {
                 this.openPosition('Long', fillPrice, bar.time, percentAllocation)
             } else if (signal === 'Sell') {
-                // Shorting omitted array for MVP brevity, but we allow exiting above.
-                // this.openPosition('Short', fillPrice, bar.time, percentAllocation)
+                this.openPosition('Short', fillPrice, bar.time, percentAllocation)
             }
         }
     }

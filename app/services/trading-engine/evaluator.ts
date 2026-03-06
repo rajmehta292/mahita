@@ -8,13 +8,15 @@ export class StrategyEvaluator {
 
     // Keep instances of indicators to calculate rolling values
     private currentFeatures: Record<string, number> = {}
+    private previousFeatures: Record<string, number> = {}
 
     constructor(ast: StrategyAST) {
         this.ast = ast
     }
 
     // Called on every new tick/bar
-    public evaluate(bar: MarketDataPoint): SignalType {
+    public evaluate(bar: MarketDataPoint, skipSignal: boolean = false): SignalType {
+        this.previousFeatures = { ...this.currentFeatures }
         this.history.push(bar)
 
         // Maintain a window of max 200 bars for performance
@@ -24,8 +26,8 @@ export class StrategyEvaluator {
 
         this.calculateFeatures()
 
-        // Base conditions
-        if (this.history.length < 2) return 'Hold' // Need history for crosses
+        // If we are in warmup or don't have enough history, don't generate signals
+        if (skipSignal || this.history.length < 2) return 'Hold'
 
         const entrySignal = this.checkConditionSet(this.ast.entryConditions)
         if (entrySignal) return 'Buy'
@@ -79,6 +81,8 @@ export class StrategyEvaluator {
             : `${rule.indicator}_${rule.parameter}`
 
         const currentValue = this.currentFeatures[key]
+        const previousValue = this.previousFeatures[key]
+
         if (currentValue === undefined) return false // Not enough data yet
 
         switch (rule.operator) {
@@ -88,11 +92,9 @@ export class StrategyEvaluator {
             case '<=': return currentValue <= rule.value
             case '==': return currentValue === rule.value
             case 'crosses_above':
-                // requires previous value logic, simplified for MVP to just strict >
-                // A true cross logic requires tracking state T-1
-                return currentValue > rule.value
+                return previousValue !== undefined && previousValue <= rule.value && currentValue > rule.value
             case 'crosses_below':
-                return currentValue < rule.value
+                return previousValue !== undefined && previousValue >= rule.value && currentValue < rule.value
             default: return false
         }
     }

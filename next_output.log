@@ -128,3 +128,23 @@ Auth Callback: session cmmdzve8600001d66lf4vrf2j
 ✓ Compiled in 662ms
 ✓ Compiled in 2.6s
 ✓ Compiled in 1573ms
+✓ Compiled in 174ms
+ GET / 200 in 1572ms (compile: 589ms, render: 983ms)
+ GET /dashboard 200 in 694ms (compile: 377ms, proxy.ts: 151ms, render: 167ms)
+ GET /api/trading/market-data?symbol=AAPL&timeframe=1d 200 in 168ms (compile: 23ms, proxy.ts: 13ms, render: 132ms)
+ GET /api/trading/inventory 200 in 262ms (compile: 51ms, proxy.ts: 12ms, render: 198ms)
+ GET /api/trading/market-data?symbol=AAPL&timeframe=1d 200 in 69ms (compile: 3ms, proxy.ts: 2ms, render: 63ms)
+ GET /api/trading/inventory 200 in 47ms (compile: 12ms, proxy.ts: 6ms, render: 30ms)
+ GET /dashboard 200 in 858ms (compile: 92ms, proxy.ts: 286ms, render: 480ms)
+ GET /api/trading/inventory 200 in 443ms (compile: 23ms, proxy.ts: 135ms, render: 284ms)
+ GET /api/trading/market-data?symbol=AAPL&timeframe=1d 200 in 522ms (compile: 80ms, proxy.ts: 145ms, render: 297ms)
+ POST /api/trading/backtest 200 in 3.5s (compile: 2.6s, proxy.ts: 79ms, render: 747ms)
+ GET /dashboard 200 in 151ms (compile: 22ms, proxy.ts: 22ms, render: 107ms)
+ GET /api/trading/market-data?symbol=AAPL&timeframe=1d 200 in 135ms (compile: 3ms, proxy.ts: 9ms, render: 123ms)
+ GET /api/trading/inventory 200 in 268ms (compile: 12ms, proxy.ts: 13ms, render: 244ms)
+ POST /api/trading/backtest 200 in 159ms (compile: 8ms, proxy.ts: 23ms, render: 127ms)
+ GET /dashboard 200 in 98ms (compile: 11ms, proxy.ts: 27ms, render: 60ms)
+ GET /api/trading/inventory 200 in 261ms (compile: 2ms, proxy.ts: 3ms, render: 255ms)
+ GET /api/trading/market-data?symbol=AAPL&timeframe=1d 200 in 728ms (compile: 5ms, proxy.ts: 2ms, render: 721ms)
+ POST /api/trading/backtest 200 in 292ms (compile: 30ms, proxy.ts: 100ms, render: 162ms)
+✓ Compiled in 924ms

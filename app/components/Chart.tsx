@@ -62,13 +62,13 @@ export default function Chart({
         })
 
         mainChartRef.current = mainChart
-        mainSeriesRef.current = mainChart.addSeries(CandlestickSeries, {
+        mainSeriesRef.current = mainChart.addCandlestickSeries({
             upColor: '#26a69a', downColor: '#ef5350', borderVisible: false,
             wickUpColor: '#26a69a', wickDownColor: '#ef5350',
         })
 
         if (indicators.includes('Volume')) {
-            volumeSeriesRef.current = mainChart.addSeries(HistogramSeries, {
+            volumeSeriesRef.current = mainChart.addHistogramSeries({
                 color: '#26a69a40',
                 priceFormat: { type: 'volume' },
                 priceScaleId: '', // overlay
@@ -93,12 +93,12 @@ export default function Chart({
             })
             oscChartRef.current = oscChart
 
-            macdSeriesRef.current = oscChart.addSeries(HistogramSeries, {
+            macdSeriesRef.current = oscChart.addHistogramSeries({
                 color: '#26a69a',
                 priceFormat: { type: 'volume' },
             })
-            macdLineRef.current = oscChart.addSeries(LineSeries, { color: '#2962FF', lineWidth: 2 })
-            macdSignalRef.current = oscChart.addSeries(LineSeries, { color: '#FF6D00', lineWidth: 2 })
+            macdLineRef.current = oscChart.addLineSeries({ color: '#2962FF', lineWidth: 2 })
+            macdSignalRef.current = oscChart.addLineSeries({ color: '#FF6D00', lineWidth: 2 })
 
             // Sync Time Scales
             const onVisibleLogicalRangeChangeMain = (range: any) => {
@@ -244,7 +244,12 @@ export default function Chart({
             })
 
             markers.sort((a, b) => (a.time as number) - (b.time as number));
-            (mainSeriesRef.current as any).setMarkers(markers);
+
+            if (mainSeriesRef.current && typeof (mainSeriesRef.current as any).setMarkers === 'function') {
+                (mainSeriesRef.current as any).setMarkers(markers);
+            } else {
+                console.warn('[Chart] setMarkers not available on mainSeries');
+            }
         }
 
     }, [data, trades, chartType, macdParams])
