@@ -22,7 +22,7 @@ export default function Home() {
                         Access Terminal
                     </Link>
 
-                    <Link href="/api/auth/signin" className="px-8 py-4 glass-panel hover:bg-white/10 text-white font-bold rounded transition-all">
+                    <Link href="/api/auth/signin?callbackUrl=/dashboard" className="px-8 py-4 glass-panel hover:bg-white/10 text-white font-bold rounded transition-all">
                         Login
                     </Link>
                 </div>

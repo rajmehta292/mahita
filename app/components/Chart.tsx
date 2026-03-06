@@ -1,6 +1,6 @@
 'use client'
 
-import { createChart, IChartApi, ISeriesApi, Time } from 'lightweight-charts'
+import { createChart, IChartApi, ISeriesApi, Time, CandlestickSeries } from 'lightweight-charts'
 import React, { useEffect, useRef } from 'react'
 import { MarketDataPoint } from '@/app/services/market-data/types'
 import { CompletedTrade } from '@/app/services/trading-engine/types'
@@ -39,7 +39,7 @@ export default function Chart({ data, trades }: ChartProps) {
 
         chart.timeScale().fitContent()
 
-        const series = (chart as any).addCandlestickSeries({
+        const series = chart.addSeries(CandlestickSeries, {
             upColor: '#26a69a',
             downColor: '#ef5350',
             borderVisible: false,

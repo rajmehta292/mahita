@@ -7,3 +7,41 @@
 ⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
 ✓ Ready in 1265ms
  GET /api/auth/session 200 in 960ms (compile: 935ms, render: 25ms)
+ GET /api/auth/signin?callbackUrl=%2Fdashboard 200 in 59ms (compile: 34ms, render: 25ms)
+ GET / 200 in 705ms (compile: 584ms, render: 121ms)
+⚠ Cross origin request detected from mahita.ai to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
+Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
+ GET /api/auth/signin 200 in 31ms (compile: 11ms, render: 20ms)
+ GET /api/auth/signin 200 in 17ms (compile: 11ms, render: 6ms)
+(node:4107) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ POST /api/auth/signin/google 302 in 153ms (compile: 3ms, render: 150ms)
+ GET /api/auth/callback/google?state=efUrF-apYJoAdt4QosXFZ-K59zY0SHs38leeYeCVpck&iss=https%3A%2F%2Faccounts.google.com&code=4%2F0AfrIepBijjOGtZLuIvGHmgcjrnJI1d9QGB9HB8-Jj-nBU17R-6Vq32fwGZ9Rl_jqas0qdg&scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+openid&authuser=0&prompt=none 302 in 527ms (compile: 38ms, render: 489ms)
+ GET / 200 in 23ms (compile: 3ms, render: 20ms)
+ GET /api/auth/signin 200 in 17ms (compile: 7ms, render: 10ms)
+ GET /api/auth/signin 200 in 10ms (compile: 1679µs, render: 8ms)
+ POST /api/auth/signin/google 302 in 150ms (compile: 8ms, render: 143ms)
+ GET /api/auth/callback/google?state=sHMLrg56DHjgxeRhM4CeMmYnyOn_2uYRJSAcjp5_2Hw&iss=https%3A%2F%2Faccounts.google.com&code=4%2F0AfrIepBdlz6qe_-1bnB6oAh2cWyD7-5iS1gKWnmVL3gZifHbrLjd9NPFumMolSESRBMetw&scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+openid&authuser=0&prompt=none 302 in 420ms (compile: 6ms, render: 415ms)
+ GET / 200 in 22ms (compile: 3ms, render: 20ms)
+ GET /api/auth/signin 200 in 27ms (compile: 16ms, render: 11ms)
+ GET /api/auth/signin 200 in 9ms (compile: 4ms, render: 5ms)
+ POST /api/auth/signin/google 302 in 127ms (compile: 6ms, render: 121ms)
+ GET /api/auth/callback/google?state=pmfrR_lXOgABBnU-BRhaHAiNIs8U05THY1Dl8ZufKrI&iss=https%3A%2F%2Faccounts.google.com&code=4%2F0AfrIepC7r2IMYg4JK5ELjCuSYfUFhjtBJC6GKUF6BmiT1dmzMuB_4G3AoACUFB0WpbyTRQ&scope=email+profile+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.email+openid+https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fuserinfo.profile&authuser=0&prompt=none 302 in 406ms (compile: 1633µs, render: 404ms)
+ GET / 200 in 35ms (compile: 6ms, render: 30ms)
+ GET /dashboard 200 in 289ms (compile: 239ms, proxy.ts: 38ms, render: 12ms)
+ GET /api/trading/market-data?symbol=AAPL&timeframe=1d 200 in 320ms (compile: 236ms, proxy.ts: 5ms, render: 78ms)
+ GET /api/trading/inventory 200 in 373ms (compile: 258ms, proxy.ts: 6ms, render: 109ms)
+ GET /api/trading/market-data?symbol=AAPL&timeframe=1d 200 in 49ms (compile: 2ms, proxy.ts: 5ms, render: 42ms)
+ GET /api/trading/inventory 200 in 29ms (compile: 3ms, proxy.ts: 6ms, render: 20ms)
+✓ Compiled in 662ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /dashboard 200 in 226ms (compile: 22ms, proxy.ts: 67ms, render: 136ms)
+ GET /api/trading/market-data?symbol=AAPL&timeframe=1d 200 in 448ms (compile: 7ms, proxy.ts: 9ms, render: 432ms)
+ GET /api/trading/inventory 200 in 515ms (compile: 60ms, proxy.ts: 7ms, render: 448ms)
+ GET /dashboard 200 in 69ms (compile: 8ms, proxy.ts: 17ms, render: 43ms)
+Auth Callback: session cmmdzve8600001d66lf4vrf2j
+ GET /api/trading/market-data?symbol=AAPL&timeframe=1d 200 in 411ms (compile: 283ms, proxy.ts: 9ms, render: 119ms)
+Auth Callback: session cmmdzve8600001d66lf4vrf2j
+ GET /api/trading/inventory 200 in 467ms (compile: 341ms, proxy.ts: 7ms, render: 120ms)
+✓ Compiled in 275ms
+ GET /dashboard 200 in 63ms (compile: 10ms, proxy.ts: 16ms, render: 37ms)
