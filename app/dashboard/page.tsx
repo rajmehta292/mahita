@@ -6,7 +6,11 @@ import dynamic from 'next/dynamic'
 import { StrategyAST, BacktestResult } from '../services/trading-engine/types'
 import { MarketDataPoint } from '../services/market-data/types'
 import StrategyTester from '../components/StrategyTester'
-import { LayoutGrid, TrendingUp, History, Activity, Settings, Sliders, Play, Plus, Trash2, ShieldCheck, Target } from 'lucide-react'
+import { MainLayout } from '../components/Layout/MainLayout'
+import { SymbolHeader } from '../components/Chart/SymbolHeader'
+import { ChartToolbar } from '../components/Chart/ChartToolbar'
+import { RightPanel } from '../components/Chart/RightPanel'
+import { Play, Settings, Sliders, Activity, History, ShieldCheck, Target, DollarSign, TrendingUp, BarChart3 } from 'lucide-react'
 
 // Dynamic imports for Chart and Editor
 const Chart = dynamic(() => import('../components/Chart'), { ssr: false })

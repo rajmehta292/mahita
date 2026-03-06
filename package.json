@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@allensarkisyan/schwab-td-ameritrade-api": "^1.0.0",
     "@libsql/client": "^0.17.0",
     "@monaco-editor/react": "^4.7.0",
     "@next-auth/prisma-adapter": "^1.0.7",

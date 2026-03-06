@@ -1,0 +1,271 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { MainLayout } from '../components/Layout/MainLayout'
+import { 
+    Settings as SettingsIcon, 
+    Key, 
+    Save, 
+    Trash2, 
+    Eye, 
+    EyeOff,
+    CheckCircle,
+    AlertCircle,
+    ExternalLink
+} from 'lucide-react'
+
+export default function SettingsPage() {
+    const [clientId, setClientId] = useState('')
+    const [clientSecret, setClientSecret] = useState('')
+    const [showClientSecret, setShowClientSecret] = useState(false)
+    const [hasConfig, setHasConfig] = useState(false)
+    const [loading, setLoading] = useState(true)
+    const [saving, setSaving] = useState(false)
+    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+
+    useEffect(() => {
+        fetchConfig()
+    }, [])
+
+    const fetchConfig = async () => {
+        try {
+            const response = await fetch('/api/user/schwab-config')
+            const data = await response.json()
+            
+            if (data.success && data.config) {
+                setHasConfig(data.config.hasClientId && data.config.hasClientSecret)
+            }
+        } catch (error) {
+            console.error('Failed to fetch config:', error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
+    const handleSave = async () => {
+        if (!clientId.trim() || !clientSecret.trim()) {
+            setMessage({ type: 'error', text: 'Please enter both Client ID and Client Secret' })
+            return
+        }
+
+        setSaving(true)
+        setMessage(null)
+
+        try {
+            const response = await fetch('/api/user/schwab-config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ clientId, clientSecret })
+            })
+
+            const data = await response.json()
+
+            if (data.success) {
+                setMessage({ type: 'success', text: 'Schwab credentials saved successfully!' })
+                setHasConfig(true)
+                setClientId('')
+                setClientSecret('')
+                setTimeout(() => setMessage(null), 5000)
+            } else {
+                setMessage({ type: 'error', text: data.error || 'Failed to save credentials' })
+            }
+        } catch (error) {
+            setMessage({ type: 'error', text: 'Failed to save credentials' })
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    const handleDelete = async () => {
+        if (!confirm('Are you sure you want to delete your Schwab credentials? This will disconnect your account.')) {
+            return
+        }
+
+        setSaving(true)
+        setMessage(null)
+
+        try {
+            const response = await fetch('/api/user/schwab-config', {
+                method: 'DELETE'
+            })
+
+            const data = await response.json()
+
+            if (data.success) {
+                setMessage({ type: 'success', text: 'Schwab credentials deleted successfully' })
+                setHasConfig(false)
+                setTimeout(() => setMessage(null), 5000)
+            } else {
+                setMessage({ type: 'error', text: data.error || 'Failed to delete credentials' })
+            }
+        } catch (error) {
+            setMessage({ type: 'error', text: 'Failed to delete credentials' })
+        } finally {
+            setSaving(false)
+        }
+    }
+
+    return (
+        <MainLayout>
+            <div className="flex-1 flex flex-col bg-[#131722] overflow-hidden">
+                {/* Header */}
+                <div className="h-14 bg-[#1E222D] border-b border-[#2A2E39] flex items-center justify-between px-6">
+                    <div className="flex items-center gap-3">
+                        <SettingsIcon className="w-6 h-6 text-blue-500" />
+                        <h1 className="text-white font-semibold text-lg">Settings</h1>
+                    </div>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-auto p-6">
+                    <div className="max-w-3xl mx-auto">
+                        {/* Schwab API Configuration */}
+                        <div className="bg-[#1E222D] border border-[#2A2E39] rounded-lg overflow-hidden">
+                            <div className="p-6 border-b border-[#2A2E39]">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <Key className="w-5 h-5 text-blue-500" />
+                                    <h2 className="text-white font-semibold text-lg">Schwab API Credentials</h2>
+                                </div>
+                                <p className="text-gray-400 text-sm">
+                                    Configure your Charles Schwab API credentials to enable live trading
+                                </p>
+                            </div>
+
+                            <div className="p-6">
+                                {/* Status */}
+                                {hasConfig && (
+                                    <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded-lg flex items-start gap-3">
+                                        <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-green-500 font-medium">Credentials Configured</p>
+                                            <p className="text-sm text-gray-400 mt-1">
+                                                Your Schwab API credentials are saved. You can now connect your account in Active Trader.
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Instructions */}
+                                <div className="mb-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                                    <div className="flex items-start gap-3">
+                                        <AlertCircle className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-blue-500 font-medium mb-2">How to get your API credentials:</p>
+                                            <ol className="text-sm text-gray-400 space-y-1 list-decimal list-inside">
+                                                <li>Visit the <a href="https://beta-developer.schwab.com/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline inline-flex items-center gap-1">Schwab Developer Portal <ExternalLink className="w-3 h-3" /></a></li>
+                                                <li>Create an application and request API access</li>
+                                                <li>Once approved, copy your Client ID and Client Secret</li>
+                                                <li>Paste them below and click Save</li>
+                                            </ol>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Form */}
+                                <div className="space-y-4">
+                                    {/* Client ID */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                                            Client ID
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={clientId}
+                                            onChange={(e) => setClientId(e.target.value)}
+                                            placeholder={hasConfig ? "Enter new Client ID to update" : "Enter your Schwab Client ID"}
+                                            className="w-full px-4 py-3 bg-[#131722] border border-[#2A2E39] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors"
+                                        />
+                                    </div>
+
+                                    {/* Client Secret */}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                                            Client Secret
+                                        </label>
+                                        <div className="relative">
+                                            <input
+                                                type={showClientSecret ? "text" : "password"}
+                                                value={clientSecret}
+                                                onChange={(e) => setClientSecret(e.target.value)}
+                                                placeholder={hasConfig ? "Enter new Client Secret to update" : "Enter your Schwab Client Secret"}
+                                                className="w-full px-4 py-3 bg-[#131722] border border-[#2A2E39] rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 transition-colors pr-12"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowClientSecret(!showClientSecret)}
+                                                className="absolute right-3 top-1/2 -translate-y-1/2 p-2 hover:bg-[#2A2E39] rounded transition-colors"
+                                            >
+                                                {showClientSecret ? (
+                                                    <EyeOff className="w-4 h-4 text-gray-400" />
+                                                ) : (
+                                                    <Eye className="w-4 h-4 text-gray-400" />
+                                                )}
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* Message */}
+                                    {message && (
+                                        <div className={`p-4 rounded-lg flex items-start gap-3 ${
+                                            message.type === 'success' 
+                                                ? 'bg-green-500/10 border border-green-500/30' 
+                                                : 'bg-red-500/10 border border-red-500/30'
+                                        }`}>
+                                            {message.type === 'success' ? (
+                                                <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                                            ) : (
+                                                <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+                                            )}
+                                            <p className={`text-sm ${
+                                                message.type === 'success' ? 'text-green-500' : 'text-red-500'
+                                            }`}>
+                                                {message.text}
+                                            </p>
+                                        </div>
+                                    )}
+
+                                    {/* Actions */}
+                                    <div className="flex items-center gap-3 pt-2">
+                                        <button
+                                            onClick={handleSave}
+                                            disabled={saving || (!clientId.trim() && !clientSecret.trim())}
+                                            className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            <Save className="w-4 h-4" />
+                                            {saving ? 'Saving...' : hasConfig ? 'Update Credentials' : 'Save Credentials'}
+                                        </button>
+
+                                        {hasConfig && (
+                                            <button
+                                                onClick={handleDelete}
+                                                disabled={saving}
+                                                className="px-6 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-500 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                                Delete Credentials
+                                            </button>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Security Note */}
+                                <div className="mt-6 p-4 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                                    <div className="flex items-start gap-3">
+                                        <AlertCircle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
+                                        <div>
+                                            <p className="text-yellow-500 font-medium mb-1">Security Notice</p>
+                                            <p className="text-sm text-gray-400">
+                                                Your credentials are stored securely in our database. We never share your API keys with third parties. 
+                                                You can delete them at any time.
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </MainLayout>
+    )
+}

@@ -3,7 +3,7 @@ import GoogleProvider from "next-auth/providers/google"
 import { PrismaAdapter } from "@next-auth/prisma-adapter"
 import prisma from "@/lib/prisma"
 
-const ALLOWED_EMAIL = process.env.ALLOWED_EMAIL
+const ALLOWED_EMAILS = ['raj.dmehta292@gmail.com', 'dh.mehta@gmail.com']
 
 export const authOptions: NextAuthOptions = {
     adapter: PrismaAdapter(prisma),
@@ -19,11 +19,12 @@ export const authOptions: NextAuthOptions = {
     secret: process.env.NEXTAUTH_SECRET,
     callbacks: {
         async signIn({ user }) {
-            console.log(`SignIn attempt: email=${user.email}, allowed=${ALLOWED_EMAIL}`)
-            if (!ALLOWED_EMAIL || user.email !== ALLOWED_EMAIL) {
+            console.log(`SignIn attempt: email=${user.email}`)
+            if (!user.email || !ALLOWED_EMAILS.includes(user.email)) {
                 console.warn(`Unauthorized login attempt by: ${user.email}`)
                 return false
             }
+            console.log(`Authorized login: ${user.email}`)
             return true
         },
         async jwt({ token, user }) {

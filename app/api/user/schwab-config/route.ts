@@ -1,0 +1,133 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import prisma from '@/lib/prisma'
+
+export async function GET(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email },
+      include: { schwabConfig: true }
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    // Return config without sensitive tokens
+    if (user.schwabConfig) {
+      return NextResponse.json({
+        success: true,
+        config: {
+          hasClientId: !!user.schwabConfig.clientId,
+          hasClientSecret: !!user.schwabConfig.clientSecret,
+          hasAccessToken: !!user.schwabConfig.accessToken,
+          hasRefreshToken: !!user.schwabConfig.refreshToken,
+          accessTokenExpiry: user.schwabConfig.accessTokenExpiry,
+          refreshTokenExpiry: user.schwabConfig.refreshTokenExpiry,
+        }
+      })
+    }
+
+    return NextResponse.json({
+      success: true,
+      config: null
+    })
+  } catch (error: any) {
+    console.error('Get Schwab config error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to get config' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const { clientId, clientSecret } = body
+
+    if (!clientId || !clientSecret) {
+      return NextResponse.json(
+        { error: 'Client ID and Client Secret are required' },
+        { status: 400 }
+      )
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    // Upsert Schwab config
+    const schwabConfig = await prisma.schwabConfig.upsert({
+      where: { userId: user.id },
+      update: {
+        clientId,
+        clientSecret,
+        updatedAt: new Date(),
+      },
+      create: {
+        userId: user.id,
+        clientId,
+        clientSecret,
+      }
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: 'Schwab credentials saved successfully'
+    })
+  } catch (error: any) {
+    console.error('Save Schwab config error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to save config' },
+      { status: 500 }
+    )
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email }
+    })
+
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    await prisma.schwabConfig.deleteMany({
+      where: { userId: user.id }
+    })
+
+    return NextResponse.json({
+      success: true,
+      message: 'Schwab credentials deleted successfully'
+    })
+  } catch (error: any) {
+    console.error('Delete Schwab config error:', error)
+    return NextResponse.json(
+      { error: error.message || 'Failed to delete config' },
+      { status: 500 }
+    )
+  }
+}
