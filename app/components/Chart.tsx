@@ -62,13 +62,13 @@ export default function Chart({
         })
 
         mainChartRef.current = mainChart
-        mainSeriesRef.current = mainChart.addCandlestickSeries({
+        mainSeriesRef.current = mainChart.addSeries(CandlestickSeries, {
             upColor: '#26a69a', downColor: '#ef5350', borderVisible: false,
             wickUpColor: '#26a69a', wickDownColor: '#ef5350',
         })
 
         if (indicators.includes('Volume')) {
-            volumeSeriesRef.current = mainChart.addHistogramSeries({
+            volumeSeriesRef.current = mainChart.addSeries(HistogramSeries, {
                 color: '#26a69a40',
                 priceFormat: { type: 'volume' },
                 priceScaleId: '', // overlay
@@ -93,12 +93,12 @@ export default function Chart({
             })
             oscChartRef.current = oscChart
 
-            macdSeriesRef.current = oscChart.addHistogramSeries({
+            macdSeriesRef.current = oscChart.addSeries(HistogramSeries, {
                 color: '#26a69a',
                 priceFormat: { type: 'volume' },
             })
-            macdLineRef.current = oscChart.addLineSeries({ color: '#2962FF', lineWidth: 2 })
-            macdSignalRef.current = oscChart.addLineSeries({ color: '#FF6D00', lineWidth: 2 })
+            macdLineRef.current = oscChart.addSeries(LineSeries, { color: '#2962FF', lineWidth: 2 })
+            macdSignalRef.current = oscChart.addSeries(LineSeries, { color: '#FF6D00', lineWidth: 2 })
 
             // Sync Time Scales
             const onVisibleLogicalRangeChangeMain = (range: any) => {
