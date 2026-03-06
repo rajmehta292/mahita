@@ -257,7 +257,7 @@ export default function Dashboard() {
 
                 {/* Main Chart Area */}
                 <div className="w-3/4 flex flex-col gap-6">
-                    <div className="glass-panel p-1 flex-1 min-h-0 overflow-hidden relative">
+                    <div className="glass-panel p-1 min-h-[700px] overflow-hidden relative">
                         {data.length === 0 ? (
                             <div className="absolute inset-0 flex items-center justify-center text-gray-500">
                                 Run backtest to visualize historical execution

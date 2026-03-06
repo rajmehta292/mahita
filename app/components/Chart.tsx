@@ -36,12 +36,15 @@ export default function Chart({
         if (!mainContainerRef.current) return
 
         const handleResize = () => {
-            const width = mainContainerRef.current?.clientWidth || 0
-            mainChartRef.current?.applyOptions({ width })
-            oscChartRef.current?.applyOptions({ width })
+            if (mainChartRef.current && mainContainerRef.current) {
+                mainChartRef.current.applyOptions({ width: mainContainerRef.current.clientWidth })
+            }
+            if (oscChartRef.current && oscillatorContainerRef.current) {
+                oscChartRef.current.applyOptions({ width: oscillatorContainerRef.current.clientWidth })
+            }
         }
 
-        // --- Main Chart ---
+        // --- Create Main Chart ---
         const mainChart = createChart(mainContainerRef.current, {
             layout: { background: { color: '#1a1b1e' }, textColor: '#C3C2D4' },
             grid: { vertLines: { color: '#2B2B43' }, horzLines: { color: '#2B2B43' } },
@@ -66,7 +69,7 @@ export default function Chart({
 
         if (indicators.includes('Volume')) {
             volumeSeriesRef.current = mainChart.addSeries(HistogramSeries, {
-                color: '#26a69a',
+                color: '#26a69a40',
                 priceFormat: { type: 'volume' },
                 priceScaleId: '', // overlay
             })
@@ -75,14 +78,18 @@ export default function Chart({
             })
         }
 
-        // --- Oscillator Chart (MACD/RSI) ---
+        // --- Create Oscillator Chart (MACD) ---
+        let oscChart: IChartApi | null = null
+        let syncUnsubMain: (() => void) | null = null
+        let syncUnsubOsc: (() => void) | null = null
+
         if (indicators.includes('MACD') && oscillatorContainerRef.current) {
-            const oscChart = createChart(oscillatorContainerRef.current, {
+            oscChart = createChart(oscillatorContainerRef.current, {
                 layout: { background: { color: '#1a1b1e' }, textColor: '#C3C2D4' },
                 grid: { vertLines: { color: '#2B2B43' }, horzLines: { color: '#2B2B43' } },
                 width: oscillatorContainerRef.current.clientWidth,
                 height: 200,
-                timeScale: { visible: false }, // Hide time scale on oscillator
+                timeScale: { visible: false },
             })
             oscChartRef.current = oscChart
 
@@ -93,33 +100,48 @@ export default function Chart({
             macdLineRef.current = oscChart.addSeries(LineSeries, { color: '#2962FF', lineWidth: 2 })
             macdSignalRef.current = oscChart.addSeries(LineSeries, { color: '#FF6D00', lineWidth: 2 })
 
-            // Sync Logic
-            mainChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
-                oscChart.timeScale().setVisibleLogicalRange(range!)
-            })
-            oscChart.timeScale().subscribeVisibleLogicalRangeChange(range => {
-                mainChart.timeScale().setVisibleLogicalRange(range!)
-            })
+            // Sync Time Scales
+            const onVisibleLogicalRangeChangeMain = (range: any) => {
+                if (oscChartRef.current) oscChartRef.current.timeScale().setVisibleLogicalRange(range)
+            }
+            const onVisibleLogicalRangeChangeOsc = (range: any) => {
+                if (mainChartRef.current) mainChartRef.current.timeScale().setVisibleLogicalRange(range)
+            }
+
+            mainChart.timeScale().subscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChangeMain)
+            oscChart.timeScale().subscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChangeOsc)
+
+            syncUnsubMain = () => mainChart.timeScale().unsubscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChangeMain)
+            syncUnsubOsc = () => oscChart.timeScale().unsubscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChangeOsc)
         }
 
         window.addEventListener('resize', handleResize)
+
         return () => {
             window.removeEventListener('resize', handleResize)
+
+            // Unsubscribe first to prevent sync crashes during destruction
+            if (syncUnsubMain) syncUnsubMain()
+            if (syncUnsubOsc) syncUnsubOsc()
+
             if (mainChartRef.current) {
-                mainChartRef.current.remove()
-                mainChartRef.current = null
-                mainSeriesRef.current = null
-                volumeSeriesRef.current = null
+                const c = mainChartRef.current
+                mainChartRef.current = null // Null out immediately to prevent resize races
+                c.remove()
             }
             if (oscChartRef.current) {
-                oscChartRef.current.remove()
+                const c = oscChartRef.current
                 oscChartRef.current = null
-                macdSeriesRef.current = null
-                macdLineRef.current = null
-                macdSignalRef.current = null
+                c.remove()
             }
+
+            mainSeriesRef.current = null
+            volumeSeriesRef.current = null
+            macdSeriesRef.current = null
+            macdLineRef.current = null
+            macdSignalRef.current = null
         }
-    }, [indicators]) // Rebuild EVERYTHING if indicators change
+    }, [indicators]) // Rebuild on indicator toggle
 
     useEffect(() => {
         if (!mainSeriesRef.current || data.length === 0) return
@@ -128,7 +150,7 @@ export default function Chart({
 
         // Main Candles
         const chartData = activeData.map(d => ({
-            time: d.time as Time,
+            time: (typeof d.time === 'string' ? Math.floor(new Date(d.time).getTime() / 1000) : d.time) as Time,
             open: d.open, high: d.high, low: d.low, close: d.close,
         }))
         mainSeriesRef.current.setData(chartData)
@@ -136,10 +158,14 @@ export default function Chart({
         // Volume
         if (volumeSeriesRef.current) {
             volumeSeriesRef.current.setData(data.map(d => ({
-                time: d.time as Time,
-                value: d.volume,
+                time: (typeof d.time === 'string' ? Math.floor(new Date(d.time).getTime() / 1000) : d.time) as Time,
+                value: d.volume || 0,
                 color: d.close >= d.open ? '#26a69a80' : '#ef535080'
             })))
+        }
+
+        if (mainChartRef.current && data.length > 0) {
+            mainChartRef.current.timeScale().fitContent()
         }
 
         // MACD v6 Logic
@@ -224,12 +250,13 @@ export default function Chart({
     }, [data, trades, chartType, macdParams])
 
     return (
-        <div className="flex flex-col gap-2 w-full h-full">
-            <div ref={mainContainerRef} className="w-full flex-grow min-h-[400px]" />
-            {indicators.includes('MACD') && (
-                <div ref={oscillatorContainerRef} className="w-full h-[200px] border-t border-white/5" />
-            )}
+        <div className="flex flex-col w-full min-h-[650px]">
+            <div ref={mainContainerRef} className="w-full h-full flex-grow min-h-[400px]" />
+            <div
+                ref={oscillatorContainerRef}
+                className={`w-full overflow-hidden transition-all duration-300 ${indicators.includes('MACD') ? 'h-[200px] mt-6' : 'h-0'}`}
+                style={{ borderTop: indicators.includes('MACD') ? '1px solid rgba(255,255,255,0.05)' : 'none' }}
+            />
         </div>
     )
 }
-

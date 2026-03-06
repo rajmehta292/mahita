@@ -3,38 +3,53 @@ import { MarketDataPoint } from './types'
 export function calculateHeikinAshi(data: MarketDataPoint[]): MarketDataPoint[] {
     if (data.length === 0) return []
 
+    // Ensure data is sorted by time ascending for HA calculation
+    const getTime = (t: string | number) => typeof t === 'number' ? t : new Date(t).getTime()
+    const sortedData = [...data].sort((a, b) => getTime(a.time) - getTime(b.time))
     const haData: MarketDataPoint[] = []
 
-    // Initial HA Open/Close
-    let prevOpen = (data[0].open + data[0].close) / 2
-    let prevClose = (data[0].open + data[0].high + data[0].low + data[0].close) / 4
+    // Initial HA Open/Close (First candle)
+    let haOpen = (Number(sortedData[0].open) + Number(sortedData[0].close)) / 2
+    let haClose = (Number(sortedData[0].open) + Number(sortedData[0].high) + Number(sortedData[0].low) + Number(sortedData[0].close)) / 4
 
     haData.push({
-        ...data[0],
-        open: prevOpen,
-        close: prevClose,
-        high: Math.max(data[0].high, prevOpen, prevClose),
-        low: Math.min(data[0].low, prevOpen, prevClose)
+        ...sortedData[0],
+        open: haOpen,
+        close: haClose,
+        high: Math.max(Number(sortedData[0].high), haOpen, haClose),
+        low: Math.min(Number(sortedData[0].low), haOpen, haClose)
     })
 
-    for (let i = 1; i < data.length; i++) {
-        const current = data[i]
+    // Loop through remaining candles
+    for (let i = 1; i < sortedData.length; i++) {
+        const current = sortedData[i]
 
-        const haClose = (current.open + current.high + current.low + current.close) / 4
-        const haOpen = (prevOpen + prevClose) / 2
-        const haHigh = Math.max(current.high, haOpen, haClose)
-        const haLow = Math.min(current.low, haOpen, haClose)
+        const open = Number(current.open)
+        const high = Number(current.high)
+        const low = Number(current.low)
+        const close = Number(current.close)
+
+        // HA Formulas:
+        // Close = Average of OHLC
+        // Open = Average of previous HA Open and previous HA Close
+        // High = Max of High, HA Open, HA Close
+        // Low = Min of Low, HA Open, HA Close
+        const currentHAClose = (open + high + low + close) / 4
+        const currentHAOpen = (haOpen + haClose) / 2
+        const currentHAHigh = Math.max(high, currentHAOpen, currentHAClose)
+        const currentHALow = Math.min(low, currentHAOpen, currentHAClose)
 
         haData.push({
             ...current,
-            open: haOpen,
-            close: haClose,
-            high: haHigh,
-            low: haLow
+            open: currentHAOpen,
+            close: currentHAClose,
+            high: currentHAHigh,
+            low: currentHALow
         })
 
-        prevOpen = haOpen
-        prevClose = haClose
+        // Store for next iteration
+        haOpen = currentHAOpen
+        haClose = currentHAClose
     }
 
     return haData

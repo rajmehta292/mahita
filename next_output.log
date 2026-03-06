@@ -92,3 +92,39 @@ Auth Callback: session cmmdzve8600001d66lf4vrf2j
  GET /api/trading/inventory 200 in 185ms (compile: 10ms, proxy.ts: 51ms, render: 124ms)
  GET /api/trading/market-data?symbol=AAPL&timeframe=1d 200 in 207ms (compile: 21ms, proxy.ts: 48ms, render: 138ms)
 ✓ Compiled in 782ms
+ GET / 200 in 566ms (compile: 178ms, render: 388ms)
+ GET /api/auth/signin?callbackUrl=%2Fdashboard 200 in 127ms (compile: 49ms, render: 78ms)
+ GET /api/auth/signin?callbackUrl=%2Fdashboard 200 in 14ms (compile: 4ms, render: 10ms)
+ GET / 200 in 283ms (compile: 74ms, render: 208ms)
+ GET / 200 in 173ms (compile: 23ms, render: 150ms)
+ GET /%5fnext/static/chunks/node%5fmodules%5fnext%5fdist%5fcompiled%5freact-dom%5f1e674e59.%5f.js 404 in 1586ms (compile: 700ms, render: 887ms)
+ GET /%5fnext/static/chunks/node%5fmodules%5fnext%5fdist%5fcompiled%5freact-dom%5f1e674e59.%5f.js 404 in 56ms (compile: 18ms, render: 38ms)
+ GET /%5fnext/static/chunks/app%5fglobals%5f71f961d1.css 404 in 63ms (compile: 31ms, render: 32ms)
+ GET /%5fnext/static/chunks/app%5fglobals%5f71f961d1.css 404 in 69ms (compile: 18ms, render: 51ms)
+ GET /%5fnext/static/chunks/node%5fmodules%5fnext%5fdist%5fcompiled%5freact-server-dom-turbopack%5f9212ccad.%5f.js 404 in 22ms (compile: 5ms, render: 18ms)
+ GET /%5fnext/static/chunks/%5bturbopack%5d%5fbrowser%5fdev%5fhmr-client%5fhmr-client%5fts%5f956a0d3a.%5f.js 404 in 23ms (compile: 4ms, render: 20ms)
+ GET /api/auth/signin?callbackUrl=%2Fdashboard 200 in 39ms (compile: 15ms, render: 24ms)
+ GET /api/auth/signin?callbackUrl=%2Fdashboard 200 in 7ms (compile: 1558µs, render: 5ms)
+ GET /%5fnext/static/chunks/node%5fmodules%5fnext%5fdist%5fcompiled%5freact-server-dom-turbopack%5f9212ccad.%5f.js 404 in 74ms (compile: 32ms, render: 41ms)
+ GET /api/trading/market-data?symbol=BA&timeframe=1d 200 in 239ms (compile: 29ms, proxy.ts: 69ms, render: 141ms)
+ GET /api/trading/market-data?symbol=DOW&timeframe=1d 200 in 62ms (compile: 4ms, proxy.ts: 10ms, render: 48ms)
+✓ Compiled in 891ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 144ms
+ GET /api/trading/inventory 200 in 2.1s (compile: 251ms, proxy.ts: 350ms, render: 1485ms)
+ GET /api/trading/market-data?symbol=AAPL&timeframe=1d 200 in 2.5s (compile: 889ms, proxy.ts: 478ms, render: 1121ms)
+ GET /dashboard 200 in 2.2s (compile: 929ms, proxy.ts: 158ms, render: 1097ms)
+ GET /api/trading/inventory 200 in 1703ms (compile: 113ms, proxy.ts: 239ms, render: 1352ms)
+ GET /api/trading/market-data?symbol=AAPL&timeframe=1d 200 in 1829ms (compile: 208ms, proxy.ts: 215ms, render: 1406ms)
+✓ Compiled in 346ms
+✓ Compiled in 105ms
+ GET /dashboard 200 in 207ms (compile: 15ms, proxy.ts: 65ms, render: 128ms)
+ GET /api/trading/inventory 200 in 220ms (compile: 24ms, proxy.ts: 41ms, render: 155ms)
+ GET /api/trading/market-data?symbol=AAPL&timeframe=1d 200 in 260ms (compile: 51ms, proxy.ts: 38ms, render: 171ms)
+ GET /%5fnext/static/chunks/%5bturbopack%5d%5fbrowser%5fdev%5fhmr-client%5fhmr-client%5fts%5f956a0d3a.%5f.js 404 in 557ms (compile: 345ms, render: 211ms)
+✓ Compiled in 1010ms
+✓ Compiled in 338ms
+✓ Compiled in 662ms
+✓ Compiled in 2.6s
+✓ Compiled in 1573ms
