@@ -129,6 +129,7 @@ model DataInventory {
   firstBar    DateTime?
   lastBar     DateTime?
   healthScore Float    @default(0)
+  targetCoveragePercent Float @default(0)
   barCount    Int      @default(0)
   gapCount    Int      @default(0)
 

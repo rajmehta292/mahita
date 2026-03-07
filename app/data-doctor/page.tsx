@@ -186,69 +186,103 @@ export default function DataDoctorPage() {
             </header>
 
             {!selectedAsset ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {filteredReports.map((report, idx) => (
-                        <div
-                            key={`${report.symbol}-${report.timeframe}`}
-                            onClick={() => {
-                                setSelectedAsset({ symbol: report.symbol, timeframe: report.timeframe })
-                                fetchInspect(report.symbol, report.timeframe)
-                            }}
-                            className="glass-panel p-6 cursor-pointer hover:border-primary/40 transition-all group relative overflow-hidden"
-                        >
-                            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none transition-transform group-hover:scale-110">
-                                <Activity className="w-24 h-24" />
+                <>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 mt-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                        <div className="glass-panel p-6 border-primary/20 bg-primary/5 relative overflow-hidden">
+                            <Activity className="absolute -right-4 -bottom-4 w-24 h-24 text-primary opacity-10" />
+                            <h3 className="text-sm font-bold uppercase tracking-widest text-primary/60 mb-2 relative z-10">Global Readiness</h3>
+                            <div className="text-4xl font-bold text-white relative z-10">
+                                {reports.length > 0 ? (reports.reduce((acc, r) => acc + (r.targetCoveragePercent || 0), 0) / reports.length).toFixed(1) : 0}%
                             </div>
-                            <div className="flex justify-between items-start mb-6 relative z-10">
-                                <div>
-                                    <h3 className="text-xl font-bold">{report.symbol}</h3>
-                                    <span className="text-[10px] font-bold uppercase tracking-widest text-primary px-2 py-0.5 bg-primary/10 rounded">{report.timeframe}</span>
-                                </div>
-                                <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full ${report.healthScore > 90 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
-                                    }`}>
-                                    {report.healthScore > 90 ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-                                    {report.healthScore}%
-                                </div>
+                            <p className="text-xs text-white/40 mt-2 relative z-10">Average horizon target coverage across {reports.length} tracked records.</p>
+                        </div>
+                        <div className="glass-panel p-6 border-emerald-500/20 bg-emerald-500/5 relative overflow-hidden">
+                            <CheckCircle2 className="absolute -right-4 -bottom-4 w-24 h-24 text-emerald-500 opacity-10" />
+                            <h3 className="text-sm font-bold uppercase tracking-widest text-emerald-500/60 mb-2 relative z-10">Fully Indexed</h3>
+                            <div className="text-4xl font-bold text-emerald-400 relative z-10">
+                                {reports.filter(r => (r.targetCoveragePercent || 0) === 100).length} <span className="text-lg text-emerald-500/40">/ {reports.length}</span>
                             </div>
+                            <p className="text-xs text-emerald-400/60 mt-2 relative z-10">Tracking timelines meeting 100% of their historical targets (10y-15y).</p>
+                        </div>
+                        <div className="glass-panel p-6 border-blue-500/20 bg-blue-500/5 relative overflow-hidden">
+                            <RefreshCw className="absolute -right-4 -bottom-4 w-24 h-24 text-blue-500 opacity-10" />
+                            <h3 className="text-sm font-bold uppercase tracking-widest text-blue-500/60 mb-2 relative z-10">Aggregator Engine</h3>
+                            <div className="text-4xl font-bold text-blue-400 relative z-10">Active</div>
+                            <p className="text-xs text-blue-400/60 mt-2 relative z-10">Continuous multi-provider background chunking enabled.</p>
+                        </div>
+                    </div>
 
-                            <div className="space-y-4 relative z-10">
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-white/40">Total Bars</span>
-                                    <span className="font-medium text-white/80">{report.count.toLocaleString()}</span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
+                        {filteredReports.map((report, idx) => (
+                            <div
+                                key={`${report.symbol}-${report.timeframe}`}
+                                onClick={() => {
+                                    setSelectedAsset({ symbol: report.symbol, timeframe: report.timeframe })
+                                    fetchInspect(report.symbol, report.timeframe)
+                                }}
+                                className="glass-panel p-6 cursor-pointer hover:border-primary/40 transition-all group relative overflow-hidden"
+                            >
+                                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none transition-transform group-hover:scale-110">
+                                    <Activity className="w-24 h-24" />
                                 </div>
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-white/40">Source</span>
-                                    <span className="font-mono text-primary/80 uppercase tracking-tighter">{report.source || 'Unknown'}</span>
-                                </div>
-                                <div className="flex justify-between text-xs">
-                                    <span className="text-white/40">Gaps Detected</span>
-                                    <span className={`font-bold ${report.gaps?.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                        {report.gaps?.length || 0}
-                                    </span>
-                                </div>
-                                <div className="pt-2">
-                                    <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden">
-                                        <div
-                                            className={`h-full transition-all duration-1000 ${report.healthScore > 90 ? 'bg-emerald-500' : 'bg-amber-500'
-                                                }`}
-                                            style={{ width: `${report.healthScore}%` }}
-                                        />
+                                <div className="flex justify-between items-start mb-6 relative z-10">
+                                    <div>
+                                        <h3 className="text-xl font-bold">{report.symbol}</h3>
+                                        <span className="text-[10px] font-bold uppercase tracking-widest text-primary px-2 py-0.5 bg-primary/10 rounded">{report.timeframe}</span>
                                     </div>
-                                    {report.lastSynced && (
-                                        <div className="mt-2 text-[8px] text-white/20 uppercase tracking-widest text-right">
-                                            Scanned: {new Date(report.lastSynced).toLocaleTimeString()}
+                                    <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full ${report.healthScore > 90 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
+                                        }`}>
+                                        {report.healthScore > 90 ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
+                                        {report.healthScore}%
+                                    </div>
+                                </div>
+
+                                <div className="space-y-4 relative z-10">
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-white/40">Continuity Health</span>
+                                        <span className={`font-medium ${report.healthScore > 90 ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                            {report.healthScore}%
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-white/40">Provider</span>
+                                        <span className="font-mono text-primary/80 uppercase tracking-tighter">{report.source || 'Unknown'}</span>
+                                    </div>
+                                    <div className="flex justify-between text-xs">
+                                        <span className="text-white/40">Internal Gaps</span>
+                                        <span className={`font-bold ${report.gaps?.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                            {report.gaps?.length || 0}
+                                        </span>
+                                    </div>
+                                    <div className="pt-2">
+                                        <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1">
+                                            <span>Target Horizon</span>
+                                            <span className={(report.targetCoveragePercent || 0) === 100 ? 'text-indigo-400' : 'text-primary'}>
+                                                {report.targetCoveragePercent || 0}%
+                                            </span>
                                         </div>
-                                    )}
+                                        <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden relative">
+                                            <div
+                                                className={`absolute top-0 left-0 h-full transition-all duration-1000 ${(report.targetCoveragePercent || 0) === 100 ? 'bg-indigo-500' : 'bg-primary'
+                                                    }`}
+                                                style={{ width: `${Math.min(report.targetCoveragePercent || 0, 100)}%` }}
+                                            />
+                                        </div>
+                                        <div className="mt-2 text-[8px] text-white/20 uppercase tracking-widest flex justify-between">
+                                            <span>{report.startIndex ? new Date(report.startIndex).getFullYear() : 'N/A'} - {report.endIndex ? new Date(report.endIndex).getFullYear() : 'N/A'}</span>
+                                            <span>Bars: {report.count.toLocaleString()}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))}
-                    {filteredReports.length === 0 && (
-                        <div className="col-span-full py-24 text-center text-white/20 font-bold uppercase tracking-widest">
-                            No data found. Try syncing a target.
-                        </div>
-                    )}
-                </div>
+                        ))}
+                        {filteredReports.length === 0 && (
+                            <div className="col-span-full py-24 text-center text-white/20 font-bold uppercase tracking-widest">
+                                No data found. Try syncing a target.
+                            </div>
+                        )}
+                    </div>
+                </>
             ) : (
                 <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-left-4 duration-500">
                     <div className="flex items-center gap-4">

@@ -14,13 +14,42 @@ export interface HealthReport {
     count: number
     startIndex: Date | null
     endIndex: Date | null
-    healthScore: number // 0-100
+    healthScore: number // 0-100 internal continuity
+    targetCoveragePercent: number // 0-100 against horizon limit
     gaps: DataGap[]
     lastSynced?: Date
     source?: string
 }
 
 export class DataHealthManager {
+    static getTargetHorizon(timeframe: Timeframe): number {
+        const now = Math.floor(Date.now() / 1000)
+        const ONE_YEAR = 31536000
+
+        switch (timeframe) {
+            case '1w':
+            case '1M':
+                return now - (15 * ONE_YEAR)
+            case '1d':
+                return now - (10 * ONE_YEAR)
+            case '1h':
+            case '2h':
+            case '3h':
+            case '4h':
+            case '1m':
+            case '3m':
+            case '5m':
+            case '10m':
+            case '15m':
+            case '30m':
+            case '45m':
+                return now - (5 * ONE_YEAR)
+            default:
+                // Fallback to 3 years
+                return now - (3 * ONE_YEAR)
+        }
+    }
+
     static timeframeToSeconds(timeframe: Timeframe): number {
         const units: Record<string, number> = {
             m: 60,
@@ -49,6 +78,7 @@ export class DataHealthManager {
                 startIndex: null,
                 endIndex: null,
                 healthScore: 0,
+                targetCoveragePercent: 0,
                 gaps: [],
                 source: 'N/A'
             }
@@ -85,6 +115,15 @@ export class DataHealthManager {
         const totalExpectedBars = data.length + missingBarsTotal
         const healthScore = Math.max(0, Math.min(100, (data.length / totalExpectedBars) * 100))
 
+        const targetStartUnix = this.getTargetHorizon(timeframe)
+        const actualHorizonSeconds = data[data.length - 1].time.getTime() / 1000 - data[0].time.getTime() / 1000
+        const desiredHorizonSeconds = data[data.length - 1].time.getTime() / 1000 - targetStartUnix
+
+        let targetCoveragePercent = 100
+        if (desiredHorizonSeconds > 0) {
+            targetCoveragePercent = Math.max(0, Math.min(100, (actualHorizonSeconds / desiredHorizonSeconds) * 100))
+        }
+
         // Use the source from the last bar as the primary source for the dataset
         const source = (data[data.length - 1] as any).source || 'unknown'
 
@@ -95,6 +134,7 @@ export class DataHealthManager {
             startIndex: data[0].time,
             endIndex: data[data.length - 1].time,
             healthScore: Math.round(healthScore),
+            targetCoveragePercent: Math.round(targetCoveragePercent),
             gaps,
             source
         }
@@ -125,6 +165,7 @@ export class DataHealthManager {
                     firstBar: report.startIndex,
                     lastBar: report.endIndex,
                     healthScore: report.healthScore,
+                    targetCoveragePercent: report.targetCoveragePercent,
                     barCount: report.count,
                     gapCount: report.gaps.length
                 },
@@ -136,6 +177,7 @@ export class DataHealthManager {
                     firstBar: report.startIndex,
                     lastBar: report.endIndex,
                     healthScore: report.healthScore,
+                    targetCoveragePercent: report.targetCoveragePercent,
                     barCount: report.count,
                     gapCount: report.gaps.length
                 }
@@ -155,6 +197,7 @@ export class DataHealthManager {
                 startIndex: item.firstBar,
                 endIndex: item.lastBar,
                 healthScore: item.healthScore,
+                targetCoveragePercent: item.targetCoveragePercent,
                 lastSynced: item.lastSynced,
                 source: item.source,
                 gaps: [] // Gaps are not stored in inventory currently for simplicity

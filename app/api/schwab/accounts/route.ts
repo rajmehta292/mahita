@@ -94,11 +94,27 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const response = await client.getAccounts()
+    const [response, numbersResponse] = await Promise.all([
+      client.getAccounts(),
+      client.getAccountNumbers()
+    ])
 
-    if (response.data && Array.isArray(response.data)) {
-      console.log(`[Schwab Accounts] Found ${response.data.length} accounts`)
-      response.data.forEach((acc: any, i: number) => {
+    const accountNumbers = numbersResponse.data || []
+    const hashMap = new Map(accountNumbers.map((n: any) => [n.accountNumber, n.hashValue]))
+
+    const mergedAccounts = (response.data || []).map((acc: any) => {
+      const sAcc = acc.securitiesAccount || {}
+      if (sAcc.accountNumber && hashMap.has(sAcc.accountNumber)) {
+        sAcc.hashValue = hashMap.get(sAcc.accountNumber)
+        // Ensure accountId is present for UI compatibility
+        sAcc.accountId = sAcc.accountNumber
+      }
+      return acc
+    })
+
+    if (mergedAccounts && Array.isArray(mergedAccounts)) {
+      console.log(`[Schwab Accounts] Found ${mergedAccounts.length} accounts`)
+      mergedAccounts.forEach((acc: any, i: number) => {
         const sAcc = acc.securitiesAccount
         console.log(`  Account ${i}: ID=${sAcc?.accountId}, Hash=${sAcc?.hashValue ? 'Present' : 'MISSING'}`)
       })
@@ -106,7 +122,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      accounts: response.data,
+      accounts: mergedAccounts,
     })
   } catch (error: any) {
     const errorData = error.response?.data

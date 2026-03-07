@@ -198,6 +198,13 @@ export class SchwabClient {
   }
 
   /**
+   * Get all account numbers and their corresponding hash values
+   */
+  async getAccountNumbers() {
+    return await this.request(`${this.traderUrl}/accounts/accountNumbers`)
+  }
+
+  /**
    * Get account positions
    */
   async getPositions(accountId: string): Promise<Position[]> {

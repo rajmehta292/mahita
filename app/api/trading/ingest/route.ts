@@ -26,27 +26,74 @@ export async function POST(request: NextRequest) {
             for (const tf of timeframes) {
                 console.log(`[IngestCron] Checking gaps for ${sym} @ ${tf}...`)
 
-                // 1. Initial 1-year historical fetch if entirely missing
+                // 1. Initial deep historical fetch if entirely missing
                 const health = await DataHealthManager.getHealth(sym, tf)
-                if (health.count === 0) {
-                    const oneYearAgo = Math.floor(Date.now() / 1000) - (365 * 24 * 60 * 60)
-                    const now = Math.floor(Date.now() / 1000)
+                const targetStart = DataHealthManager.getTargetHorizon(tf)
+                const now = Math.floor(Date.now() / 1000)
+                const ONE_YEAR = 31536000
 
-                    console.log(`[IngestCron] No data found. Bootstrapping ${sym}...`)
-                    const fetched = await marketDataStore.getHistoricalData(sym, tf, oneYearAgo, now)
-                    results.push({ symbol: sym, timeframe: tf, action: 'bootstrapped', newBars: fetched.length })
+                if (health.count === 0) {
+                    console.log(`[IngestCron] No data found for ${sym}. Bootstrapping from ${new Date(targetStart * 1000).toISOString()}...`)
+                    let currentStart = targetStart
+                    let totalFetched = 0
+
+                    while (currentStart < now) {
+                        const currentEnd = Math.min(currentStart + (ONE_YEAR * 2), now) // 2 year chunks to avoid rate limits/OOM
+                        try {
+                            console.log(`  -> Fetching chunk ${new Date(currentStart * 1000).toISOString()} to ${new Date(currentEnd * 1000).toISOString()}`)
+                            const fetched = await marketDataStore.getHistoricalData(sym, tf, currentStart, currentEnd)
+                            totalFetched += fetched.length
+
+                            // Prevent infinite loops if provider returns empty for older ranges (e.g. IPO was recent)
+                            if (fetched.length === 0 && currentStart < now - (ONE_YEAR * 5)) {
+                                console.log(`  -> No data found for deep chunk, assumption: Asset did not exist yet (pre-IPO). Bailing early.`)
+                                break;
+                            }
+                            await new Promise(resolve => setTimeout(resolve, 1500)) // Rate limit delay
+                        } catch (e) {
+                            console.error(`[IngestCron] Chunk failed for ${sym}:`, e)
+                            break;
+                        }
+                        currentStart = currentEnd
+                    }
+
+                    results.push({ symbol: sym, timeframe: tf, action: 'bootstrapped', newBars: totalFetched })
                     continue
                 }
 
-                // 2. Continuous Sync Gaps if data exists but is fragmented
+                // 2. Pre-pend missing deep historical data if coverage < 100%
+                if (health.targetCoveragePercent < 100 && health.startIndex) {
+                    const actualStart = Math.floor(health.startIndex.getTime() / 1000)
+                    if (actualStart > targetStart + (ONE_YEAR)) { // Only backfill if we're missing more than a year
+                        console.log(`[IngestCron] Low coverage (${health.targetCoveragePercent}%). Backfilling deep history for ${sym}...`)
+
+                        let currentStart = targetStart
+                        let totalFetched = 0
+
+                        while (currentStart < actualStart) {
+                            const currentEnd = Math.min(currentStart + (ONE_YEAR * 2), actualStart)
+                            try {
+                                const fetched = await marketDataStore.getHistoricalData(sym, tf, currentStart, currentEnd)
+                                totalFetched += fetched.length
+                                if (fetched.length === 0 && currentStart < actualStart - (ONE_YEAR * 5)) break;
+                                await new Promise(resolve => setTimeout(resolve, 1500))
+                            } catch (e) {
+                                break;
+                            }
+                            currentStart = currentEnd
+                        }
+                        results.push({ symbol: sym, timeframe: tf, action: 'historical_backfill', newBars: totalFetched })
+                    }
+                }
+
+                // 3. Continuous Sync Internal Gaps if data exists but is fragmented
                 if (health.gaps && health.gaps.length > 0) {
-                    console.log(`[IngestCron] Healing ${health.gaps.length} gaps for ${sym}...`)
+                    console.log(`[IngestCron] Healing ${health.gaps.length} internal gaps for ${sym}...`)
                     const fixReport = await DataHealthManager.syncGaps(sym, tf)
                     results.push({ symbol: sym, timeframe: tf, action: 'healed', ...fixReport })
                 } else {
-                    // 3. Just catch up to present day
+                    // 4. Just catch up to present day (tail sync)
                     const lastBarUnix = Math.floor(health.endIndex!.getTime() / 1000)
-                    const now = Math.floor(Date.now() / 1000)
 
                     if (now - lastBarUnix > DataHealthManager.timeframeToSeconds(tf) * 2) {
                         const fetched = await marketDataStore.getHistoricalData(sym, tf, lastBarUnix, now)
