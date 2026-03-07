@@ -44,6 +44,7 @@ export async function GET(request: NextRequest) {
     // Initialize client with user's credentials
     const client = initializeSchwabClient({
       clientId,
+      clientSecret,
       callbackUrl,
     })
 
@@ -107,7 +108,7 @@ export async function POST(request: NextRequest) {
     const { clientId, clientSecret } = user.schwabConfig
     const callbackUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/schwab/callback`
 
-    const client = getSchwabClient({ clientId, callbackUrl })
+    const client = getSchwabClient({ clientId, clientSecret, callbackUrl })
     const authResponse = await client.authenticate(code)
 
     // Calculate expiry times

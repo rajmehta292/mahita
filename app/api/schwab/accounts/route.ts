@@ -53,8 +53,8 @@ export async function GET(request: NextRequest) {
     })
 
     client.setAccessToken(
-      config.accessToken,
-      config.refreshToken,
+      config.accessToken || '',
+      config.refreshToken || '',
       config.accessTokenExpiry ? Math.floor((config.accessTokenExpiry.getTime() - Date.now()) / 1000) : undefined,
       config.refreshTokenExpiry ? Math.floor((config.refreshTokenExpiry.getTime() - Date.now()) / 1000) : undefined
     )

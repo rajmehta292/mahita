@@ -1,11 +1,11 @@
-// @ts-ignore - The third party typings don't resolve properly with nextJS exports map
-import { TDAmeritradeAPI } from '@allensarkisyan/schwab-td-ameritrade-api'
-
 export interface SchwabConfig {
   clientId: string
+  clientSecret?: string
   callbackUrl: string
   accessToken?: string
   refreshToken?: string
+  accessTokenExpiry?: Date
+  refreshTokenExpiry?: Date
 }
 
 export interface SchwabAuthResponse {
@@ -46,19 +46,47 @@ export interface AccountBalance {
 }
 
 export class SchwabClient {
-  private client: TDAmeritradeAPI
   private config: SchwabConfig
+  private traderUrl = 'https://api.schwabapi.com/trader/v1'
+  private marketDataUrl = 'https://api.schwabapi.com/marketdata/v1'
 
   constructor(config: SchwabConfig) {
     this.config = config
-    this.client = new TDAmeritradeAPI({
-      clientId: config.clientId,
-      callbackUrl: config.callbackUrl,
-    })
+  }
 
-    if (config.accessToken && config.refreshToken) {
-      this.setAccessToken(config.accessToken, config.refreshToken)
+  private async request(url: string, options: RequestInit = {}) {
+    if (!this.config.accessToken) {
+      throw new Error('Access token is missing. Please authenticate first.')
     }
+
+    const headers = {
+      'Authorization': `Bearer ${this.config.accessToken}`,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    }
+
+    const response = await fetch(url, { ...options, headers })
+
+    if (!response.ok) {
+      let errorData
+      try {
+        errorData = await response.json()
+      } catch (e) {
+        errorData = { message: await response.text() }
+      }
+
+      const errorMsg = errorData?.message || errorData?.error || response.statusText
+      const error = new Error(`Schwab API Error ${response.status}: ${errorMsg}`)
+        ; (error as any).response = { status: response.status, data: errorData }
+      throw error
+    }
+
+    // Handle empty responses (like 204 No Content for cancels or 201 Created)
+    if (response.status === 204) return { data: null }
+    if (response.status === 201) return { data: null, headers: { location: response.headers.get('location') } }
+
+    return { data: await response.json() }
   }
 
   /**
@@ -72,44 +100,65 @@ export class SchwabClient {
    * Authenticate with authorization code
    */
   async authenticate(authorizationCode: string): Promise<SchwabAuthResponse> {
-    const response = await this.client.authenticate(authorizationCode)
-    return response.data as SchwabAuthResponse
+    if (!this.config.clientSecret) {
+      throw new Error('clientSecret is required to authenticate')
+    }
+
+    const credentials = Buffer.from(`${this.config.clientId}:${this.config.clientSecret}`).toString('base64')
+
+    const response = await fetch('https://api.schwabapi.com/v1/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${credentials}`
+      },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: authorizationCode,
+        redirect_uri: this.config.callbackUrl
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      throw new Error(`Authentication failed (${response.status}): ${errorText}`)
+    }
+
+    return await response.json() as SchwabAuthResponse
   }
 
   /**
    * Set access token manually
    */
-  setAccessToken(accessToken: string, refreshToken: string, expiresIn?: number, refreshTokenExpiresIn?: number) {
-    this.client.setUserAccessToken({
-      userAccessToken: accessToken,
-      accessTokenExpires: expiresIn,
-      refreshToken: refreshToken,
-      refreshTokenExpires: refreshTokenExpiresIn,
-    })
+  setAccessToken(
+    accessToken: string,
+    refreshToken: string,
+    expiresIn?: number,
+    refreshTokenExpiresIn?: number
+  ) {
+    this.config.accessToken = accessToken
+    this.config.refreshToken = refreshToken
   }
 
   /**
    * Get account information
    */
   async getAccount(accountId: string) {
-    return await this.client.getAccount(accountId)
+    return await this.request(`${this.traderUrl}/accounts/${accountId}`)
   }
 
   /**
    * Get all accounts
    */
   async getAccounts() {
-    return await this.client.getAccounts()
+    return await this.request(`${this.traderUrl}/accounts`)
   }
 
   /**
    * Get account positions
    */
   async getPositions(accountId: string): Promise<Position[]> {
-    const response = await this.client.getAccount(accountId, {
-      fields: 'positions'
-    })
-
+    const response = await this.request(`${this.traderUrl}/accounts/${accountId}?fields=positions`)
     const positions = response.data?.securitiesAccount?.positions || []
 
     return positions.map((pos: any) => ({
@@ -127,7 +176,7 @@ export class SchwabClient {
    * Get account balance
    */
   async getBalance(accountId: string): Promise<AccountBalance> {
-    const response = await this.client.getAccount(accountId)
+    const response = await this.request(`${this.traderUrl}/accounts/${accountId}`)
     const balances = response.data?.securitiesAccount?.currentBalances || {}
 
     return {
@@ -144,14 +193,19 @@ export class SchwabClient {
    */
   async placeOrder(accountId: string, order: OrderRequest) {
     const orderPayload = this.buildOrderPayload(order)
-    return await this.client.placeOrder(accountId, orderPayload)
+    return await this.request(`${this.traderUrl}/accounts/${accountId}/orders`, {
+      method: 'POST',
+      body: JSON.stringify(orderPayload)
+    })
   }
 
   /**
    * Cancel an order
    */
   async cancelOrder(accountId: string, orderId: string) {
-    return await this.client.cancelOrder(accountId, orderId)
+    return await this.request(`${this.traderUrl}/accounts/${accountId}/orders/${orderId}`, {
+      method: 'DELETE'
+    })
   }
 
   /**
@@ -163,21 +217,23 @@ export class SchwabClient {
     toEnteredTime?: string
     status?: string
   }) {
-    return await this.client.getOrdersByAccount(accountId, params)
+    const query = params ? `?${new URLSearchParams(params as any).toString()}` : ''
+    return await this.request(`${this.traderUrl}/accounts/${accountId}/orders${query}`)
   }
 
   /**
    * Get quote for symbol
    */
   async getQuote(symbol: string) {
-    return await this.client.getQuote(symbol)
+    return await this.request(`${this.marketDataUrl}/${symbol}/quotes`)
   }
 
   /**
    * Get quotes for multiple symbols
    */
   async getQuotes(symbols: string[]) {
-    return await this.client.getQuotes(symbols)
+    const query = `?symbols=${symbols.join(',')}`
+    return await this.request(`${this.marketDataUrl}/quotes${query}`)
   }
 
   /**
@@ -191,14 +247,26 @@ export class SchwabClient {
     startDate?: number
     endDate?: number
   }) {
-    return await this.client.getPriceHistory(symbol, params)
+    const queryParams: Record<string, string> = {}
+    if (params) {
+      if (params.periodType) queryParams.periodType = params.periodType
+      if (params.period) queryParams.period = params.period.toString()
+      if (params.frequencyType) queryParams.frequencyType = params.frequencyType
+      if (params.frequency) queryParams.frequency = params.frequency.toString()
+      if (params.startDate) queryParams.startDate = params.startDate.toString()
+      if (params.endDate) queryParams.endDate = params.endDate.toString()
+    }
+    const query = Object.keys(queryParams).length > 0 ? `?${new URLSearchParams(queryParams).toString()}` : ''
+    return await this.request(`${this.marketDataUrl}/pricehistory${query}&symbol=${symbol}`)
   }
 
   /**
    * Get option chain
    */
   async getOptionChain(symbol: string, params?: any) {
-    return await this.client.getOptionChain(symbol, params)
+    const queryParams = { symbol, ...params }
+    const query = `?${new URLSearchParams(queryParams).toString()}`
+    return await this.request(`${this.marketDataUrl}/chains${query}`)
   }
 
   /**
@@ -240,207 +308,207 @@ export class SchwabClient {
 }
 
 export class MockSchwabClient extends SchwabClient {
-    constructor(config: SchwabConfig) {
-        // We still call super to initialize the base class, but we will override the methods
-        super(config)
-    }
+  constructor(config: SchwabConfig) {
+    // We still call super to initialize the base class, but we will override the methods
+    super(config)
+  }
 
-    getAuthorizationUrl(): string {
-        return `${this['config'].callbackUrl}?code=mock_auth_code_12345`
-    }
+  getAuthorizationUrl(): string {
+    return `${this['config'].callbackUrl}?code=mock_auth_code_12345`
+  }
 
-    async authenticate(authorizationCode: string): Promise<SchwabAuthResponse> {
-        return {
-            access_token: 'mock_access_token_' + Date.now(),
-            refresh_token: 'mock_refresh_token_' + Date.now(),
-            expires_in: 1800,
-            refresh_token_expires_in: 604800,
-            token_type: 'Bearer'
+  async authenticate(authorizationCode: string): Promise<SchwabAuthResponse> {
+    return {
+      access_token: 'mock_access_token_' + Date.now(),
+      refresh_token: 'mock_refresh_token_' + Date.now(),
+      expires_in: 1800,
+      refresh_token_expires_in: 604800,
+      token_type: 'Bearer'
+    }
+  }
+
+  async getAccount(accountId: string) {
+    return {
+      data: {
+        securitiesAccount: {
+          accountId,
+          type: 'MARGIN',
+          currentBalances: {
+            cashBalance: 25000.00,
+            equity: 105000.00,
+            buyingPower: 210000.00,
+            dayTradingBuyingPower: 420000.00,
+            maintenanceRequirement: 15000.00
+          }
         }
+      }
     }
+  }
 
-    async getAccount(accountId: string) {
-        return {
-            data: {
-                securitiesAccount: {
-                    accountId,
-                    type: 'MARGIN',
-                    currentBalances: {
-                        cashBalance: 25000.00,
-                        equity: 105000.00,
-                        buyingPower: 210000.00,
-                        dayTradingBuyingPower: 420000.00,
-                        maintenanceRequirement: 15000.00
-                    }
-                }
+  async getAccounts() {
+    return {
+      data: [
+        {
+          securitiesAccount: {
+            accountId: 'MOCK_ACCT_001',
+            type: 'MARGIN',
+            currentBalances: {
+              cashBalance: 25000.00,
+              equity: 105000.00,
+              buyingPower: 210000.00
             }
+          }
         }
+      ]
     }
+  }
 
-    async getAccounts() {
-        return {
-            data: [
-                {
-                    securitiesAccount: {
-                        accountId: 'MOCK_ACCT_001',
-                        type: 'MARGIN',
-                        currentBalances: {
-                            cashBalance: 25000.00,
-                            equity: 105000.00,
-                            buyingPower: 210000.00
-                        }
-                    }
-                }
-            ]
-        }
+  async getPositions(accountId: string): Promise<Position[]> {
+    return [
+      {
+        symbol: 'AAPL',
+        quantity: 100,
+        averagePrice: 150.00,
+        currentPrice: 175.50,
+        marketValue: 17550.00,
+        unrealizedPL: 2550.00,
+        unrealizedPLPercent: 17.00
+      },
+      {
+        symbol: 'MSFT',
+        quantity: 50,
+        averagePrice: 380.00,
+        currentPrice: 410.68,
+        marketValue: 20534.00,
+        unrealizedPL: 1534.00,
+        unrealizedPLPercent: 8.07
+      }
+    ]
+  }
+
+  async getBalance(accountId: string): Promise<AccountBalance> {
+    const res = await this.getAccount(accountId)
+    const balances = res.data.securitiesAccount.currentBalances
+    return {
+      cashBalance: balances.cashBalance,
+      equity: balances.equity,
+      buyingPower: balances.buyingPower,
+      dayTradingBuyingPower: balances.dayTradingBuyingPower,
+      maintenanceRequirement: balances.maintenanceRequirement
     }
+  }
 
-    async getPositions(accountId: string): Promise<Position[]> {
-        return [
+  async placeOrder(accountId: string, order: OrderRequest) {
+    console.log(`[MOCK] Order Placed: ${order.instruction} ${order.quantity} ${order.symbol}`)
+    return {
+      data: {
+        orderId: 'MOCK_ORDER_' + Date.now()
+      }
+    }
+  }
+
+  async cancelOrder(accountId: string, orderId: string) {
+    console.log(`[MOCK] Order Cancelled: ${orderId}`)
+    return { data: { success: true } }
+  }
+
+  async getOrders(accountId: string, params?: any) {
+    return {
+      data: [
+        {
+          orderId: 'MOCK_ORDER_1',
+          status: 'FILLED',
+          enteredTime: new Date(Date.now() - 86400000).toISOString(),
+          orderLegCollection: [
             {
-                symbol: 'AAPL',
-                quantity: 100,
-                averagePrice: 150.00,
-                currentPrice: 175.50,
-                marketValue: 17550.00,
-                unrealizedPL: 2550.00,
-                unrealizedPLPercent: 17.00
-            },
-            {
-                symbol: 'MSFT',
-                quantity: 50,
-                averagePrice: 380.00,
-                currentPrice: 410.68,
-                marketValue: 20534.00,
-                unrealizedPL: 1534.00,
-                unrealizedPLPercent: 8.07
+              instruction: 'BUY',
+              quantity: 100,
+              instrument: { symbol: 'AAPL' },
+              price: 150.00
             }
-        ]
+          ]
+        }
+      ]
+    }
+  }
+
+  async getQuote(symbol: string) {
+    return {
+      data: {
+        [symbol]: {
+          symbol,
+          lastPrice: 100.00 + (Math.random() * 10),
+          netChange: Math.random() * 2 - 1,
+          totalVolume: 1000000
+        }
+      }
+    }
+  }
+
+  async getQuotes(symbols: string[]) {
+    const quotes: any = {}
+    for (const sym of symbols) {
+      quotes[sym] = {
+        symbol: sym,
+        lastPrice: 100.00 + (Math.random() * 10),
+        netChange: Math.random() * 2 - 1,
+        totalVolume: 1000000
+      }
+    }
+    return { data: quotes }
+  }
+
+  async getPriceHistory(symbol: string, params?: any) {
+    console.log(`[MOCK] Generating synthetic price history for ${symbol}`)
+    const candles = []
+
+    // Determine number of candles (e.g., mock 100 candles if dates not specified carefully)
+    let numCandles = 100
+    let intervalMs = 60000 // 1 minute default
+
+    if (params?.frequencyType === 'daily') {
+      intervalMs = 86400000
     }
 
-    async getBalance(accountId: string): Promise<AccountBalance> {
-        const res = await this.getAccount(accountId)
-        const balances = res.data.securitiesAccount.currentBalances
-        return {
-            cashBalance: balances.cashBalance,
-            equity: balances.equity,
-            buyingPower: balances.buyingPower,
-            dayTradingBuyingPower: balances.dayTradingBuyingPower,
-            maintenanceRequirement: balances.maintenanceRequirement
-        }
+    let startTime = params?.startDate || (Date.now() - (numCandles * intervalMs))
+    let currentPrice = 150.0
+
+    for (let i = 0; i < numCandles; i++) {
+      const open = currentPrice + (Math.random() * 2 - 1)
+      const high = open + Math.random() * 2
+      const low = open - Math.random() * 2
+      const close = low + Math.random() * (high - low)
+
+      candles.push({
+        datetime: startTime + (i * intervalMs),
+        open,
+        high,
+        low,
+        close,
+        volume: Math.floor(Math.random() * 10000)
+      })
+      currentPrice = close
     }
 
-    async placeOrder(accountId: string, order: OrderRequest) {
-        console.log(`[MOCK] Order Placed: ${order.instruction} ${order.quantity} ${order.symbol}`)
-        return {
-            data: {
-                orderId: 'MOCK_ORDER_' + Date.now()
-            }
-        }
+    return {
+      data: {
+        candles,
+        symbol,
+        empty: false
+      }
     }
+  }
 
-    async cancelOrder(accountId: string, orderId: string) {
-        console.log(`[MOCK] Order Cancelled: ${orderId}`)
-        return { data: { success: true } }
+  async getOptionChain(symbol: string, params?: any) {
+    return {
+      data: {
+        symbol,
+        status: "SUCCESS",
+        callExpDateMap: {},
+        putExpDateMap: {}
+      }
     }
-
-    async getOrders(accountId: string, params?: any) {
-        return {
-            data: [
-                {
-                    orderId: 'MOCK_ORDER_1',
-                    status: 'FILLED',
-                    enteredTime: new Date(Date.now() - 86400000).toISOString(),
-                    orderLegCollection: [
-                        {
-                            instruction: 'BUY',
-                            quantity: 100,
-                            instrument: { symbol: 'AAPL' },
-                            price: 150.00
-                        }
-                    ]
-                }
-            ]
-        }
-    }
-
-    async getQuote(symbol: string) {
-        return {
-            data: {
-                [symbol]: {
-                    symbol,
-                    lastPrice: 100.00 + (Math.random() * 10),
-                    netChange: Math.random() * 2 - 1,
-                    totalVolume: 1000000
-                }
-            }
-        }
-    }
-
-    async getQuotes(symbols: string[]) {
-        const quotes: any = {}
-        for (const sym of symbols) {
-            quotes[sym] = {
-                symbol: sym,
-                lastPrice: 100.00 + (Math.random() * 10),
-                netChange: Math.random() * 2 - 1,
-                totalVolume: 1000000
-            }
-        }
-        return { data: quotes }
-    }
-
-    async getPriceHistory(symbol: string, params?: any) {
-        console.log(`[MOCK] Generating synthetic price history for ${symbol}`)
-        const candles = []
-
-        // Determine number of candles (e.g., mock 100 candles if dates not specified carefully)
-        let numCandles = 100
-        let intervalMs = 60000 // 1 minute default
-
-        if (params?.frequencyType === 'daily') {
-            intervalMs = 86400000
-        }
-
-        let startTime = params?.startDate || (Date.now() - (numCandles * intervalMs))
-        let currentPrice = 150.0
-
-        for (let i = 0; i < numCandles; i++) {
-            const open = currentPrice + (Math.random() * 2 - 1)
-            const high = open + Math.random() * 2
-            const low = open - Math.random() * 2
-            const close = low + Math.random() * (high - low)
-
-            candles.push({
-                datetime: startTime + (i * intervalMs),
-                open,
-                high,
-                low,
-                close,
-                volume: Math.floor(Math.random() * 10000)
-            })
-            currentPrice = close
-        }
-
-        return {
-            data: {
-                candles,
-                symbol,
-                empty: false
-            }
-        }
-    }
-
-    async getOptionChain(symbol: string, params?: any) {
-        return {
-            data: {
-                symbol,
-                status: "SUCCESS",
-                callExpDateMap: {},
-                putExpDateMap: {}
-            }
-        }
-    }
+  }
 }
 
 // Singleton instance

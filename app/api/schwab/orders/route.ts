@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      orderId: response.headers?.location?.split('/').pop(),
+      orderId: (response as any).headers?.location?.split('/').pop(),
     })
   } catch (error: any) {
     console.error('Schwab place order error:', error)
