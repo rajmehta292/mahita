@@ -21,6 +21,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (process.env.USE_MOCK_DATA === 'true') {
+      return NextResponse.json({
+        success: true,
+        config: {
+          hasClientId: true,
+          hasClientSecret: true,
+          hasAccessToken: true,
+          hasRefreshToken: true,
+          accessTokenExpiry: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
+          refreshTokenExpiry: new Date(Date.now() + 1000 * 60 * 60 * 24 * 365),
+        }
+      })
+    }
+
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },
       include: { schwabConfig: true }

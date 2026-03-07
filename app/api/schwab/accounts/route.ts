@@ -22,6 +22,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (process.env.USE_MOCK_DATA === 'true') {
+      const client = getSchwabClient({ clientId: 'mock', clientSecret: 'mock', callbackUrl: 'mock' })
+      client.setAccessToken('mock', 'mock')
+      const response = await client.getAccounts()
+      return NextResponse.json({ success: true, accounts: response.data })
+    }
+
     // Get user's Schwab config with tokens
     const user = await prisma.user.findUnique({
       where: { email: session.user.email },

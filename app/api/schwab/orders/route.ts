@@ -9,6 +9,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (process.env.USE_MOCK_DATA === 'true') {
+      const searchParams = request.nextUrl.searchParams
+      const accountId = searchParams.get('accountId') || 'mock'
+      const client = getSchwabClient({ clientId: 'mock', clientSecret: 'mock', callbackUrl: 'mock' })
+      client.setAccessToken('mock', 'mock')
+      const response = await client.getOrders(accountId)
+      return NextResponse.json({ success: true, orders: response.data })
+    }
+
     const searchParams = request.nextUrl.searchParams
     const accessToken = searchParams.get('accessToken')
     const refreshToken = searchParams.get('refreshToken')
@@ -56,6 +65,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (process.env.USE_MOCK_DATA === 'true') {
+      const body = await request.json()
+      const accountId = body.accountId || 'mock'
+      const client = getSchwabClient({ clientId: 'mock', clientSecret: 'mock', callbackUrl: 'mock' })
+      client.setAccessToken('mock', 'mock')
+      const response = await client.placeOrder(accountId, body.order)
+      return NextResponse.json({ success: true, orderId: (response as any).headers?.location?.split('/').pop() || 'mock-id' })
+    }
+
     const body = await request.json()
     const { accessToken, refreshToken, accountId, order } = body
 
@@ -99,6 +117,10 @@ export async function DELETE(request: NextRequest) {
     const session = await getServerSession()
     if (!session) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (process.env.USE_MOCK_DATA === 'true') {
+      return NextResponse.json({ success: true, message: 'Order cancelled successfully' })
     }
 
     const searchParams = request.nextUrl.searchParams
