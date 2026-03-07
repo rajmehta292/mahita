@@ -44,39 +44,79 @@ export async function GET(request: NextRequest) {
 
     const config = user.schwabConfig
 
-    if (process.env.USE_MOCK_DATA !== 'true') {
-      if (!config.accessToken || !config.refreshToken) {
-        return NextResponse.json(
-          { error: 'Please connect your Schwab account first' },
-          { status: 400 }
-        )
-      }
+    if (!config.clientId || !config.clientSecret) {
+      return NextResponse.json({ error: 'Schwab Client ID or Secret missing' }, { status: 400 })
+    }
+
+    if (!config.accessToken || !config.refreshToken) {
+      return NextResponse.json(
+        { error: 'Please connect your Schwab account first' },
+        { status: 400 }
+      )
     }
 
     const callbackUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/schwab/callback`
     const client = getSchwabClient({
       clientId: config.clientId,
+      clientSecret: config.clientSecret,
       callbackUrl
     })
 
     client.setAccessToken(
-      config.accessToken || '',
-      config.refreshToken || '',
-      config.accessTokenExpiry ? Math.floor((config.accessTokenExpiry.getTime() - Date.now()) / 1000) : undefined,
-      config.refreshTokenExpiry ? Math.floor((config.refreshTokenExpiry.getTime() - Date.now()) / 1000) : undefined
+      config.accessToken,
+      config.refreshToken
     )
 
+    // Check if token is expired or near expiry (less than 5 mins)
+    const isExpired = config.accessTokenExpiry && (config.accessTokenExpiry.getTime() - Date.now() < 300000)
+
+    if (isExpired) {
+      console.log('Schwab token near expiry, refreshing...')
+      try {
+        const newTokens = await client.refreshAccessToken(config.refreshToken)
+
+        // Save new tokens to DB
+        await prisma.schwabConfig.update({
+          where: { id: config.id },
+          data: {
+            accessToken: newTokens.access_token,
+            refreshToken: newTokens.refresh_token,
+            accessTokenExpiry: new Date(Date.now() + newTokens.expires_in * 1000),
+            refreshTokenExpiry: new Date(Date.now() + newTokens.refresh_token_expires_in * 1000)
+          }
+        })
+
+        client.setAccessToken(newTokens.access_token, newTokens.refresh_token)
+        console.log('Schwab token refreshed successfully')
+      } catch (refreshError) {
+        console.error('Failed to refresh Schwab token:', refreshError)
+        return NextResponse.json({ error: 'Session expired. Please reconnect Schwab.' }, { status: 401 })
+      }
+    }
+
     const response = await client.getAccounts()
+
+    if (response.data && Array.isArray(response.data)) {
+      console.log(`[Schwab Accounts] Found ${response.data.length} accounts`)
+      response.data.forEach((acc: any, i: number) => {
+        const sAcc = acc.securitiesAccount
+        console.log(`  Account ${i}: ID=${sAcc?.accountId}, Hash=${sAcc?.hashValue ? 'Present' : 'MISSING'}`)
+      })
+    }
 
     return NextResponse.json({
       success: true,
       accounts: response.data,
     })
   } catch (error: any) {
-    console.error('Schwab accounts error:', error)
+    const errorData = error.response?.data
+    console.error('Schwab accounts route error:', errorData || error.message)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch accounts' },
-      { status: 500 }
+      {
+        error: error.message || 'Failed to fetch accounts',
+        details: errorData
+      },
+      { status: error.response?.status || 500 }
     )
   }
 }

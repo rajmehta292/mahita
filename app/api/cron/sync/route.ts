@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
         // 5. Sync the gaps
         for (const item of needsSync) {
             console.log(`[CRON] Syncing gaps for ${item.symbol} ${item.timeframe}...`)
-            const result = await DataHealthManager.syncGaps(item.symbol, item.timeframe as Timeframe, client)
+            const result = await DataHealthManager.syncGaps(item.symbol, item.timeframe as Timeframe)
             totalGapsFixed += result.gapsFixed
             totalBarsAdded += result.barsAdded
             syncedItems.push(item.symbol)

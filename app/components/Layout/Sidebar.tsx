@@ -26,7 +26,7 @@ const menuItems = [
     { icon: Briefcase, label: 'Portfolio', href: '/portfolio' },
     { icon: Zap, label: 'Active Trader', href: '/active-trader' },
     { icon: TrendingUp, label: 'Chart', href: '/chart' },
-    { icon: Activity, label: 'Screener', href: '/screener' },
+    { icon: Activity, label: 'Data Doctor', href: '/data-doctor' },
     { icon: List, label: 'Orders', href: '/orders' },
     { icon: Star, label: 'Watchlist', href: '/watchlist' },
     { icon: Code, label: 'Script Editor', href: '/script-editor' },
@@ -50,23 +50,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     } ${collapsed ? 'lg:w-14' : 'lg:w-56'
                     } w-64`}
             >
-                {/* Header/Collapse Toggle (Desktop only for collapse) */}
-                <div className="h-12 flex items-center justify-between px-4 border-b border-[#2A2E39]">
-                    <span className={`text-white font-bold text-sm ${collapsed ? 'lg:hidden' : ''}`}>Menu Navigation</span>
-                    <button
-                        onClick={() => setCollapsed(!collapsed)}
-                        className="hidden lg:flex items-center justify-center p-1 hover:bg-[#2A2E39] rounded transition-colors"
-                    >
-                        {collapsed ? (
-                            <ChevronRight className="w-4 h-4 text-gray-400" />
-                        ) : (
-                            <ChevronLeft className="w-4 h-4 text-gray-400" />
-                        )}
-                    </button>
-                    {/* Mobile Close Button */}
+                {/* Header (Mobile ONLY Close) */}
+                <div className="h-12 flex lg:hidden items-center justify-between px-4 border-b border-[#2A2E39]">
+                    <span className="text-white font-bold text-sm">Menu Navigation</span>
                     <button
                         onClick={onClose}
-                        className="lg:hidden p-1 hover:bg-[#2A2E39] rounded"
+                        className="p-1 hover:bg-[#2A2E39] rounded"
                     >
                         <X className="w-5 h-5 text-gray-400" />
                     </button>
@@ -99,7 +88,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                     })}
                 </nav>
 
-                {/* Settings at Bottom */}
+                {/* Settings & Collapse at Bottom */}
                 <div className="border-t border-[#2A2E39]">
                     <Link
                         href="/settings"
@@ -113,6 +102,21 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                             Settings
                         </span>
                     </Link>
+
+                    {/* Desktop Collapse Toggle at Bottom */}
+                    <button
+                        onClick={() => setCollapsed(!collapsed)}
+                        className="hidden lg:flex w-full items-center gap-3 px-4 py-3 text-gray-500 hover:text-white hover:bg-[#2A2E39] transition-colors border-t border-[#2A2E39]/50"
+                    >
+                        {collapsed ? (
+                            <ChevronRight className="w-5 h-5 flex-shrink-0" />
+                        ) : (
+                            <ChevronLeft className="w-5 h-5 flex-shrink-0" />
+                        )}
+                        <span className={`text-xs font-bold uppercase tracking-widest transition-opacity duration-300 ${collapsed ? 'opacity-0 w-0 overflow-hidden' : 'opacity-100'}`}>
+                            Collapse Menu
+                        </span>
+                    </button>
                 </div>
             </div>
         </>

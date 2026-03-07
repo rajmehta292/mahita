@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
         })
 
         // 3. Trigger sync
-        const result = await DataHealthManager.syncGaps(symbol, timeframe as Timeframe, client)
+        const result = await DataHealthManager.syncGaps(symbol, timeframe as Timeframe)
 
         return NextResponse.json({
             success: true,

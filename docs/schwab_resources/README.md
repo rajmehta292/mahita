@@ -9,6 +9,7 @@ This folder contains comprehensive documentation on the Schwab OAuth integration
 | Document | Description |
 |----------|-------------|
 | [OAUTH_IMPLEMENTATION.md](./OAUTH_IMPLEMENTATION.md) | Complete OAuth flow, token exchange, and API integration |
+| [OAUTH_CALLBACK_FLOW.md](./OAUTH_CALLBACK_FLOW.md) | Popup window, authorization code capture, postMessage flow |
 | [MULTI_USER_SESSIONS.md](./MULTI_USER_SESSIONS.md) | How multiple users are isolated and managed |
 | [TOKEN_SECURITY.md](./TOKEN_SECURITY.md) | Secure token storage and encryption |
 | [ERROR_HANDLING.md](./ERROR_HANDLING.md) | Error handling and token refresh mechanisms |

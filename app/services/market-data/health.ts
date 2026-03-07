@@ -57,14 +57,17 @@ export class DataHealthManager {
         const interval = this.timeframeToSeconds(timeframe)
         const gaps: DataGap[] = []
         let missingBarsTotal = 0
+        const isCrypto = symbol.includes('-USD')
 
         for (let i = 1; i < data.length; i++) {
             const diff = (data[i].time.getTime() - data[i - 1].time.getTime()) / 1000
 
             // Allow some slack (e.g., 20% jitter) but if it's > 1.5x interval, it's a gap
             if (diff > interval * 1.5) {
-                // Ignore weekends for daily data (Friday to Monday is 3 days = 259200s)
-                if (timeframe === '1d' && diff <= 3 * 86400) continue
+                // Ignore weekends for daily data for non-crypto (Friday to Monday is 3 days = 259200s)
+                if (!isCrypto && timeframe === '1d' && diff <= 3 * 86400) continue
+                // Ignore weekends for intraday data for non-crypto (Friday close to Monday open)
+                if (!isCrypto && timeframe.endsWith('m') && diff <= 3 * 86400 && diff >= 2 * 86400) continue
 
                 const missingBars = Math.round(diff / interval) - 1
                 if (missingBars > 0) {
@@ -73,7 +76,8 @@ export class DataHealthManager {
                         end: data[i].time,
                         missingBars
                     })
-                    missingBarsTotal += missingBars
+                    // Cap missing bars addition to prevent infinite metrics if gap is massive
+                    missingBarsTotal += Math.min(missingBars, 10000)
                 }
             }
         }
@@ -170,53 +174,27 @@ export class DataHealthManager {
     }
 
     /**
-     * Automatically syncs missing data gaps using Schwab API.
+     * Automatically syncs missing data gaps using the Multi-Provider MarketDataStore.
      */
-    static async syncGaps(symbol: string, timeframe: Timeframe, client: SchwabClient): Promise<{ gapsFixed: number, barsAdded: number }> {
+    static async syncGaps(symbol: string, timeframe: Timeframe): Promise<{ gapsFixed: number, barsAdded: number }> {
         const report = await this.getHealth(symbol, timeframe)
         let gapsFixed = 0
         let barsAdded = 0
 
-        const frequencyMap: Record<string, any> = {
-            '1m': { frequencyType: 'minute', frequency: 1 },
-            '5m': { frequencyType: 'minute', frequency: 5 },
-            '15m': { frequencyType: 'minute', frequency: 15 },
-            '30m': { frequencyType: 'minute', frequency: 30 },
-            '1h': { frequencyType: 'minute', frequency: 60 },
-            '1d': { frequencyType: 'daily', frequency: 1 },
-        }
-
-        const frequency = frequencyMap[timeframe] || { frequencyType: 'daily', frequency: 1 }
+        // Import dynamically to avoid circular dependencies if called globally
+        const { marketDataStore } = await import('./store')
 
         for (const gap of report.gaps) {
             try {
-                // Fetch data for the gap period
-                const response = await client.getPriceHistory(symbol, {
-                    ...frequency,
-                    startDate: gap.start.getTime(),
-                    endDate: gap.end.getTime()
-                })
+                // Trigger the store to fetch for this explicit gap timestamp range
+                const startUnix = Math.floor(gap.start.getTime() / 1000)
+                const endUnix = Math.floor(gap.end.getTime() / 1000)
 
-                const candles = (response as any).data?.candles || []
-                if (candles.length > 0) {
-                    // Upsert into MarketData
-                    await (prisma as any).marketData.createMany({
-                        data: candles.map((c: any) => ({
-                            symbol,
-                            timeframe,
-                            time: new Date(c.datetime),
-                            open: c.open,
-                            high: c.high,
-                            low: c.low,
-                            close: c.close,
-                            volume: c.volume,
-                            source: 'schwab-sync'
-                        })),
-                        skipDuplicates: true
-                    })
+                const fetchedData = await marketDataStore.getHistoricalData(symbol, timeframe, startUnix, endUnix)
 
+                if (fetchedData.length > 0) {
                     gapsFixed++
-                    barsAdded += candles.length
+                    barsAdded += fetchedData.length
                 }
             } catch (error) {
                 console.error(`Failed to sync gap for ${symbol} @ ${timeframe}:`, error)

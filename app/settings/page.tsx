@@ -122,7 +122,8 @@ export default function SettingsPage() {
             if (data.success) {
                 setMessage({ type: 'success', text: `Connection successful! Found ${data.accounts?.length || 0} accounts.` })
             } else {
-                setMessage({ type: 'error', text: `Connection failed: ${data.error || 'Unknown error'}. Please re-authenticate in Active Trader.` })
+                const errorDetail = data.details ? `: ${JSON.stringify(data.details)}` : ''
+                setMessage({ type: 'error', text: `Connection failed: ${data.error || 'Unknown error'}${errorDetail}. Please check your keys and re-authenticate.` })
             }
         } catch (error: any) {
             setMessage({ type: 'error', text: `Connection failed: ${error.message}` })

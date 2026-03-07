@@ -1,12 +1,22 @@
 import prisma from '@/lib/prisma'
 import { IDataProvider, MarketDataPoint, Timeframe } from './types'
+import { YahooProvider } from './providers/yahoo'
+import { AlphaVantageProvider } from './providers/alphavantage'
 import { MockDataProvider } from './mock-provider'
 
 export class MarketDataStore {
-    private provider: IDataProvider
+    private providers: IDataProvider[]
 
-    constructor(provider: IDataProvider = new MockDataProvider()) {
-        this.provider = provider
+    constructor() {
+        // Fallback chain: Yahoo (Fast/Robust) -> AlphaVantage (Rate-limited but precise) -> Mock (if requested)
+        this.providers = [
+            new YahooProvider(),
+            new AlphaVantageProvider()
+        ]
+
+        if (process.env.USE_MOCK_DATA === 'true') {
+            this.providers.push(new MockDataProvider())
+        }
     }
 
     async getHistoricalData(symbol: string, timeframe: Timeframe, startTime: number, endTime: number): Promise<MarketDataPoint[]> {
@@ -23,10 +33,8 @@ export class MarketDataStore {
             orderBy: { time: 'asc' }
         })
 
-        // For the MVP, if we have ANY data in that range, we'll return it (imperfect caching logic for brevity, 
-        // a real implementation would find exact gaps and only fetch those).
+        // Simple MVP cache logic
         if (cachedData.length > 0) {
-            // Return mapped cached data
             return cachedData.map(c => ({
                 time: Math.floor(c.time.getTime() / 1000),
                 open: c.open,
@@ -37,24 +45,47 @@ export class MarketDataStore {
             }))
         }
 
-        // 2. Data missing, fetch from provider
-        const fetchedData = await this.provider.getHistoricalData(symbol, timeframe, startTime, endTime)
+        // 2. Data missing, trigger fallback chain
+        let fetchedData: MarketDataPoint[] = []
+        let successfulProviderIndex = -1;
+
+        for (let i = 0; i < this.providers.length; i++) {
+            try {
+                fetchedData = await this.providers[i].getHistoricalData(symbol, timeframe, startTime, endTime)
+                if (fetchedData && fetchedData.length > 0) {
+                    successfulProviderIndex = i;
+                    break; // Successfully got data, stop trying fallbacks
+                }
+            } catch (err) {
+                console.warn(`[MarketDataStore] Provider ${i} failed for ${symbol}:`, err)
+            }
+            console.log(`[MarketDataStore] Falling back to provider ${i + 1} for ${symbol}...`)
+        }
 
         // 3. Cache to DB
         if (fetchedData.length > 0) {
-            // Use createMany to bulk insert
-            await prisma.marketData.createMany({
-                data: fetchedData.map(d => ({
-                    symbol,
-                    timeframe,
-                    time: new Date(d.time * 1000),
-                    open: d.open,
-                    high: d.high,
-                    low: d.low,
-                    close: d.close,
-                    volume: d.volume
-                }))
-            })
+
+            const providerName = successfulProviderIndex === 0 ? 'yahoo' :
+                successfulProviderIndex === 1 ? 'alphavantage' : 'mock';
+
+            try {
+                await (prisma.marketData as any).createMany({
+                    data: fetchedData.map(d => ({
+                        symbol,
+                        timeframe,
+                        time: new Date(d.time * 1000),
+                        open: d.open,
+                        high: d.high,
+                        low: d.low,
+                        close: d.close,
+                        volume: d.volume,
+                        source: providerName
+                    })),
+                    skipDuplicates: true
+                })
+            } catch (dbErr) {
+                console.error(`[MarketDataStore] Error persisting gap data to DB:`, dbErr)
+            }
         }
 
         return fetchedData

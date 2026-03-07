@@ -39,7 +39,13 @@ export async function GET(request: NextRequest) {
     }
 
     const { clientId, clientSecret } = user.schwabConfig
-    const callbackUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/schwab/callback`
+
+    // Robust Callback URL detection
+    const protocol = request.headers.get('x-forwarded-proto') || 'http'
+    const host = request.headers.get('host') || 'localhost:6244'
+    const callbackUrl = `${protocol}://${host}/schwab/callback`
+
+    console.log(`[Schwab Auth] Using dynamic authorize callback: ${callbackUrl}`)
 
     // Initialize client with user's credentials
     const client = initializeSchwabClient({
@@ -106,7 +112,13 @@ export async function POST(request: NextRequest) {
     }
 
     const { clientId, clientSecret } = user.schwabConfig
-    const callbackUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/schwab/callback`
+
+    // Robust Callback URL detection
+    const protocol = request.headers.get('x-forwarded-proto') || 'http'
+    const host = request.headers.get('host') || 'localhost:6244'
+    const callbackUrl = `${protocol}://${host}/schwab/callback`
+
+    console.log(`[Schwab Auth] Using dynamic exchange callback: ${callbackUrl}`)
 
     const client = getSchwabClient({ clientId, clientSecret, callbackUrl })
     const authResponse = await client.authenticate(code)
@@ -127,6 +139,20 @@ export async function POST(request: NextRequest) {
         updatedAt: new Date(),
       }
     })
+
+    // Debug: Decode the token payload to verify scopes (it's a JWT)
+    try {
+      if (authResponse.access_token) {
+        const payloadBase64 = authResponse.access_token.split('.')[1]
+        if (payloadBase64) {
+          const payloadString = Buffer.from(payloadBase64, 'base64').toString('ascii')
+          const payloadInfo = JSON.parse(payloadString)
+          console.log('[Schwab Auth] Access Token Decoded Scopes:', payloadInfo.scp || payloadInfo.scope || 'No scope field')
+        }
+      }
+    } catch (decodeErr) {
+      console.log('[Schwab Auth] Could not decode access token payload:', decodeErr)
+    }
 
     return NextResponse.json({
       success: true,

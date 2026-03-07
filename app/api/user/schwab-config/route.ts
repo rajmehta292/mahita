@@ -91,7 +91,18 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { clientId, clientSecret } = body
+    const clientId = body.clientId?.trim()
+    const clientSecret = body.clientSecret?.trim()
+
+    // Robust Callback URL detection
+    const protocol = request.headers.get('x-forwarded-proto') || 'http'
+    const host = request.headers.get('host') || 'localhost:6244'
+    const callbackUrl = `${protocol}://${host}/schwab/callback`
+
+    console.log(`[Schwab Auth] Using dynamic callback URL: ${callbackUrl}`)
+
+    // Note: getSchwabClient is not defined in this file, assuming it's imported or defined elsewhere
+    // const client = getSchwabClient({ clientId, clientSecret, callbackUrl })
 
     if (!clientId || !clientSecret) {
       return NextResponse.json(

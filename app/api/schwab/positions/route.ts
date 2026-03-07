@@ -44,6 +44,10 @@ export async function GET(request: NextRequest) {
 
     const config = user.schwabConfig
 
+    if (!config.clientId || !config.clientSecret) {
+      return NextResponse.json({ error: 'Schwab Client ID or Secret missing' }, { status: 400 })
+    }
+
     if (!config.accessToken || !config.refreshToken) {
       return NextResponse.json(
         { error: 'Please connect your Schwab account first' },
@@ -54,26 +58,70 @@ export async function GET(request: NextRequest) {
     const callbackUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/schwab/callback`
     const client = getSchwabClient({
       clientId: config.clientId,
+      clientSecret: config.clientSecret,
       callbackUrl
     })
 
     client.setAccessToken(
       config.accessToken,
-      config.refreshToken,
-      config.accessTokenExpiry ? Math.floor((config.accessTokenExpiry.getTime() - Date.now()) / 1000) : undefined,
-      config.refreshTokenExpiry ? Math.floor((config.refreshTokenExpiry.getTime() - Date.now()) / 1000) : undefined
+      config.refreshToken
     )
 
-    const positions = await client.getPositions(accountId)
-    const balance = await client.getBalance(accountId)
+    // Check if token is expired or near expiry (less than 5 mins)
+    const isExpired = config.accessTokenExpiry && (config.accessTokenExpiry.getTime() - Date.now() < 300000)
 
-    return NextResponse.json({
-      success: true,
-      positions,
-      balance,
-    })
+    if (isExpired) {
+      console.log('Schwab token near expiry, refreshing...')
+      try {
+        const newTokens = await client.refreshAccessToken(config.refreshToken)
+
+        // Save new tokens to DB
+        const updatedConfig = await prisma.schwabConfig.update({
+          where: { id: config.id },
+          data: {
+            accessToken: newTokens.access_token,
+            refreshToken: newTokens.refresh_token,
+            accessTokenExpiry: new Date(Date.now() + newTokens.expires_in * 1000),
+            refreshTokenExpiry: new Date(Date.now() + newTokens.refresh_token_expires_in * 1000)
+          }
+        })
+
+        client.setAccessToken(newTokens.access_token, newTokens.refresh_token)
+        console.log('Schwab token refreshed successfully')
+      } catch (refreshError) {
+        console.error('Failed to refresh Schwab token:', refreshError)
+        // If refresh fails, we might still want to try the current one or return error
+        return NextResponse.json({ error: 'Session expired. Please reconnect Schwab.' }, { status: 401 })
+      }
+    }
+
+    console.log(`[Schwab Positions] Fetching for account: ${accountId}`)
+
+    try {
+      const positions = await client.getPositions(accountId)
+      const balance = await client.getBalance(accountId)
+
+      console.log(`[Schwab Positions] Successfully fetched ${positions.length} positions for ${accountId}`)
+
+      return NextResponse.json({
+        success: true,
+        positions,
+        balance,
+      })
+    } catch (apiError: any) {
+      const errorData = apiError.response?.data
+      console.error(`[Schwab Positions] API Error for account ${accountId}:`, errorData || apiError.message)
+
+      if (apiError.response?.status === 400) {
+        return NextResponse.json({
+          error: 'Bad Request: Please ensure you are using a valid account ID (hashValue) and have proper permissions.',
+          details: errorData
+        }, { status: 400 })
+      }
+      throw apiError
+    }
   } catch (error: any) {
-    console.error('Schwab positions error:', error)
+    console.error('Schwab positions route error:', error)
     return NextResponse.json(
       { error: error.message || 'Failed to fetch positions' },
       { status: 500 }

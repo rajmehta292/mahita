@@ -58,22 +58,26 @@ export class SchwabClient {
     if (!this.config.accessToken) {
       throw new Error('Access token is missing. Please authenticate first.')
     }
-
-    const headers = {
+    // Set standard headers - ONLY Authorization. Schwab V1 API crashes with 500 errors if arbitrary headers are present.
+    const headers: Record<string, string> = {
       'Authorization': `Bearer ${this.config.accessToken}`,
-      'Accept': 'application/json',
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
+      ...(options.headers as Record<string, string> || {})
     }
 
+    if (options.method === 'POST' || options.method === 'PUT') {
+      headers['Content-Type'] = 'application/json'
+    }
+
+    console.log(`[Schwab API] ${options.method || 'GET'} ${url}`)
     const response = await fetch(url, { ...options, headers })
 
     if (!response.ok) {
-      let errorData
+      const errorText = await response.text()
+      let errorData: any = { message: errorText }
       try {
-        errorData = await response.json()
+        errorData = JSON.parse(errorText)
       } catch (e) {
-        errorData = { message: await response.text() }
+        // Keep as text if not JSON
       }
 
       const errorMsg = errorData?.message || errorData?.error || response.statusText
@@ -89,11 +93,9 @@ export class SchwabClient {
     return { data: await response.json() }
   }
 
-  /**
-   * Get the authorization URL for OAuth flow
-   */
   getAuthorizationUrl(): string {
-    return `https://api.schwabapi.com/v1/oauth/authorize?client_id=${this.config.clientId}&redirect_uri=${encodeURIComponent(this.config.callbackUrl)}`
+    const scopes = encodeURIComponent('readonly trading')
+    return `https://api.schwabapi.com/v1/oauth/authorize?response_type=code&client_id=${this.config.clientId}&redirect_uri=${encodeURIComponent(this.config.callbackUrl)}&scope=${scopes}`
   }
 
   /**
@@ -121,7 +123,48 @@ export class SchwabClient {
 
     if (!response.ok) {
       const errorText = await response.text()
+      console.error(`[Schwab Auth] Authentication failed (${response.status}). Payload:`, {
+        clientId: this.config.clientId,
+        callbackUrl: this.config.callbackUrl,
+        credentialsSet: !!credentials
+      })
+      console.error(`[Schwab Auth] Response body: ${errorText}`)
       throw new Error(`Authentication failed (${response.status}): ${errorText}`)
+    }
+
+    return await response.json() as SchwabAuthResponse
+  }
+
+  /**
+   * Refresh the access token
+   */
+  async refreshAccessToken(refreshToken: string): Promise<SchwabAuthResponse> {
+    if (!this.config.clientSecret) {
+      throw new Error('clientSecret is required to refresh token')
+    }
+
+    const credentials = Buffer.from(`${this.config.clientId}:${this.config.clientSecret}`).toString('base64')
+
+    const response = await fetch('https://api.schwabapi.com/v1/oauth/token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${credentials}`
+      },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken
+      })
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error(`[Schwab Token] Refresh failed (${response.status}). Payload:`, {
+        clientId: this.config.clientId,
+        credentialsSet: !!credentials
+      })
+      console.error(`[Schwab Token] Response body: ${errorText}`)
+      throw new Error(`Token refresh failed (${response.status}): ${errorText}`)
     }
 
     return await response.json() as SchwabAuthResponse

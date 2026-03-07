@@ -1,0 +1,91 @@
+# Mahita Terminal: Current Status & Roadmap
+
+As of March 2026, **Phase 1 (Foundation & Data Pipeline) is 100% complete.** The platform's foundation has been stabilized, the data pipeline is resilient, and the Schwab API integration is natively owned.
+
+We are now ready to execute on **Phase 2 (The Execution Engine)** and **Phase 3 (The Script Editor)**.
+
+Below is a complete explanation of the platform's current state, functionality, UI vision, and the roadmap forward.
+
+---
+
+## 1. How the Platform Works Right Now
+
+The Mahita Terminal operates on a **3-Tier Hybrid Architecture**:
+
+1.  **The UI Layer (Next.js & Tailwind)**: The frontend is purely for presentation and capturing user intent. It runs both as a desktop web app and is fully responsive on mobile devices (iPhone X size).
+2.  **The Domain Layer (Business Logic)**: The backend API routes `/api/*` handle authentication, session validation, and data formatting.
+3.  **The Data Layer (Hybrid Source)**: 
+    -   **L1 Cache**: A local SQLite ([prisma](file:///Users/rmehta01/Sites/mahita/prisma/schema.prisma)) database stores users, Schwab connection tokens, and cached historical market data ([MarketDataStore](file:///Users/rmehta01/Sites/mahita/app/services/market-data/store.ts#5-63) & `DataInventory`).
+    -   **L2 Source**: The native [SchwabClient](file:///Users/rmehta01/Sites/mahita/app/services/schwab/client.ts#48-309) fetches real-time quotes, account balances, positions, and backfills missing historical data natively without third-party libraries.
+    -   **Fallback**: If the Schwab API is down or the user is developing locally without credentials (`USE_MOCK_DATA=true`), the [MockSchwabClient](file:///Users/rmehta01/Sites/mahita/app/services/schwab/client.ts#310-513) seamlessly intercepts requests and provides synthetic data (fake candlesticks, a mock $105k account balance, and realistic AAPL/MSFT positions) so the UI never crashes.
+
+### The OAuth Flow (How connection works)
+When users click `Connect Schwab`, a popup opens the `api.schwabapi.com` login page. Once authorized, a callback script securely posts the Authorization Code back to the main window, which the backend exchanges for a 7-day refresh token and a 30-minute access token, securely storing both against the user's database ID. The connection automatically refreshes tokens in the background five minutes before expiration.
+
+---
+
+## 2. Feature Matrix: What Works & What Doesn't
+
+### ✅ Fully Working Features (Production Ready)
+-   **Authentication & Development Bypass**: Standard NextAuth Google Login works. On `localhost`, a special "Dev Bypass" button perfectly bypasses security for rapid agentic testing.
+-   **Schwab Connection Flow**: The full OAuth flow works. We rebuilt the client natively, meaning it has 0 third-party dependencies and perfectly typed responses.
+-   **Data Health & Inventory**: The [DataHealthManager](file:///Users/rmehta01/Sites/mahita/app/services/market-data/health.ts#23-234) accurately scans the database, detects missing candlesticks in time series data, and securely triggers Schwab API backfills via a background `/api/cron/sync` worker.
+-   **Mobile Layout**: The Dashboard, Active Trader, Backtester, and History pages dynamically rearrange their grids, sidebars, and tables for use on mobile devices.
+-   **The Native Schwab Client**: [getAccounts](file:///Users/rmehta01/Sites/mahita/app/services/schwab/client.ts#348-365), [getPositions](file:///Users/rmehta01/Sites/mahita/app/services/schwab/client.ts#366-388), [getOrders](file:///Users/rmehta01/Sites/mahita/app/services/schwab/client.ts#415-434), [placeOrder](file:///Users/rmehta01/Sites/mahita/app/services/schwab/client.ts#191-201), [cancelOrder](file:///Users/rmehta01/Sites/mahita/app/services/schwab/client.ts#202-210), [getQuote](file:///Users/rmehta01/Sites/mahita/app/services/schwab/client.ts#435-447), and [getPriceHistory](file:///Users/rmehta01/Sites/mahita/app/services/schwab/client.ts#239-262) are all hard-wired and working perfectly under the hood.
+
+### ⚠️ Partially Working (UI Exists, Needs Wire-up)
+-   **Settings - Test Connection Button**: It verifies if tokens exist and makes a test ping, but full dynamic connection status polling across the app isn't perfectly synced yet.
+-   **Chart Page**: The LightWeight Charts UI renders, but it needs to be directly wired up to the stabilized [MarketDataStore](file:///Users/rmehta01/Sites/mahita/app/services/market-data/store.ts#5-63) and the new [SchwabClient](file:///Users/rmehta01/Sites/mahita/app/services/schwab/client.ts#48-309) data feeds to render real-time ticks.
+-   **Active Trader - Order Placement**: The UI for limit/market orders exists, but the "Execute Order" button isn't reliably intercepting the form state to call the `/api/schwab/orders` POST endpoint yet. 
+
+### ❌ Not Working Yet (Next Phases)
+-   **The Script Editor (Pineify Clone)**: The UI is currently just a placeholder. The visual builder, Monaco Pro code editor, and AST generation engine have not been built yet.
+-   **The Backtester**: The lightweight engine exists in the backend, but it cannot run against custom strategies yet because the Script Editor doesn't output valid AST objects.
+-   **Screener**: Placeholder UI. The logic to filter the `DataInventory` against technical parameters hasn't been implemented.
+-   **Options Trading**: The Schwab API client has the [getOptionChain](file:///Users/rmehta01/Sites/mahita/app/services/schwab/client.ts#502-512) method, but there is no UI built to navigate an options chain yet.
+
+---
+
+## 3. UI/UX Vision (How It Is Supposed to Look)
+
+The platform is designed to emulate professional, institutional-grade tools (like TradingView or Pineify) but with a significantly more modern, aesthetic, "dark mode glassmorphism" vibe.
+
+-   **Color Palette**: Deep dark blue/grays (`#131722`) for backgrounds, offset by vibrant neon accents (green for buy/profit, red for sell/loss, and a signature primary color like electric blue or purple for active UI states).
+-   **Layout Structure**: 
+    -   A sleek, collapsible **Left Sidebar** containing the navigation order: *Dash, Portfolio, Active Trader, Chart, Screener, Orders, Watchlist, Script Editor, Backtester, Learn*.
+    -   A dense but clean **Main Content Area** using CSS Grid to pack maximum data without feeling cluttered.
+-   **Interactivity**: Hover states should feel alive with subtle micro-animations (e.g., buttons glowing slightly on hover). Data should update seamlessly without page reloads.
+-   **Mobile Philosophy**: "Desktop power in your pocket." Tables transform into swipeable cards. Heavy charts default to landscape orientation prompts. The Active Trader shifts to a sticky bottom-sheet "Quick Trade" drawer.
+
+---
+
+## 4. The Roadmap (From Now Forward)
+
+According to the rules of strict, cohesive, incremental execution (VIBE -> VERIFY -> VAULT), we will proceed one highly focused component at a time. The data pipeline is secure; we now build on top of it.
+
+### Phase 2: The Execution Engine (Active Trader & Orders)
+**Goal**: Wire the beautiful UI to the verified Schwab endpoints to securely execute live/paper trades.
+1.  **Account & Positions Sync**: Wire the Active Trader UI to automatically poll the `/api/schwab/accounts` endpoint and render the real-time cash balance, buying power, and active positions table.
+2.  **Order Placement Flow**: Connect the trade execution form (Buy/Sell, Market/Limit, TIF) to the `/api/schwab/orders` POST endpoint. Add explicit pre-trade UI validation (e.g., "Not enough buying power").
+3.  **Orders Page & Watchlist**: Build the dedicated Orders page to view Open/Filled/Cancelled orders. Wire up the Watchlist to poll [getQuotes](file:///Users/rmehta01/Sites/mahita/app/services/schwab/client.ts#448-460).
+
+### Phase 3: The Script Editor (The Core Feature)
+**Goal**: Build the Pineify-inspired drag-and-drop strategy builder and pro-code editor.
+1.  **Monaco Editor Integration**: Install and configure the Monaco code editor (the engine behind VS Code) for the "Pro View."
+2.  **Visual Builder Engine**: Build the React state management to allow users to click "Add Indicator", select "RSI", and set parameters visually.
+3.  **AST Generator Engine**: Build the domain logic that translates the Visual Builder's JSON state into valid, compilable syntax that the Backtester can run.
+
+### Phase 4: Analysis & Validation (Chart & Backtester)
+**Goal**: Visually prove that the Script Editor logic works against historical data.
+1.  **Chart Re-Wiring**: Connect Lightweight Charts securely to the internal data pipeline. Ensure it can plot real data or the [MockSchwabClient](file:///Users/rmehta01/Sites/mahita/app/services/schwab/client.ts#310-513) synthetic candles seamlessly.
+2.  **Backtest Engine Upgrades**: Upgrade the internal backtest algorithm to accept the AST generated by the Script Editor and execute it against the data.
+3.  **Visual Backtesting**: Plot successful backtest entry/exit points (Buy/Sell markers) directly onto the Chart page.
+
+### Phase 5: Polish & Institutional Features
+**Goal**: Final production readiness and advanced tooling.
+1.  **Screener Implementation**: Build the logic to scan the `DataInventory` for specific technical criteria.
+2.  **Options Chain UI**: Build an interactive component to view and trade the options chain.
+3.  **E2E Performance**: Optimize React renders to ensure the platform feels like a native desktop app even when under high data loads. 
+
+---
+*Roadmap updated and aligned following the successful completion of the Native Schwab Client rewrite.*

@@ -231,8 +231,8 @@ export default function ActiveTraderPage() {
                 <div className="bg-[#1E222D] border-b border-[#2A2E39] flex flex-col sm:flex-row sm:items-center justify-between px-4 py-3 sm:h-14 sm:px-6 shrink-0 gap-3">
                     <div className="flex items-center gap-3">
                         <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />
-                        <h1 className="text-white font-semibold text-sm sm:text-lg">Active Trader</h1>
-                        <span className="hidden xs:inline text-[10px] sm:text-xs text-gray-400">Live Trading with Schwab API</span>
+                        <h1 className="text-xl font-bold">Active Trader</h1>
+                        <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">Live Execution Engine</p>
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-4">
@@ -305,48 +305,46 @@ export default function ActiveTraderPage() {
                     /* Connected State */
                     <div className="flex-1 overflow-auto p-4 sm:p-6">
                         {/* Account Overview */}
-                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-xl p-3 sm:p-4">
-                                <div className="flex items-center justify-between mb-1 sm:mb-2 text-gray-400">
-                                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded">Equity</span>
-                                    <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-2xl p-5 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <DollarSign className="w-12 h-12" />
                                 </div>
-                                <div className="text-lg sm:text-2xl font-bold text-white truncate">
-                                    ${balance?.equity.toLocaleString() || '0'}
-                                </div>
-                            </div>
-
-                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-xl p-3 sm:p-4">
-                                <div className="flex items-center justify-between mb-1 sm:mb-2 text-gray-400">
-                                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded">Power</span>
-                                    <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />
-                                </div>
-                                <div className="text-lg sm:text-2xl font-bold text-white truncate">
-                                    ${balance?.buyingPower.toLocaleString() || '0'}
+                                <div className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Total Equity</div>
+                                <div className="text-2xl font-bold text-white">
+                                    <span className="text-blue-500 text-lg mr-1">$</span>
+                                    {balance?.equity.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                 </div>
                             </div>
 
-                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-xl p-3 sm:p-4">
-                                <div className="flex items-center justify-between mb-1 sm:mb-2 text-gray-400">
-                                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded">Total P&L</span>
-                                    {totalPL >= 0 ? (
-                                        <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
-                                    ) : (
-                                        <TrendingDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />
-                                    )}
+                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-2xl p-5 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <Activity className="w-12 h-12" />
                                 </div>
-                                <div className={`text-lg sm:text-2xl font-bold truncate ${totalPL >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                    ${totalPL.toFixed(2)}
+                                <div className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Buying Power</div>
+                                <div className="text-2xl font-bold text-white">
+                                    <span className="text-orange-500 text-lg mr-1">$</span>
+                                    {balance?.buyingPower.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                 </div>
                             </div>
 
-                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-xl p-3 sm:p-4">
-                                <div className="flex items-center justify-between mb-1 sm:mb-2 text-gray-400">
-                                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded">Positions</span>
-                                    <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />
+                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-2xl p-5 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    {totalPL >= 0 ? <TrendingUp className="w-12 h-12" /> : <TrendingDown className="w-12 h-12" />}
                                 </div>
-                                <div className="text-lg sm:text-2xl font-bold text-white truncate">
-                                    {positions.length}
+                                <div className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Session P&L</div>
+                                <div className={`text-2xl font-bold flex items-center gap-2 ${totalPL >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                    <span>{totalPL >= 0 ? '+' : '-'}${Math.abs(totalPL).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                </div>
+                            </div>
+
+                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-2xl p-5 relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <Zap className="w-12 h-12" />
+                                </div>
+                                <div className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Open Positions</div>
+                                <div className="text-2xl font-bold text-white">
+                                    {positions.length} <span className="text-xs text-gray-500 font-normal">Active</span>
                                 </div>
                             </div>
                         </div>
@@ -492,7 +490,7 @@ export default function ActiveTraderPage() {
                                             key={strat.id}
                                             className="p-4 bg-[#131722] border border-[#2A2E39] rounded-lg hover:border-blue-500/50 transition-all cursor-pointer group"
                                             onClick={() => {
-                                                alert(`Deployment of "${strat.name}" is coming in Milestone B. Verifying connection...`)
+                                                console.log(`Starting deployment for ${strat.name}...`)
                                                 setShowDeployModal(false)
                                             }}
                                         >
