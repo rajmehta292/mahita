@@ -112,7 +112,10 @@ export default function Chart({
             oscChart.timeScale().subscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChangeOsc)
 
             syncUnsubMain = () => mainChart.timeScale().unsubscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChangeMain)
-            syncUnsubOsc = () => oscChart.timeScale().unsubscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChangeOsc)
+            if (oscChart) {
+                const chart = oscChart;
+                syncUnsubOsc = () => chart.timeScale().unsubscribeVisibleLogicalRangeChange(onVisibleLogicalRangeChangeOsc)
+            }
         }
 
         window.addEventListener('resize', handleResize)

@@ -6,7 +6,18 @@ import prisma from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    let session: any = await getServerSession(authOptions)
+
+    // DEV BYPASS
+    if (!session && process.env.NODE_ENV === 'development') {
+      session = { user: { email: 'dev@mahita.ai' } }
+      await prisma.user.upsert({
+        where: { email: 'dev@mahita.ai' },
+        create: { email: 'dev@mahita.ai', name: 'Dev User' },
+        update: {}
+      })
+    }
+
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -26,21 +37,23 @@ export async function GET(request: NextRequest) {
 
     const config = user.schwabConfig
 
-    if (!config.accessToken || !config.refreshToken) {
-      return NextResponse.json(
-        { error: 'Please connect your Schwab account first' },
-        { status: 400 }
-      )
+    if (process.env.USE_MOCK_DATA !== 'true') {
+      if (!config.accessToken || !config.refreshToken) {
+        return NextResponse.json(
+          { error: 'Please connect your Schwab account first' },
+          { status: 400 }
+        )
+      }
     }
 
     const callbackUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/schwab/callback`
-    const client = getSchwabClient({ 
-      clientId: config.clientId, 
-      callbackUrl 
+    const client = getSchwabClient({
+      clientId: config.clientId,
+      callbackUrl
     })
-    
+
     client.setAccessToken(
-      config.accessToken, 
+      config.accessToken,
       config.refreshToken,
       config.accessTokenExpiry ? Math.floor((config.accessTokenExpiry.getTime() - Date.now()) / 1000) : undefined,
       config.refreshTokenExpiry ? Math.floor((config.refreshTokenExpiry.getTime() - Date.now()) / 1000) : undefined

@@ -1,5 +1,6 @@
 datasource db {
   provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 generator client {
@@ -113,7 +114,23 @@ model MarketData {
   low       Float
   close     Float
   volume    Float
+  source    String   @default("unknown")
 
   @@unique([symbol, timeframe, time])
   @@index([symbol, timeframe, time])
+}
+
+model DataInventory {
+  id          String   @id @default(cuid())
+  symbol      String
+  timeframe   String
+  lastSynced  DateTime @default(now())
+  source      String   @default("unknown")
+  firstBar    DateTime?
+  lastBar     DateTime?
+  healthScore Float    @default(0)
+  barCount    Int      @default(0)
+  gapCount    Int      @default(0)
+
+  @@unique([symbol, timeframe])
 }

@@ -29,7 +29,7 @@ export class StrategyEvaluator {
         // If we are in warmup or don't have enough history, don't generate signals
         if (skipSignal || this.history.length < 2) return 'Hold'
 
-        const entrySignal = this.checkConditionSet(this.ast.entryConditions)
+        const entrySignal = this.ast.entryConditions ? this.checkConditionSet(this.ast.entryConditions) : false
         if (entrySignal) return 'Buy'
 
         if (this.ast.exitConditions) {
@@ -45,7 +45,7 @@ export class StrategyEvaluator {
         this.currentFeatures['Volume'] = this.history[this.history.length - 1].volume
 
         // Find all distinct required indicators in AST
-        const allRules = [...this.ast.entryConditions.rules, ...(this.ast.exitConditions?.rules || [])]
+        const allRules = [...(this.ast.entryConditions?.rules || []), ...(this.ast.exitConditions?.rules || [])]
 
         for (const rule of allRules) {
             const key = `${rule.indicator}_${rule.parameter}`

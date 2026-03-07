@@ -6,7 +6,18 @@ import prisma from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    let session: any = await getServerSession(authOptions)
+
+    // DEV BYPASS
+    if (!session && process.env.NODE_ENV === 'development') {
+      session = { user: { email: 'dev@mahita.ai' } }
+      await prisma.user.upsert({
+        where: { email: 'dev@mahita.ai' },
+        create: { email: 'dev@mahita.ai', name: 'Dev User' },
+        update: {}
+      })
+    }
+
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -54,7 +65,18 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    let session: any = await getServerSession(authOptions)
+
+    // DEV BYPASS
+    if (!session && process.env.NODE_ENV === 'development') {
+      session = { user: { email: 'dev@mahita.ai' } }
+      await prisma.user.upsert({
+        where: { email: 'dev@mahita.ai' },
+        create: { email: 'dev@mahita.ai', name: 'Dev User' },
+        update: {}
+      })
+    }
+
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }

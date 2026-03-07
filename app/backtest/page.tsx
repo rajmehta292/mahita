@@ -64,6 +64,7 @@ export default function BacktestPage() {
     const [showSaveDialog, setShowSaveDialog] = useState(false)
     const [editorDetached, setEditorDetached] = useState(false)
     const [detachedWindow, setDetachedWindow] = useState<Window | null>(null)
+    const [activeMobileView, setActiveMobileView] = useState<'editor' | 'results'>('editor')
 
     useEffect(() => {
         loadStrategies()
@@ -71,7 +72,6 @@ export default function BacktestPage() {
     }, [selectedSymbol, selectedTimeframe])
 
     const loadStrategies = async () => {
-        // TODO: Load from API
         const saved = localStorage.getItem('strategies')
         if (saved) {
             setStrategies(JSON.parse(saved))
@@ -234,26 +234,28 @@ export default function BacktestPage() {
         <MainLayout>
             <div className="flex-1 flex flex-col bg-[#131722] overflow-hidden">
                 {/* Header */}
-                <div className="h-14 bg-[#1E222D] border-b border-[#2A2E39] flex items-center justify-between px-6">
-                    <div className="flex items-center gap-3">
-                        <BarChart3 className="w-6 h-6 text-blue-500" />
-                        <h1 className="text-white font-semibold text-lg">Strategy Backtester</h1>
-                        <span className="text-xs text-gray-400">Pine Script Engine</span>
+                <div className="h-14 bg-[#1E222D] border-b border-[#2A2E39] flex items-center justify-between px-4 sm:px-6 shrink-0">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />
+                        <h1 className="text-white font-semibold text-sm sm:text-lg">Strategy Tester</h1>
+                        <span className="hidden xs:inline text-xs text-gray-400">Pine Script Engine</span>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={newStrategy}
-                            className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center gap-2 text-sm"
+                            className="p-2 sm:px-4 sm:py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center gap-2 text-sm"
+                            title="New Strategy"
                         >
                             <Plus className="w-4 h-4" />
-                            New Strategy
+                            <span className="hidden sm:inline">New Strategy</span>
                         </button>
                         <button
                             onClick={() => setShowSaveDialog(true)}
-                            className="px-4 py-2 bg-green-500/20 hover:bg-green-500/30 text-green-500 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                            className="p-2 sm:px-4 sm:py-2 bg-green-500/20 hover:bg-green-500/30 text-green-500 rounded-lg transition-colors flex items-center gap-2 text-sm"
+                            title="Save"
                         >
                             <Save className="w-4 h-4" />
-                            Save
+                            <span className="hidden sm:inline">Save</span>
                         </button>
                     </div>
                 </div>
@@ -261,7 +263,7 @@ export default function BacktestPage() {
                 {/* Content */}
                 <div className="flex-1 flex overflow-hidden">
                     {/* Left Sidebar - Strategies */}
-                    <div className="w-64 bg-[#1E222D] border-r border-[#2A2E39] flex flex-col">
+                    <div className="hidden lg:flex w-64 bg-[#1E222D] border-r border-[#2A2E39] flex-col shrink-0">
                         <div className="p-4 border-b border-[#2A2E39]">
                             <h3 className="text-white font-semibold flex items-center gap-2">
                                 <FolderOpen className="w-4 h-4" />
@@ -305,16 +307,32 @@ export default function BacktestPage() {
                     </div>
 
                     {/* Main Content */}
-                    <div className="flex-1 flex flex-col overflow-hidden">
+                    <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+                        {/* Mobile View Toggle */}
+                        <div className="lg:hidden flex bg-[#1E222D] border-b border-[#2A2E39] p-1 shrink-0">
+                            <button
+                                onClick={() => setActiveMobileView('editor')}
+                                className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${activeMobileView === 'editor' ? 'bg-blue-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                            >
+                                Editor
+                            </button>
+                            <button
+                                onClick={() => setActiveMobileView('results')}
+                                className={`flex-1 py-1.5 text-xs font-medium rounded transition-colors ${activeMobileView === 'results' ? 'bg-blue-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                            >
+                                Chart & Results
+                            </button>
+                        </div>
+
                         {/* Configuration Bar */}
-                        <div className="bg-[#1E222D] border-b border-[#2A2E39] p-4">
-                            <div className="grid grid-cols-5 gap-4">
-                                <div>
+                        <div className="bg-[#1E222D] border-b border-[#2A2E39] p-4 overflow-x-auto shrink-0">
+                            <div className="flex lg:grid lg:grid-cols-5 gap-4 min-w-max lg:min-w-0">
+                                <div className="w-32 lg:w-auto">
                                     <label className="text-xs text-gray-400 mb-1 block">Symbol</label>
                                     <select
                                         value={selectedSymbol}
                                         onChange={(e) => setSelectedSymbol(e.target.value)}
-                                        className="w-full px-3 py-2 bg-[#131722] border border-[#2A2E39] rounded text-white text-sm"
+                                        className="w-full px-3 py-2 bg-[#131722] border border-[#2A2E39] rounded text-white text-sm outline-none focus:border-blue-500"
                                     >
                                         <option value="AAPL">AAPL</option>
                                         <option value="MSFT">MSFT</option>
@@ -322,92 +340,61 @@ export default function BacktestPage() {
                                         <option value="TSLA">TSLA</option>
                                     </select>
                                 </div>
-                                <div>
+                                <div className="w-32 lg:w-auto">
                                     <label className="text-xs text-gray-400 mb-1 block">Timeframe</label>
                                     <select
                                         value={selectedTimeframe}
                                         onChange={(e) => setSelectedTimeframe(e.target.value)}
-                                        className="w-full px-3 py-2 bg-[#131722] border border-[#2A2E39] rounded text-white text-sm"
+                                        className="w-full px-3 py-2 bg-[#131722] border border-[#2A2E39] rounded text-white text-sm outline-none focus:border-blue-500"
                                     >
-                                        <option value="1m">1 minute</option>
-                                        <option value="5m">5 minutes</option>
-                                        <option value="15m">15 minutes</option>
-                                        <option value="1h">1 hour</option>
-                                        <option value="1d">1 day</option>
+                                        <option value="1m">1m</option>
+                                        <option value="5m">5m</option>
+                                        <option value="15m">15m</option>
+                                        <option value="1h">1h</option>
+                                        <option value="1d">1d</option>
                                     </select>
                                 </div>
-                                <div>
-                                    <label className="text-xs text-gray-400 mb-1 block">Initial Capital</label>
+                                <div className="w-32 lg:w-auto">
+                                    <label className="text-xs text-gray-400 mb-1 block">Capital</label>
                                     <input
                                         type="number"
                                         value={initialCapital}
                                         onChange={(e) => setInitialCapital(Number(e.target.value))}
-                                        className="w-full px-3 py-2 bg-[#131722] border border-[#2A2E39] rounded text-white text-sm"
+                                        className="w-full px-3 py-2 bg-[#131722] border border-[#2A2E39] rounded text-white text-sm outline-none focus:border-blue-500"
                                     />
                                 </div>
-                                <div>
+                                <div className="w-40 lg:w-auto">
                                     <label className="text-xs text-gray-400 mb-1 block">Start Date</label>
                                     <input
                                         type="date"
                                         value={startDate}
                                         onChange={(e) => setStartDate(e.target.value)}
-                                        className="w-full px-3 py-2 bg-[#131722] border border-[#2A2E39] rounded text-white text-sm"
+                                        className="w-full px-3 py-2 bg-[#131722] border border-[#2A2E39] rounded text-white text-sm outline-none focus:border-blue-500"
                                     />
                                 </div>
-                                <div>
+                                <div className="w-40 lg:w-auto">
                                     <label className="text-xs text-gray-400 mb-1 block">End Date</label>
                                     <input
                                         type="date"
                                         value={endDate}
                                         onChange={(e) => setEndDate(e.target.value)}
-                                        className="w-full px-3 py-2 bg-[#131722] border border-[#2A2E39] rounded text-white text-sm"
-                                    />
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-5 gap-4 mt-4">
-                                <div>
-                                    <label className="text-xs text-amber-500/60 mb-1 block font-bold uppercase tracking-widest">Stop Loss (%)</label>
-                                    <input
-                                        type="number"
-                                        step="0.1"
-                                        value={stopLoss}
-                                        onChange={(e) => setStopLoss(Number(e.target.value))}
-                                        className="w-full px-3 py-2 bg-[#131722] border border-amber-500/20 rounded text-amber-500 text-sm focus:border-amber-500/50 outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-emerald-500/60 mb-1 block font-bold uppercase tracking-widest">Take Profit (%)</label>
-                                    <input
-                                        type="number"
-                                        step="0.1"
-                                        value={takeProfit}
-                                        onChange={(e) => setTakeProfit(Number(e.target.value))}
-                                        className="w-full px-3 py-2 bg-[#131722] border border-emerald-500/20 rounded text-emerald-500 text-sm focus:border-emerald-500/50 outline-none"
-                                    />
-                                </div>
-                                <div>
-                                    <label className="text-xs text-gray-400 mb-1 block">Pos Sizing (%)</label>
-                                    <input
-                                        type="number"
-                                        value={positionSize}
-                                        onChange={(e) => setPositionSize(Number(e.target.value))}
-                                        className="w-full px-3 py-2 bg-[#131722] border border-[#2A2E39] rounded text-white text-sm"
+                                        className="w-full px-3 py-2 bg-[#131722] border border-[#2A2E39] rounded text-white text-sm outline-none focus:border-blue-500"
                                     />
                                 </div>
                             </div>
                         </div>
 
                         {/* Editor and Chart */}
-                        <div className="flex-1 flex overflow-hidden">
+                        <div className="flex-1 flex overflow-hidden relative">
                             {/* Pine Script Editor */}
-                            {!editorDetached && (
-                                <div className="w-1/2 border-r border-[#2A2E39] flex flex-col">
-                                    <div className="bg-[#1E222D] border-b border-[#2A2E39] px-4 py-2 flex items-center justify-between">
-                                        <span className="text-white text-sm font-medium">Pine Script Editor</span>
+                            {(activeMobileView === 'editor' || (typeof window !== 'undefined' && window.innerWidth >= 1024)) && (
+                                <div className={`${activeMobileView === 'editor' ? 'flex' : 'hidden'} lg:flex w-full lg:w-1/2 border-r border-[#2A2E39] flex flex-col h-full min-w-0`}>
+                                    <div className="bg-[#1E222D] border-b border-[#2A2E39] px-4 py-2 flex items-center justify-between shrink-0">
+                                        <span className="text-white text-sm font-medium">Editor</span>
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={detachEditor}
-                                                className="p-1 hover:bg-[#2A2E39] rounded"
+                                                className="hidden lg:block p-1 hover:bg-[#2A2E39] rounded"
                                                 title="Detach editor"
                                             >
                                                 <Maximize2 className="w-4 h-4 text-gray-400" />
@@ -417,12 +404,11 @@ export default function BacktestPage() {
                                                 target="_blank"
                                                 className="text-xs text-blue-500 hover:text-blue-400 flex items-center gap-1"
                                             >
-                                                Learn Pine Script
-                                                <ExternalLink className="w-3 h-3" />
+                                                Help <ExternalLink className="w-3 h-3" />
                                             </a>
                                         </div>
                                     </div>
-                                    <div className="flex-1">
+                                    <div className="flex-1 min-h-0">
                                         <Editor
                                             height="100%"
                                             defaultLanguage="javascript"
@@ -439,52 +425,60 @@ export default function BacktestPage() {
                                             }}
                                         />
                                     </div>
-                                    <div className="bg-[#1E222D] border-t border-[#2A2E39] p-4 flex gap-3">
+                                    <div className="bg-[#1E222D] border-t border-[#2A2E39] p-4 flex gap-2 shrink-0">
                                         <button
                                             onClick={verifyScript}
                                             disabled={verifying || loading}
-                                            className="flex-1 py-3 bg-[#131722] hover:bg-[#2A2E39] text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 border border-[#2A2E39] disabled:opacity-50"
+                                            className="flex-1 py-2.5 bg-[#131722] hover:bg-[#2A2E39] text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 border border-[#2A2E39] disabled:opacity-50 text-sm"
                                         >
                                             <CheckCircle className={`w-4 h-4 ${verifying ? 'animate-pulse' : ''}`} />
-                                            {verifying ? 'Verifying...' : 'Verify'}
+                                            {verifying ? '...' : 'Verify'}
                                         </button>
                                         <button
                                             onClick={runBacktest}
                                             disabled={loading || data.length === 0}
-                                            className="flex-[2] py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex-[2] py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                                         >
                                             <Play className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                                            {loading ? 'Running...' : 'Run Backtest'}
+                                            {loading ? 'Running...' : 'Run'}
                                         </button>
                                     </div>
                                 </div>
                             )}
 
                             {/* Chart */}
-                            <div className={`${editorDetached ? 'w-full' : 'w-1/2'} flex flex-col`}>
-                                <div className="bg-[#1E222D] border-b border-[#2A2E39] px-4 py-2">
-                                    <span className="text-white text-sm font-medium">Chart Visualization</span>
-                                </div>
-                                <div className="flex-1 bg-[#131722]">
-                                    {data.length === 0 ? (
-                                        <div className="h-full flex items-center justify-center text-gray-400">
-                                            Loading market data...
+                            {(activeMobileView === 'results' || (typeof window !== 'undefined' && window.innerWidth >= 1024)) && (
+                                <div className={`${activeMobileView === 'results' ? 'flex' : 'hidden'} lg:flex flex-1 flex flex-col bg-[#131722] min-w-0`}>
+                                    <div className="bg-[#1E222D] border-b border-[#2A2E39] px-4 py-2 shrink-0">
+                                        <span className="text-white text-sm font-medium">Chart</span>
+                                    </div>
+                                    <div className="flex-1 min-h-0 bg-[#131722]">
+                                        {data.length === 0 ? (
+                                            <div className="h-full flex items-center justify-center text-gray-400 text-xs text-center p-4">
+                                                Loading market data...
+                                            </div>
+                                        ) : (
+                                            <Chart
+                                                data={data}
+                                                trades={results?.trades}
+                                                chartType="Standard"
+                                                indicators={[]}
+                                            />
+                                        )}
+                                    </div>
+                                    {/* Results in same pane on Mobile */}
+                                    {results && (
+                                        <div className="lg:hidden h-1/2 border-t border-[#2A2E39] overflow-auto bg-[#1E222D] shrink-0">
+                                            <StrategyTester results={results} />
                                         </div>
-                                    ) : (
-                                        <Chart
-                                            data={data}
-                                            trades={results?.trades}
-                                            chartType="Standard"
-                                            indicators={[]}
-                                        />
                                     )}
                                 </div>
-                            </div>
+                            )}
                         </div>
 
-                        {/* Results */}
+                        {/* Desktop Results */}
                         {results && (
-                            <div className="h-64 border-t border-[#2A2E39] overflow-auto">
+                            <div className="hidden lg:block h-64 border-t border-[#2A2E39] overflow-auto shrink-0 bg-[#1E222D]">
                                 <StrategyTester results={results} />
                             </div>
                         )}
@@ -493,8 +487,8 @@ export default function BacktestPage() {
 
                 {/* Save Dialog */}
                 {showSaveDialog && (
-                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                        <div className="bg-[#1E222D] border border-[#2A2E39] rounded-lg p-6 w-full max-w-md">
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
+                        <div className="bg-[#1E222D] border border-[#2A2E39] rounded-lg p-6 w-full max-w-md shadow-2xl">
                             <h3 className="text-white font-semibold text-lg mb-4">Save Strategy</h3>
                             <div className="space-y-4">
                                 <div>
@@ -503,23 +497,15 @@ export default function BacktestPage() {
                                         type="text"
                                         value={strategyName}
                                         onChange={(e) => setStrategyName(e.target.value)}
-                                        className="w-full px-3 py-2 bg-[#131722] border border-[#2A2E39] rounded text-white"
+                                        className="w-full px-3 py-2 bg-[#131722] border border-[#2A2E39] rounded text-white outline-none focus:border-blue-500"
                                         placeholder="My Strategy"
+                                        autoFocus
                                     />
                                 </div>
-                                <div>
-                                    <label className="text-sm text-gray-400 mb-1 block">Description (optional)</label>
-                                    <textarea
-                                        value={strategyDescription}
-                                        onChange={(e) => setStrategyDescription(e.target.value)}
-                                        className="w-full px-3 py-2 bg-[#131722] border border-[#2A2E39] rounded text-white h-20 resize-none"
-                                        placeholder="Describe your strategy..."
-                                    />
-                                </div>
-                                <div className="flex gap-3">
+                                <div className="flex gap-3 pt-2">
                                     <button
                                         onClick={() => setShowSaveDialog(false)}
-                                        className="flex-1 py-2 bg-[#131722] hover:bg-[#2A2E39] text-white rounded-lg transition-colors"
+                                        className="flex-1 py-2 bg-[#131722] hover:bg-[#2A2E39] text-white rounded-lg transition-colors border border-[#2A2E39]"
                                     >
                                         Cancel
                                     </button>

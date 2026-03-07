@@ -228,19 +228,19 @@ export default function ActiveTraderPage() {
         <MainLayout>
             <div className="flex-1 flex flex-col bg-[#131722] overflow-hidden">
                 {/* Header */}
-                <div className="h-14 bg-[#1E222D] border-b border-[#2A2E39] flex items-center justify-between px-6">
+                <div className="bg-[#1E222D] border-b border-[#2A2E39] flex flex-col sm:flex-row sm:items-center justify-between px-4 py-3 sm:h-14 sm:px-6 shrink-0 gap-3">
                     <div className="flex items-center gap-3">
-                        <Zap className="w-6 h-6 text-blue-500" />
-                        <h1 className="text-white font-semibold text-lg">Active Trader</h1>
-                        <span className="text-xs text-gray-400">Live Trading with Schwab API</span>
+                        <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-blue-500" />
+                        <h1 className="text-white font-semibold text-sm sm:text-lg">Active Trader</h1>
+                        <span className="hidden xs:inline text-[10px] sm:text-xs text-gray-400">Live Trading with Schwab API</span>
                     </div>
 
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 sm:gap-4">
                         {connected ? (
                             <>
-                                <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/20 rounded-lg border border-green-500/30">
-                                    <CheckCircle className="w-4 h-4 text-green-500" />
-                                    <span className="text-sm text-green-500">Connected</span>
+                                <div className="flex items-center gap-1.5 px-2 py-1 sm:px-3 sm:py-1.5 bg-green-500/10 rounded-lg border border-green-500/20">
+                                    <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-500" />
+                                    <span className="text-[10px] sm:text-sm text-green-500 font-medium">Connected</span>
                                 </div>
                                 <button
                                     onClick={() => {
@@ -249,17 +249,17 @@ export default function ActiveTraderPage() {
                                         setPositions([])
                                         setBalance(null)
                                     }}
-                                    className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-500 rounded-lg transition-colors flex items-center gap-2"
+                                    className="p-1.5 sm:px-4 sm:py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors flex items-center gap-2 text-xs"
                                 >
-                                    <Unlink className="w-4 h-4" />
-                                    Disconnect
+                                    <Unlink className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    <span className="hidden xs:inline">Disconnect</span>
                                 </button>
                             </>
                         ) : (
                             <button
                                 onClick={handleConnect}
                                 disabled={connecting}
-                                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50"
+                                className="w-full sm:w-auto px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center justify-center gap-2 disabled:opacity-50 text-xs sm:text-sm font-medium"
                             >
                                 <LinkIcon className="w-4 h-4" />
                                 {connecting ? 'Connecting...' : 'Connect Schwab'}
@@ -303,49 +303,49 @@ export default function ActiveTraderPage() {
                     </div>
                 ) : (
                     /* Connected State */
-                    <div className="flex-1 overflow-auto p-6">
+                    <div className="flex-1 overflow-auto p-4 sm:p-6">
                         {/* Account Overview */}
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-lg p-4">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-gray-400 text-sm">Account Value</span>
-                                    <DollarSign className="w-4 h-4 text-gray-400" />
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-xl p-3 sm:p-4">
+                                <div className="flex items-center justify-between mb-1 sm:mb-2 text-gray-400">
+                                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded">Equity</span>
+                                    <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />
                                 </div>
-                                <div className="text-2xl font-bold text-white">
+                                <div className="text-lg sm:text-2xl font-bold text-white truncate">
                                     ${balance?.equity.toLocaleString() || '0'}
                                 </div>
                             </div>
 
-                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-lg p-4">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-gray-400 text-sm">Buying Power</span>
-                                    <Activity className="w-4 h-4 text-gray-400" />
+                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-xl p-3 sm:p-4">
+                                <div className="flex items-center justify-between mb-1 sm:mb-2 text-gray-400">
+                                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded">Power</span>
+                                    <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />
                                 </div>
-                                <div className="text-2xl font-bold text-white">
+                                <div className="text-lg sm:text-2xl font-bold text-white truncate">
                                     ${balance?.buyingPower.toLocaleString() || '0'}
                                 </div>
                             </div>
 
-                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-lg p-4">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-gray-400 text-sm">Total P&L</span>
+                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-xl p-3 sm:p-4">
+                                <div className="flex items-center justify-between mb-1 sm:mb-2 text-gray-400">
+                                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded">Total P&L</span>
                                     {totalPL >= 0 ? (
-                                        <TrendingUp className="w-4 h-4 text-green-500" />
+                                        <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-500" />
                                     ) : (
-                                        <TrendingDown className="w-4 h-4 text-red-500" />
+                                        <TrendingDown className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-500" />
                                     )}
                                 </div>
-                                <div className={`text-2xl font-bold ${totalPL >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                <div className={`text-lg sm:text-2xl font-bold truncate ${totalPL >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
                                     ${totalPL.toFixed(2)}
                                 </div>
                             </div>
 
-                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-lg p-4">
-                                <div className="flex items-center justify-between mb-2">
-                                    <span className="text-gray-400 text-sm">Positions</span>
-                                    <Activity className="w-4 h-4 text-gray-400" />
+                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-xl p-3 sm:p-4">
+                                <div className="flex items-center justify-between mb-1 sm:mb-2 text-gray-400">
+                                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest bg-white/5 px-2 py-0.5 rounded">Positions</span>
+                                    <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-500" />
                                 </div>
-                                <div className="text-2xl font-bold text-white">
+                                <div className="text-lg sm:text-2xl font-bold text-white truncate">
                                     {positions.length}
                                 </div>
                             </div>

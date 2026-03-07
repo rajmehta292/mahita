@@ -56,6 +56,19 @@ export default function SignIn() {
                     <div className="mt-12 text-[10px] text-white/20 uppercase tracking-widest font-medium">
                         Access Restricted to Authorized Accounts
                     </div>
+
+                    {process.env.NODE_ENV === 'development' && (
+                        <div className="mt-8 border-t border-white/10 w-full pt-8">
+                            <p className="text-white/40 text-xs mb-4">Development Tools</p>
+                            <button
+                                onClick={() => signIn("credentials", { email: "dev@mahita.ai", password: "password", callbackUrl: "/dashboard" })}
+                                className="w-full py-3 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-bold rounded-xl flex items-center justify-center space-x-3 hover:bg-indigo-500/30 transition-all active:scale-[0.98] text-sm"
+                            >
+                                <Zap className="w-4 h-4" />
+                                <span>Sign in with Dev Bypass</span>
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

@@ -2,16 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import { MainLayout } from '../components/Layout/MainLayout'
-import { 
-    Settings as SettingsIcon, 
-    Key, 
-    Save, 
-    Trash2, 
-    Eye, 
+import {
+    Settings as SettingsIcon,
+    Key,
+    Save,
+    Trash2,
+    Eye,
     EyeOff,
     CheckCircle,
     AlertCircle,
-    ExternalLink
+    ExternalLink,
+    Activity
 } from 'lucide-react'
 
 export default function SettingsPage() {
@@ -21,7 +22,8 @@ export default function SettingsPage() {
     const [hasConfig, setHasConfig] = useState(false)
     const [loading, setLoading] = useState(true)
     const [saving, setSaving] = useState(false)
-    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+    const [testing, setTesting] = useState(false)
+    const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info', text: string } | null>(null)
 
     useEffect(() => {
         fetchConfig()
@@ -31,7 +33,7 @@ export default function SettingsPage() {
         try {
             const response = await fetch('/api/user/schwab-config')
             const data = await response.json()
-            
+
             if (data.success && data.config) {
                 setHasConfig(data.config.hasClientId && data.config.hasClientSecret)
             }
@@ -106,6 +108,29 @@ export default function SettingsPage() {
             setMessage({ type: 'error', text: 'Failed to delete credentials' })
         } finally {
             setSaving(false)
+        }
+    }
+
+    const handleTestConnection = async () => {
+        setTesting(true)
+        setMessage({ type: 'info', text: 'Testing connection to Schwab...' })
+
+        try {
+            const response = await fetch('/api/schwab/accounts')
+            const data = await response.json()
+
+            if (data.success) {
+                setMessage({ type: 'success', text: `Connection successful! Found ${data.accounts?.length || 0} accounts.` })
+            } else {
+                setMessage({ type: 'error', text: `Connection failed: ${data.error || 'Unknown error'}. Please re-authenticate in Active Trader.` })
+            }
+        } catch (error: any) {
+            setMessage({ type: 'error', text: `Connection failed: ${error.message}` })
+        } finally {
+            setTesting(false)
+            setTimeout(() => {
+                if (message?.type !== 'error') setMessage(null)
+            }, 6000)
         }
     }
 
@@ -210,26 +235,28 @@ export default function SettingsPage() {
 
                                     {/* Message */}
                                     {message && (
-                                        <div className={`p-4 rounded-lg flex items-start gap-3 ${
-                                            message.type === 'success' 
-                                                ? 'bg-green-500/10 border border-green-500/30' 
+                                        <div className={`p-4 rounded-lg flex items-start gap-3 ${message.type === 'success'
+                                            ? 'bg-green-500/10 border border-green-500/30'
+                                            : message.type === 'info'
+                                                ? 'bg-blue-500/10 border border-blue-500/30'
                                                 : 'bg-red-500/10 border border-red-500/30'
-                                        }`}>
+                                            }`}>
                                             {message.type === 'success' ? (
                                                 <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" />
+                                            ) : message.type === 'info' ? (
+                                                <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin flex-shrink-0 mt-0.5" />
                                             ) : (
                                                 <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
                                             )}
-                                            <p className={`text-sm ${
-                                                message.type === 'success' ? 'text-green-500' : 'text-red-500'
-                                            }`}>
+                                            <p className={`text-sm ${message.type === 'success' ? 'text-green-500' : message.type === 'info' ? 'text-blue-500' : 'text-red-500'
+                                                }`}>
                                                 {message.text}
                                             </p>
                                         </div>
                                     )}
 
                                     {/* Actions */}
-                                    <div className="flex items-center gap-3 pt-2">
+                                    <div className="flex flex-wrap items-center gap-3 pt-2">
                                         <button
                                             onClick={handleSave}
                                             disabled={saving || (!clientId.trim() && !clientSecret.trim())}
@@ -240,14 +267,25 @@ export default function SettingsPage() {
                                         </button>
 
                                         {hasConfig && (
-                                            <button
-                                                onClick={handleDelete}
-                                                disabled={saving}
-                                                className="px-6 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-500 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                                Delete Credentials
-                                            </button>
+                                            <>
+                                                <button
+                                                    onClick={handleTestConnection}
+                                                    disabled={testing || saving}
+                                                    className="px-6 py-3 bg-[#2A2E39] hover:bg-[#323644] text-white rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed border border-[#3A3E49]"
+                                                >
+                                                    <Activity className="w-4 h-4 text-blue-400" />
+                                                    {testing ? 'Testing...' : 'Test Connection'}
+                                                </button>
+
+                                                <button
+                                                    onClick={handleDelete}
+                                                    disabled={saving || testing}
+                                                    className="px-6 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-500 rounded-lg font-medium transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                    Delete
+                                                </button>
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -259,7 +297,7 @@ export default function SettingsPage() {
                                         <div>
                                             <p className="text-yellow-500 font-medium mb-1">Security Notice</p>
                                             <p className="text-sm text-gray-400">
-                                                Your credentials are stored securely in our database. We never share your API keys with third parties. 
+                                                Your credentials are stored securely in our database. We never share your API keys with third parties.
                                                 You can delete them at any time.
                                             </p>
                                         </div>

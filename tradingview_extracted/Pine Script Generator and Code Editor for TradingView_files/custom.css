@@ -1,0 +1,148 @@
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  position: relative;
+}
+
+code {
+  /*white-space: pre;*/
+  font-family: monospace;
+  display: block;
+  /*background-color: #efefef;*/
+  padding: 10px;
+  color: #666;
+  overflow-y: scroll;
+  height: 50vh;
+}
+
+.copyTextButton {
+  position: absolute;
+  right: 30px;
+}
+
+b,
+strong {
+  font-weight: 600;
+}
+
+.slogan {
+  color: #ccc;
+}
+
+.code-block code {
+  height: auto;
+  overflow-y: hidden;
+  background: #343a40;
+  color: #fff;
+}
+
+.copyButton {
+  position: absolute;
+  right: 0px;
+  top: 0px;
+}
+
+.lh-lg {
+  line-height: 1.6;
+}
+
+.btn-outline-gray {
+  border-color: #ccc;
+  color: #666;
+}
+
+.btn-outline-gray:hover {
+  background: #EFF2F7;
+  color: #000;
+}
+
+.is-invalid {
+  color: #ff0d00;
+}
+
+.is-invalid:after {
+  content: "*";
+}
+
+.accordion>.rules-card {
+  overflow: visible;
+}
+
+/* hide mean reversion columns */
+/*div.html-conditions div.table-responsive table.table-bordered tr:nth-child(3n){
+  display: none;
+}
+
+div.html-inputs tbody tr:nth-child(2){
+  display: none;
+}
+
+div.html-inputs tbody tr td:nth-child(4n){
+  display: none;
+}
+
+div.html-inputs tbody tr th:nth-child(3n){
+  display: none;
+}*/
+
+.google-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 21px;
+  background-color: #ffffff;
+  border: 1px solid #dfdfdf;
+  border-radius: 4px;
+  color: #333333;
+  font-weight: bold;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.google-btn img {
+  width: 30px;
+  margin-right: 10px;
+}
+
+.google-btn:hover {
+  background-color: #f1f1f1;
+}
+
+.main-content .slice {
+  background: none;
+}
+
+.bg-container {
+  min-height: 100vh;
+  background: rgb(58, 77, 100);
+  background: radial-gradient(circle, rgba(58, 77, 100, 1) 0%, rgba(39, 52, 68, 1) 50%, rgba(20, 27, 36, 1) 100%);
+}
+
+
+.go-top-btn {
+  z-index:999;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  display: none;
+  color: black;
+  border: none;
+  padding: 4px 15px;
+  font-size: 20px;
+  cursor: pointer;
+  background-color: #fff;
+  border-radius: 0.25rem;
+  border:1px solid #ccc;
+}
+
+.go-top-btn:hover {
+  background-color: #f8f8f8;
+  color: #343a40;
+}
+
+.go-top-btn:focus {
+  outline: none;
+}

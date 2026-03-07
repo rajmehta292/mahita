@@ -91,30 +91,37 @@ export default function ChartPage() {
 
     return (
         <MainLayout showBottomPanel={true}>
-            <div className="flex flex-col h-full">
-                <SymbolHeader
-                    symbol={selectedSymbol}
-                    price={data.length > 0 ? data[data.length - 1].close : 0}
-                    change={data.length > 1 ? data[data.length - 1].close - data[data.length - 2].close : 0}
-                    changePercent={data.length > 1 ? ((data[data.length - 1].close - data[data.length - 2].close) / data[data.length - 2].close) * 100 : 0}
-                    onSymbolChange={setSelectedSymbol}
-                />
-                <ChartToolbar />
-                <div className="flex flex-1 overflow-hidden">
-                    <div className="flex-1 flex flex-col bg-[#131722]">
+            <div className="flex flex-col h-full bg-[#131722] overflow-hidden">
+                <div className="flex-shrink-0">
+                    <SymbolHeader
+                        symbol={selectedSymbol}
+                        price={data.length > 0 ? data[data.length - 1].close : 0}
+                        change={data.length > 1 ? data[data.length - 1].close - data[data.length - 2].close : 0}
+                        changePercent={data.length > 1 ? ((data[data.length - 1].close - data[data.length - 2].close) / data[data.length - 2].close) * 100 : 0}
+                        onSymbolChange={setSelectedSymbol}
+                    />
+                    <ChartToolbar />
+                </div>
+                <div className="flex flex-1 overflow-hidden relative">
+                    <div className="flex-1 flex flex-col bg-[#131722] min-h-0">
                         {data.length > 0 ? (
-                            <Chart
-                                data={data}
-                                chartType={chartType}
-                                indicators={activeIndicators}
-                            />
+                            <div className="flex-1 min-h-0">
+                                <Chart
+                                    data={data}
+                                    chartType={chartType}
+                                    indicators={activeIndicators}
+                                />
+                            </div>
                         ) : (
-                            <div className="flex items-center justify-center h-full text-gray-400">
+                            <div className="flex-1 flex items-center justify-center text-gray-400">
                                 No data available
                             </div>
                         )}
                     </div>
-                    <RightPanel />
+                    {/* Only show RightPanel on Desktop */}
+                    <div className="hidden lg:block w-80 flex-shrink-0 border-l border-[#2A2E39]">
+                        <RightPanel />
+                    </div>
                 </div>
             </div>
         </MainLayout>

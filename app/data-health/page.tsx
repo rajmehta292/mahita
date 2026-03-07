@@ -1,7 +1,22 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Activity, ArrowLeft, AlertCircle, CheckCircle2, Search, Table, Filter, ChevronLeft, ChevronRight, Calendar, BarChart3, Clock, LayoutGrid } from 'lucide-react'
+import React, { useState, useEffect, useCallback } from 'react'
+import {
+    Activity,
+    ArrowLeft,
+    AlertCircle,
+    CheckCircle2,
+    Search,
+    Table,
+    Filter,
+    ChevronLeft,
+    ChevronRight,
+    Calendar,
+    BarChart3,
+    Clock,
+    LayoutGrid,
+    RefreshCw
+} from 'lucide-react'
 import { HealthReport } from '../services/market-data/health'
 
 export default function DataHealthPage() {
@@ -13,6 +28,8 @@ export default function DataHealthPage() {
     const [inspectLoading, setInspectLoading] = useState(false)
     const [search, setSearch] = useState('')
     const [page, setPage] = useState(1)
+    const [refreshing, setRefreshing] = useState(false)
+    const [syncing, setSyncing] = useState<string | null>(null)
 
     const fetchReports = useCallback(async () => {
         setLoading(true)
@@ -26,6 +43,45 @@ export default function DataHealthPage() {
             setLoading(false)
         }
     }, [])
+
+    const handleRefresh = useCallback(async () => {
+        setRefreshing(true)
+        try {
+            const res = await fetch('/api/trading/data-health/refresh', { method: 'POST' })
+            if (res.ok) {
+                await fetchReports()
+                alert('Inventory refreshed successfully')
+            }
+        } catch (e) {
+            console.error(e)
+            alert('Failed to refresh inventory')
+        } finally {
+            setRefreshing(false)
+        }
+    }, [fetchReports])
+
+    const handleSyncGaps = useCallback(async (symbol: string, timeframe: string) => {
+        setSyncing(`${symbol}-${timeframe}`)
+        try {
+            const res = await fetch('/api/trading/data-health/sync-gaps', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ symbol, timeframe })
+            })
+            const data = await res.json()
+            if (res.ok) {
+                alert(data.message)
+                await fetchReports()
+            } else {
+                alert(data.error || 'Failed to sync gaps')
+            }
+        } catch (e) {
+            console.error(e)
+            alert('Failed to sync gaps')
+        } finally {
+            setSyncing(null)
+        }
+    }, [fetchReports])
 
     const fetchInspect = useCallback(async (symbol: string, timeframe: string, p: number = 1) => {
         setInspectLoading(true)
@@ -75,6 +131,14 @@ export default function DataHealthPage() {
                 </div>
 
                 <div className="flex items-center gap-4">
+                    <button
+                        onClick={handleRefresh}
+                        disabled={refreshing}
+                        className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${refreshing ? 'bg-white/5 text-white/20 border-white/10' : 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'}`}
+                    >
+                        <Clock className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+                        {refreshing ? 'Refreshing...' : 'Refresh Inventory'}
+                    </button>
                     <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 mr-4">
                         <button
                             onClick={() => { setView('summary'); setSelectedAsset(null); }}
@@ -111,7 +175,7 @@ export default function DataHealthPage() {
                                 setSelectedAsset({ symbol: report.symbol, timeframe: report.timeframe })
                                 fetchInspect(report.symbol, report.timeframe)
                             }}
-                            className="glass-panel p-6 cursor-pointer hover:border-primary/40 transition-all groups"
+                            className="glass-panel p-6 cursor-pointer hover:border-primary/40 transition-all group"
                         >
                             <div className="flex justify-between items-start mb-6">
                                 <div>
@@ -131,9 +195,13 @@ export default function DataHealthPage() {
                                     <span className="font-medium text-white/80">{report.count.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between text-xs">
+                                    <span className="text-white/40">Source</span>
+                                    <span className="font-mono text-primary/80 uppercase tracking-tighter">{report.source || 'Unknown'}</span>
+                                </div>
+                                <div className="flex justify-between text-xs">
                                     <span className="text-white/40">Gaps Detected</span>
-                                    <span className={`font-bold ${report.gaps.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                        {report.gaps.length}
+                                    <span className={`font-bold ${report.gaps?.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                        {report.gaps?.length || 0}
                                     </span>
                                 </div>
                                 <div className="pt-2">
@@ -144,6 +212,11 @@ export default function DataHealthPage() {
                                             style={{ width: `${report.healthScore}%` }}
                                         />
                                     </div>
+                                    {report.lastSynced && (
+                                        <div className="mt-2 text-[8px] text-white/20 uppercase tracking-widest text-right">
+                                            Synced: {new Date(report.lastSynced).toLocaleTimeString()}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -151,122 +224,130 @@ export default function DataHealthPage() {
                 </div>
             ) : (
                 <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-left-4 duration-500">
+                    <div className="flex items-center gap-4">
+                        <button
+                            onClick={() => setSelectedAsset(null)}
+                            className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm"
+                        >
+                            <ChevronLeft className="w-4 h-4" /> Back to Summary
+                        </button>
+                        <h2 className="text-2xl font-bold">{selectedAsset.symbol} <span className="text-white/20">/</span> {selectedAsset.timeframe}</h2>
+                    </div>
+
                     {view === 'summary' ? (
-                        <>
-                            <div className="flex items-center gap-4">
-                                <button
-                                    onClick={() => setSelectedAsset(null)}
-                                    className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm"
-                                >
-                                    <ChevronLeft className="w-4 h-4" /> Back to Summary
-                                </button>
-                                <h2 className="text-2xl font-bold">{selectedAsset.symbol} <span className="text-white/20">/</span> {selectedAsset.timeframe}</h2>
-                            </div>
-
-                            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                                {/* Stats Sidebar */}
-                                <div className="lg:col-span-1 space-y-6">
-                                    <div className="glass-panel p-6">
-                                        <h3 className="text-sm font-bold uppercase tracking-widest text-white/40 mb-6 font-mono">Status</h3>
-                                        <div className="space-y-6">
-                                            <StatItem icon={<Calendar className="w-4 h-4" />} label="Start Date" value={inspectData?.health.startIndex ? new Date(inspectData.health.startIndex).toLocaleDateString() : 'N/A'} />
-                                            <StatItem icon={<Clock className="w-4 h-4" />} label="End Date" value={inspectData?.health.endIndex ? new Date(inspectData.health.endIndex).toLocaleDateString() : 'N/A'} />
-                                            <StatItem icon={<BarChart3 className="w-4 h-4" />} label="Bar Count" value={inspectData?.health.count.toLocaleString() || '0'} />
-                                            <StatItem icon={<Filter className="w-4 h-4" />} label="Gap Count" value={inspectData?.health.gaps.length || '0'} />
-                                        </div>
-                                    </div>
-
-                                    <div className="glass-panel p-6 border-amber-500/20 bg-amber-500/5">
-                                        <h3 className="text-sm font-bold uppercase tracking-widest text-amber-500/60 mb-4 flex items-center gap-2">
-                                            <AlertCircle className="w-4 h-4" /> Identified Gaps
-                                        </h3>
-                                        <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
-                                            {inspectData?.health.gaps.map((gap: any, i: number) => (
-                                                <div key={i} className="p-3 bg-white/5 rounded-lg border border-white/5 text-[10px]">
-                                                    <div className="flex justify-between mb-1">
-                                                        <span className="text-white/40 font-mono">MISSING {gap.missingBars} BARS</span>
-                                                    </div>
-                                                    <div className="text-white/60">
-                                                        {new Date(gap.start).toLocaleString()} → {new Date(gap.end).toLocaleString()}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                            {(!inspectData?.health.gaps || inspectData.health.gaps.length === 0) && (
-                                                <p className="text-xs text-emerald-400/60 text-center py-4 italic">No gaps detected in time series.</p>
-                                            )}
-                                        </div>
+                        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                            {/* Stats Sidebar */}
+                            <div className="lg:col-span-1 space-y-6">
+                                <div className="glass-panel p-6">
+                                    <h3 className="text-sm font-bold uppercase tracking-widest text-white/40 mb-6 font-mono">Status</h3>
+                                    <div className="space-y-6">
+                                        <StatItem icon={<Calendar className="w-4 h-4" />} label="Start Date" value={inspectData?.health.startIndex ? new Date(inspectData.health.startIndex).toLocaleDateString() : 'N/A'} />
+                                        <StatItem icon={<Clock className="w-4 h-4" />} label="End Date" value={inspectData?.health.endIndex ? new Date(inspectData.health.endIndex).toLocaleDateString() : 'N/A'} />
+                                        <StatItem icon={<BarChart3 className="w-4 h-4" />} label="Bar Count" value={inspectData?.health.count.toLocaleString() || '0'} />
+                                        <StatItem icon={<Filter className="w-4 h-4" />} label="Gap Count" value={inspectData?.health.gaps.length || '0'} />
                                     </div>
                                 </div>
 
-                                {/* Data Table */}
-                                <div className="lg:col-span-3 flex flex-col gap-4">
-                                    <div className="glass-panel p-0 overflow-hidden flex flex-col min-h-[600px]">
-                                        <div className="p-4 border-b border-white/5 bg-white/5 flex justify-between items-center">
-                                            <div className="flex items-center gap-4">
-                                                <Table className="w-4 h-4 text-primary" />
-                                                <span className="text-sm font-bold">Raw Market Candles</span>
+                                <div className="glass-panel p-6 border-amber-500/20 bg-amber-500/5">
+                                    <h3 className="text-sm font-bold uppercase tracking-widest text-amber-500/60 mb-4 flex items-center gap-2">
+                                        <AlertCircle className="w-4 h-4" /> Identified Gaps
+                                    </h3>
+                                    <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                                        {inspectData?.health.gaps.map((gap: any, i: number) => (
+                                            <div key={i} className="p-3 bg-white/5 rounded-lg border border-white/5 text-[10px]">
+                                                <div className="flex justify-between mb-1">
+                                                    <span className="text-white/40 font-mono">MISSING {gap.missingBars} BARS</span>
+                                                </div>
+                                                <div className="text-white/60">
+                                                    {new Date(gap.start).toLocaleString()} → {new Date(gap.end).toLocaleString()}
+                                                </div>
                                             </div>
+                                        ))}
+                                        {(!inspectData?.health.gaps || inspectData.health.gaps.length === 0) && (
+                                            <p className="text-xs text-emerald-400/60 text-center py-4 italic">No gaps detected in time series.</p>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
 
-                                            <div className="flex items-center gap-2">
-                                                <button
-                                                    disabled={page === 1}
-                                                    onClick={() => fetchInspect(selectedAsset.symbol, selectedAsset.timeframe, page - 1)}
-                                                    className="p-1 hover:bg-white/10 disabled:opacity-20 rounded"
-                                                >
-                                                    <ChevronLeft className="w-4 h-4" />
-                                                </button>
-                                                <span className="text-xs font-mono text-white/40">PAGE {page} / {inspectData?.pagination.totalPages}</span>
-                                                <button
-                                                    disabled={page === inspectData?.pagination.totalPages}
-                                                    onClick={() => fetchInspect(selectedAsset.symbol, selectedAsset.timeframe, page + 1)}
-                                                    className="p-1 hover:bg-white/10 disabled:opacity-20 rounded"
-                                                >
-                                                    <ChevronRight className="w-4 h-4" />
-                                                </button>
-                                            </div>
+                            {/* Data Table */}
+                            <div className="lg:col-span-3 flex flex-col gap-4">
+                                <div className="glass-panel p-0 overflow-hidden flex flex-col min-h-[600px]">
+                                    <div className="p-4 border-b border-white/5 bg-white/5 flex justify-between items-center">
+                                        <div className="flex items-center gap-4">
+                                            <Table className="w-4 h-4 text-primary" />
+                                            <span className="text-sm font-bold">Raw Market Candles</span>
                                         </div>
 
-                                        <div className="flex-1 overflow-x-auto">
-                                            {inspectLoading ? (
-                                                <div className="h-full flex items-center justify-center">
-                                                    <div className="flex flex-col items-center gap-3">
-                                                        <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
-                                                        <span className="text-[10px] text-white/20 uppercase tracking-widest font-bold">Loading Bars...</span>
-                                                    </div>
+                                        <div className="flex items-center gap-2">
+                                            {inspectData?.health.gaps.length > 0 && (
+                                                <button
+                                                    onClick={() => handleSyncGaps(selectedAsset.symbol, selectedAsset.timeframe)}
+                                                    disabled={!!syncing}
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${syncing ? 'bg-white/5 text-white/20 border border-white/10' : 'bg-blue-500/10 text-blue-500 border border-blue-500/20 hover:bg-blue-500/20'}`}
+                                                >
+                                                    <RefreshCw className={`w-3 h-3 ${syncing === `${selectedAsset.symbol}-${selectedAsset.timeframe}` ? 'animate-spin' : ''}`} />
+                                                    {syncing === `${selectedAsset.symbol}-${selectedAsset.timeframe}` ? 'Syncing...' : 'Sync Gaps'}
+                                                </button>
+                                            )}
+                                            <button
+                                                disabled={page === 1}
+                                                onClick={() => fetchInspect(selectedAsset.symbol, selectedAsset.timeframe, page - 1)}
+                                                className="p-1 hover:bg-white/10 disabled:opacity-20 rounded"
+                                            >
+                                                <ChevronLeft className="w-4 h-4" />
+                                            </button>
+                                            <span className="text-xs font-mono text-white/40">PAGE {page} / {inspectData?.pagination.totalPages}</span>
+                                            <button
+                                                disabled={page === inspectData?.pagination.totalPages}
+                                                onClick={() => fetchInspect(selectedAsset.symbol, selectedAsset.timeframe, page + 1)}
+                                                className="p-1 hover:bg-white/10 disabled:opacity-20 rounded"
+                                            >
+                                                <ChevronRight className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 overflow-x-auto">
+                                        {inspectLoading ? (
+                                            <div className="h-full flex items-center justify-center">
+                                                <div className="flex flex-col items-center gap-3">
+                                                    <div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
+                                                    <span className="text-[10px] text-white/20 uppercase tracking-widest font-bold">Loading Bars...</span>
                                                 </div>
-                                            ) : (
-                                                <table className="w-full text-left text-xs">
-                                                    <thead className="sticky top-0 bg-[#16171d] text-white/40 uppercase font-mono text-[10px] border-b border-white/5">
-                                                        <tr>
-                                                            <th className="px-6 py-4 font-bold">Timestamp</th>
-                                                            <th className="px-6 py-4 font-bold">Open</th>
-                                                            <th className="px-6 py-4 font-bold text-success/60">High</th>
-                                                            <th className="px-6 py-4 font-bold text-destructive/60">Low</th>
-                                                            <th className="px-6 py-4 font-bold">Close</th>
-                                                            <th className="px-6 py-4 font-bold">Volume</th>
+                                            </div>
+                                        ) : (
+                                            <table className="w-full text-left text-xs">
+                                                <thead className="sticky top-0 bg-[#16171d] text-white/40 uppercase font-mono text-[10px] border-b border-white/5">
+                                                    <tr>
+                                                        <th className="px-6 py-4 font-bold">Timestamp</th>
+                                                        <th className="px-6 py-4 font-bold">Open</th>
+                                                        <th className="px-6 py-4 font-bold text-success/60">High</th>
+                                                        <th className="px-6 py-4 font-bold text-destructive/60">Low</th>
+                                                        <th className="px-6 py-4 font-bold">Close</th>
+                                                        <th className="px-6 py-4 font-bold">Volume</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-white/5">
+                                                    {inspectData?.data.map((row: any) => (
+                                                        <tr key={row.time} className="hover:bg-white/[0.02] transition-colors group">
+                                                            <td className="px-6 py-4 font-mono text-white/40 group-hover:text-white transition-colors">{new Date(row.time * 1000).toLocaleString()}</td>
+                                                            <td className="px-6 py-4 font-medium">${row.open.toFixed(2)}</td>
+                                                            <td className="px-6 py-4 text-emerald-400">${row.high.toFixed(2)}</td>
+                                                            <td className="px-6 py-4 text-rose-400">${row.low.toFixed(2)}</td>
+                                                            <td className="px-6 py-4 font-bold">${row.close.toFixed(2)}</td>
+                                                            <td className="px-6 py-4 text-white/20 group-hover:text-white/60">{row.volume.toLocaleString()}</td>
                                                         </tr>
-                                                    </thead>
-                                                    <tbody className="divide-y divide-white/5">
-                                                        {inspectData?.data.map((row: any) => (
-                                                            <tr key={row.time} className="hover:bg-white/[0.02] transition-colors group">
-                                                                <td className="px-6 py-4 font-mono text-white/40 group-hover:text-white transition-colors">{new Date(row.time * 1000).toLocaleString()}</td>
-                                                                <td className="px-6 py-4 font-medium">${row.open.toFixed(2)}</td>
-                                                                <td className="px-6 py-4 text-emerald-400">${row.high.toFixed(2)}</td>
-                                                                <td className="px-6 py-4 text-rose-400">${row.low.toFixed(2)}</td>
-                                                                <td className="px-6 py-4 font-bold">${row.close.toFixed(2)}</td>
-                                                                <td className="px-6 py-4 text-white/20 group-hover:text-white/60">{row.volume.toLocaleString()}</td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            )}
-                                        </div>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        )}
                                     </div>
                                 </div>
                             </div>
-                        </>
+                        </div>
                     ) : (
-                        <AcquisitionRoadmap reports={reports} />
+                        <AcquisitionRoadmap reports={reports} onSync={handleSyncGaps} syncing={syncing} />
                     )}
                 </div>
             )}
@@ -274,7 +355,7 @@ export default function DataHealthPage() {
     )
 }
 
-function AcquisitionRoadmap({ reports }: { reports: HealthReport[] }) {
+function AcquisitionRoadmap({ reports, onSync, syncing }: { reports: HealthReport[], onSync: (s: string, t: string) => void, syncing: string | null }) {
     const dow30 = ["AAPL", "AMGN", "AXP", "BA", "CAT", "CRM", "CSCO", "CVX", "DIS", "GS", "HD", "HON", "IBM", "INTC", "JNJ", "JPM", "KO", "MCD", "MMM", "MRK", "MSFT", "NKE", "PG", "TRV", "UNH", "V", "VZ", "WBA", "WMT"]
 
     return (
@@ -282,6 +363,7 @@ function AcquisitionRoadmap({ reports }: { reports: HealthReport[] }) {
             {dow30.map(symbol => {
                 const hasData = reports.some(r => r.symbol === symbol)
                 const qualityReport = reports.find(r => r.symbol === symbol && r.timeframe === '1d')
+                const isSyncing = syncing === `${symbol}-1d`
 
                 return (
                     <div key={symbol} className={`glass-panel p-4 flex flex-col gap-3 ${hasData ? 'border-primary/20' : 'border-dashed opacity-50'}`}>
@@ -310,13 +392,18 @@ function AcquisitionRoadmap({ reports }: { reports: HealthReport[] }) {
                             </div>
                         ) : (
                             <div className="text-[9px] text-white/20 italic">
-                                Ready for ingestion via Schwab/Yahoo interface.
+                                Ready for ingestion via Schwab interface.
                             </div>
                         )}
 
                         {!hasData && (
-                            <button className="mt-2 w-full py-1.5 border border-white/5 rounded text-[10px] font-bold hover:bg-white/5 transition-colors uppercase tracking-widest">
-                                Queue Sync
+                            <button
+                                onClick={() => onSync(symbol, '1d')}
+                                disabled={!!syncing}
+                                className={`mt-2 w-full py-1.5 border border-white/5 rounded text-[10px] font-bold transition-colors uppercase tracking-widest flex items-center justify-center gap-2 ${syncing ? 'opacity-50' : 'hover:bg-white/5'}`}
+                            >
+                                {isSyncing && <RefreshCw className="w-3 h-3 animate-spin" />}
+                                {isSyncing ? 'Syncing...' : 'Queue Sync'}
                             </button>
                         )}
                     </div>
