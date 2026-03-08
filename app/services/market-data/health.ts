@@ -1,6 +1,6 @@
 import prisma from "@/lib/prisma"
 import { Timeframe } from "./types"
-import { SchwabClient } from "../schwab/client"
+import { getMissingRanges, timeframeToSeconds } from "./utils"
 
 export interface DataGap {
     start: Date
@@ -14,9 +14,10 @@ export interface HealthReport {
     count: number
     startIndex: Date | null
     endIndex: Date | null
-    healthScore: number // 0-100 internal continuity
-    targetCoveragePercent: number // 0-100 against horizon limit
+    healthScore: number
+    targetCoveragePercent: number
     gaps: DataGap[]
+    gapCount?: number
     lastSynced?: Date
     source?: string
 }
@@ -29,13 +30,13 @@ export class DataHealthManager {
         switch (timeframe) {
             case '1w':
             case '1M':
-                return now - (15 * ONE_YEAR)
             case '1d':
-                return now - (10 * ONE_YEAR)
+                return now - (15 * ONE_YEAR)
             case '1h':
             case '2h':
             case '3h':
             case '4h':
+                return now - (700 * 86400)
             case '1m':
             case '3m':
             case '5m':
@@ -43,34 +44,24 @@ export class DataHealthManager {
             case '15m':
             case '30m':
             case '45m':
-                return now - (5 * ONE_YEAR)
+                return now - (90 * 86400)
             default:
-                // Fallback to 3 years
                 return now - (3 * ONE_YEAR)
         }
     }
 
     static timeframeToSeconds(timeframe: Timeframe): number {
-        const units: Record<string, number> = {
-            m: 60,
-            h: 3600,
-            d: 86400,
-            w: 604800,
-            M: 2592000 // 30 days
-        }
-        const value = parseInt(timeframe.slice(0, -1))
-        const unit = timeframe.slice(-1)
-        return value * (units[unit] || 0)
+        return timeframeToSeconds(timeframe)
     }
 
     static async getHealth(symbol: string, timeframe: Timeframe): Promise<HealthReport> {
-        const data = await (prisma.marketData as any).findMany({
+        const rows = await prisma.marketData.findMany({
             where: { symbol, timeframe },
             orderBy: { time: 'asc' },
             select: { time: true, source: true }
         })
 
-        if (data.length === 0) {
+        if (rows.length === 0) {
             return {
                 symbol,
                 timeframe,
@@ -80,98 +71,122 @@ export class DataHealthManager {
                 healthScore: 0,
                 targetCoveragePercent: 0,
                 gaps: [],
+                gapCount: 0,
                 source: 'N/A'
             }
         }
 
-        const interval = this.timeframeToSeconds(timeframe)
-        const gaps: DataGap[] = []
-        let missingBarsTotal = 0
-        const isCrypto = symbol.includes('-USD')
+        const data = rows.map((row) => ({
+            time: Math.floor(row.time.getTime() / 1000),
+            open: 0,
+            high: 0,
+            low: 0,
+            close: 0,
+            volume: 0
+        }))
 
-        for (let i = 1; i < data.length; i++) {
-            const diff = (data[i].time.getTime() - data[i - 1].time.getTime()) / 1000
+        const gaps = getMissingRanges(
+            symbol,
+            timeframe,
+            data,
+            data[0].time,
+            data[data.length - 1].time
+        ).map((gap) => {
+            const interval = Math.max(1, this.timeframeToSeconds(timeframe))
+            const missingBars = Math.max(0, Math.round((gap.endTime - gap.startTime) / interval) + 1)
 
-            // Allow some slack (e.g., 20% jitter) but if it's > 1.5x interval, it's a gap
-            if (diff > interval * 1.5) {
-                // Ignore weekends for daily data for non-crypto (Friday to Monday is 3 days = 259200s)
-                if (!isCrypto && timeframe === '1d' && diff <= 3 * 86400) continue
-                // Ignore weekends for intraday data for non-crypto (Friday close to Monday open)
-                if (!isCrypto && timeframe.endsWith('m') && diff <= 3 * 86400 && diff >= 2 * 86400) continue
-
-                const missingBars = Math.round(diff / interval) - 1
-                if (missingBars > 0) {
-                    gaps.push({
-                        start: data[i - 1].time,
-                        end: data[i].time,
-                        missingBars
-                    })
-                    // Cap missing bars addition to prevent infinite metrics if gap is massive
-                    missingBarsTotal += Math.min(missingBars, 10000)
-                }
+            return {
+                start: new Date(gap.startTime * 1000),
+                end: new Date(gap.endTime * 1000),
+                missingBars
             }
-        }
+        })
 
-        const totalExpectedBars = data.length + missingBarsTotal
-        const healthScore = Math.max(0, Math.min(100, (data.length / totalExpectedBars) * 100))
+        const missingBarsTotal = gaps.reduce((total, gap) => total + Math.min(gap.missingBars, 10000), 0)
+        const totalExpectedBars = rows.length + missingBarsTotal
+        const healthScore = totalExpectedBars === 0
+            ? 0
+            : Math.max(0, Math.min(100, (rows.length / totalExpectedBars) * 100))
 
         const targetStartUnix = this.getTargetHorizon(timeframe)
-        const actualHorizonSeconds = data[data.length - 1].time.getTime() / 1000 - data[0].time.getTime() / 1000
-        const desiredHorizonSeconds = data[data.length - 1].time.getTime() / 1000 - targetStartUnix
+        const actualHorizonSeconds = data[data.length - 1].time - data[0].time
+        const desiredHorizonSeconds = data[data.length - 1].time - targetStartUnix
 
-        let targetCoveragePercent = 100
-        if (desiredHorizonSeconds > 0) {
-            targetCoveragePercent = Math.max(0, Math.min(100, (actualHorizonSeconds / desiredHorizonSeconds) * 100))
-        }
-
-        // Use the source from the last bar as the primary source for the dataset
-        const source = (data[data.length - 1] as any).source || 'unknown'
+        const targetCoveragePercent = desiredHorizonSeconds <= 0
+            ? 100
+            : Math.max(0, Math.min(100, (actualHorizonSeconds / desiredHorizonSeconds) * 100))
 
         return {
             symbol,
             timeframe,
-            count: data.length,
-            startIndex: data[0].time,
-            endIndex: data[data.length - 1].time,
+            count: rows.length,
+            startIndex: rows[0].time,
+            endIndex: rows[rows.length - 1].time,
             healthScore: Math.round(healthScore),
             targetCoveragePercent: Math.round(targetCoveragePercent),
             gaps,
-            source
+            gapCount: gaps.length,
+            source: rows[rows.length - 1].source || 'unknown'
         }
     }
 
-    /**
-     * Updates the DataInventory table by scanning MarketData.
-     * This is a slow operation and should be run periodically or on-demand.
-     */
     static async refreshInventory(): Promise<void> {
-        const inventoryGroups = await (prisma.marketData as any).groupBy({
+        const groups = await prisma.marketData.groupBy({
             by: ['symbol', 'timeframe']
         })
 
-        for (const item of inventoryGroups) {
-            const report = await this.getHealth(item.symbol, item.timeframe as Timeframe)
+        if (groups.length === 0) {
+            await prisma.dataInventory.deleteMany({})
+            return
+        }
 
-            await (prisma as any).dataInventory.upsert({
+        const reports = await Promise.all(
+            groups.map((item) => this.getHealth(item.symbol, item.timeframe as Timeframe))
+        )
+
+        await this.syncInventoryReports(reports)
+    }
+
+    static async getAllHealth(): Promise<HealthReport[]> {
+        const groups = await prisma.marketData.groupBy({
+            by: ['symbol', 'timeframe']
+        })
+
+        if (groups.length === 0) {
+            await prisma.dataInventory.deleteMany({})
+            return []
+        }
+
+        const reports = await Promise.all(
+            groups.map((item) => this.getHealth(item.symbol, item.timeframe as Timeframe))
+        )
+
+        await this.syncInventoryReports(reports)
+
+        return reports.sort((left, right) => {
+            if (left.symbol === right.symbol) {
+                return left.timeframe.localeCompare(right.timeframe)
+            }
+
+            return left.symbol.localeCompare(right.symbol)
+        })
+    }
+
+    private static async syncInventoryReports(reports: HealthReport[]): Promise<void> {
+        const liveKeys = new Set(reports.map((report) => `${report.symbol}::${report.timeframe}`))
+        const existingInventory = await prisma.dataInventory.findMany({
+            select: { id: true, symbol: true, timeframe: true }
+        })
+
+        for (const report of reports) {
+            await prisma.dataInventory.upsert({
                 where: {
                     symbol_timeframe: {
-                        symbol: item.symbol,
-                        timeframe: item.timeframe
+                        symbol: report.symbol,
+                        timeframe: report.timeframe
                     }
                 },
                 update: {
-                    lastSynced: new Date(),
-                    source: report.source,
-                    firstBar: report.startIndex,
-                    lastBar: report.endIndex,
-                    healthScore: report.healthScore,
-                    targetCoveragePercent: report.targetCoveragePercent,
-                    barCount: report.count,
-                    gapCount: report.gaps.length
-                },
-                create: {
-                    symbol: item.symbol,
-                    timeframe: item.timeframe,
                     lastSynced: new Date(),
                     source: report.source || 'unknown',
                     firstBar: report.startIndex,
@@ -179,75 +194,64 @@ export class DataHealthManager {
                     healthScore: report.healthScore,
                     targetCoveragePercent: report.targetCoveragePercent,
                     barCount: report.count,
-                    gapCount: report.gaps.length
+                    gapCount: report.gapCount || report.gaps.length
+                },
+                create: {
+                    symbol: report.symbol,
+                    timeframe: report.timeframe,
+                    lastSynced: new Date(),
+                    source: report.source || 'unknown',
+                    firstBar: report.startIndex,
+                    lastBar: report.endIndex,
+                    healthScore: report.healthScore,
+                    targetCoveragePercent: report.targetCoveragePercent,
+                    barCount: report.count,
+                    gapCount: report.gapCount || report.gaps.length
                 }
+            })
+        }
+
+        const staleIds = existingInventory
+            .filter((item) => !liveKeys.has(`${item.symbol}::${item.timeframe}`))
+            .map((item) => item.id)
+
+        if (staleIds.length > 0) {
+            await prisma.dataInventory.deleteMany({
+                where: { id: { in: staleIds } }
             })
         }
     }
 
-    static async getAllHealth(): Promise<HealthReport[]> {
-        // First try to get from DataInventory for speed
-        const inventory = await (prisma as any).dataInventory.findMany()
-
-        if (inventory.length > 0) {
-            return inventory.map((item: any) => ({
-                symbol: item.symbol,
-                timeframe: item.timeframe as Timeframe,
-                count: item.barCount,
-                startIndex: item.firstBar,
-                endIndex: item.lastBar,
-                healthScore: item.healthScore,
-                targetCoveragePercent: item.targetCoveragePercent,
-                lastSynced: item.lastSynced,
-                source: item.source,
-                gaps: [] // Gaps are not stored in inventory currently for simplicity
-            }))
-        }
-
-        // Fallback to slow scan if inventory is empty
-        const groups = await (prisma.marketData as any).groupBy({
-            by: ['symbol', 'timeframe']
-        })
-
-        const reports = await Promise.all(
-            groups.map((item: any) => this.getHealth(item.symbol, item.timeframe as Timeframe))
-        )
-
-        return reports
-    }
-
-    /**
-     * Automatically syncs missing data gaps using the Multi-Provider MarketDataStore.
-     */
-    static async syncGaps(symbol: string, timeframe: Timeframe, providerOverride?: string): Promise<{ gapsFixed: number, barsAdded: number }> {
+    static async syncGaps(
+        symbol: string,
+        timeframe: Timeframe,
+        providerOverride?: string
+    ): Promise<{ gapsFixed: number, barsAdded: number }> {
         const report = await this.getHealth(symbol, timeframe)
         let gapsFixed = 0
         let barsAdded = 0
 
-        // Import dynamically to avoid circular dependencies if called globally
         const { marketDataStore } = await import('./store')
 
         for (const gap of report.gaps) {
             try {
-                // Trigger the store to fetch for this explicit gap timestamp range
                 const startUnix = Math.floor(gap.start.getTime() / 1000)
                 const endUnix = Math.floor(gap.end.getTime() / 1000)
 
-                const fetchedData = await marketDataStore.getHistoricalData(symbol, timeframe, startUnix, endUnix, providerOverride)
+                const result = await marketDataStore.getHistoricalDataWithReport(symbol, timeframe, startUnix, endUnix, {
+                    providerOverride
+                })
 
-                if (fetchedData.length > 0) {
+                if (result.report.persistedBars > 0) {
                     gapsFixed++
-                    barsAdded += fetchedData.length
+                    barsAdded += result.report.persistedBars
                 }
             } catch (error) {
                 console.error(`Failed to sync gap for ${symbol} @ ${timeframe}:`, error)
             }
         }
 
-        // Refresh inventory after fix
-        if (gapsFixed > 0) {
-            await this.refreshInventory()
-        }
+        await this.refreshInventory()
 
         return { gapsFixed, barsAdded }
     }

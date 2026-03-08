@@ -17,7 +17,17 @@ export default function AIChatPage() {
     const [messages, setMessages] = useState<Message[]>([])
     const [input, setInput] = useState('')
     const [isStreaming, setIsStreaming] = useState(false)
+    const [selectedModel, setSelectedModel] = useState('llama3.2:latest')
+    const [usage, setUsage] = useState({ prompt: 0, completion: 0 })
     const messagesEndRef = useRef<HTMLDivElement>(null)
+
+    const models = [
+        { id: 'llama3.2:latest', name: 'Llama 3.2 (Local)', provider: 'ollama' },
+        { id: 'mistral:latest', name: 'Mistral (Local)', provider: 'ollama' },
+        { id: 'kimi-k2.5:cloud', name: 'Kimi K2.5 (Cloud)', provider: 'kimi' },
+    ]
+
+    const kilocode = ((usage.prompt + usage.completion) / 1000).toFixed(3)
 
     const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -42,7 +52,10 @@ export default function AIChatPage() {
             const res = await fetch('/api/ai/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messages: newMessages })
+                body: JSON.stringify({
+                    messages: newMessages,
+                    model: selectedModel
+                })
             })
 
             if (!res.ok) {
@@ -70,17 +83,46 @@ export default function AIChatPage() {
 
                     for (const line of lines) {
                         try {
-                            const parsed = JSON.parse(line)
-                            if (parsed.message?.content) {
-                                setMessages(prev => {
-                                    const latest = [...prev]
-                                    const lastIndex = latest.length - 1
-                                    latest[lastIndex] = {
-                                        ...latest[lastIndex],
-                                        content: latest[lastIndex].content + parsed.message.content
+                            if (selectedModel.includes('kimi')) {
+                                // SSE Parsing for Kimi
+                                if (line.startsWith('data: ')) {
+                                    const dataLine = line.slice(6)
+                                    if (dataLine === '[DONE]') continue
+                                    const parsed = JSON.parse(dataLine)
+                                    const content = parsed.choices?.[0]?.delta?.content
+                                    if (content) {
+                                        setMessages(prev => {
+                                            const latest = [...prev]
+                                            const lastIndex = latest.length - 1
+                                            latest[lastIndex] = {
+                                                ...latest[lastIndex],
+                                                content: latest[lastIndex].content + content
+                                            }
+                                            return latest
+                                        })
                                     }
-                                    return latest
-                                })
+                                }
+                            } else {
+                                // NDJSON Parsing for Ollama
+                                const parsed = JSON.parse(line)
+                                if (parsed.message?.content) {
+                                    setMessages(prev => {
+                                        const latest = [...prev]
+                                        const lastIndex = latest.length - 1
+                                        latest[lastIndex] = {
+                                            ...latest[lastIndex],
+                                            content: latest[lastIndex].content + parsed.message.content
+                                        }
+                                        return latest
+                                    })
+                                }
+                                // Extract telemetry if present
+                                if (parsed.done) {
+                                    setUsage({
+                                        prompt: parsed.prompt_eval_count || 0,
+                                        completion: parsed.eval_count || 0
+                                    })
+                                }
                             }
                         } catch (e) {
                             console.warn("Failed to parse chunk", line, e)
@@ -111,11 +153,29 @@ export default function AIChatPage() {
                         </div>
                         <div>
                             <h1 className="text-lg font-bold text-white tracking-wide">Mahita Intelligence</h1>
-                            <p className="text-xs text-gray-400 flex items-center gap-2 mt-0.5">
-                                <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
-                                Local LLM Engine Connected (llama3.2)
-                            </p>
+                            <div className="flex items-center gap-3 mt-0.5">
+                                <span className="text-[10px] text-gray-400 flex items-center gap-2">
+                                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                                    Engine Connected
+                                </span>
+                                <span className="text-[10px] text-blue-400 font-mono bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20">
+                                    Usage: {kilocode} Kilocode
+                                </span>
+                            </div>
                         </div>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        <select
+                            value={selectedModel}
+                            onChange={(e) => setSelectedModel(e.target.value)}
+                            disabled={isStreaming}
+                            className="bg-[#131722] border border-[#2A2E39] text-gray-300 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
+                        >
+                            {models.map(m => (
+                                <option key={m.id} value={m.id}>{m.name}</option>
+                            ))}
+                        </select>
                     </div>
                 </div>
 

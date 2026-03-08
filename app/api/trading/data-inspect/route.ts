@@ -44,7 +44,8 @@ export async function GET(req: NextRequest) {
                 high: d.high,
                 low: d.low,
                 close: d.close,
-                volume: d.volume
+                volume: d.volume,
+                source: d.source
             })),
             pagination: {
                 page,

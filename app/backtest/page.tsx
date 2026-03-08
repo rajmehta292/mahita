@@ -91,7 +91,7 @@ export default function BacktestPage() {
 
     const fetchMarketData = async () => {
         try {
-            const response = await fetch(`/api/v2/market-data?symbol=${selectedSymbol}&timeframe=${selectedTimeframe}`)
+            const response = await fetch(`/api/trading/market-data?symbol=${selectedSymbol}&timeframe=${selectedTimeframe}`)
             const json = await response.json()
             if (json && json.data) setData(json.data)
         } catch (error) {

@@ -12,3 +12,36 @@ export interface MarketDataPoint {
 export interface IDataProvider {
     getHistoricalData(symbol: string, timeframe: Timeframe, startTime: number, endTime: number): Promise<MarketDataPoint[]>
 }
+
+export interface TimeRange {
+    startTime: number
+    endTime: number
+}
+
+export interface ChunkIngestionReport {
+    provider: string
+    rangeStart: number
+    rangeEnd: number
+    fetchedBars: number
+    persistedBars: number
+    dbTotalAfterChunk: number
+    warnings: string[]
+}
+
+export interface MarketDataFetchReport {
+    symbol: string
+    timeframe: Timeframe
+    rangeStart: number
+    rangeEnd: number
+    cacheBars: number
+    fetchedBars: number
+    persistedBars: number
+    dbTotalAfterFetch: number
+    chunkReports: ChunkIngestionReport[]
+    warnings: string[]
+}
+
+export interface MarketDataFetchResult {
+    data: MarketDataPoint[]
+    report: MarketDataFetchReport
+}

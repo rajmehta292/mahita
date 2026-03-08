@@ -15,6 +15,7 @@ export default function ChartPage() {
     const { data: session, status } = useSession()
     const [data, setData] = useState<MarketDataPoint[]>([])
     const [inventory, setInventory] = useState<any[]>([])
+    const [dataMessage, setDataMessage] = useState('Loading market data...')
     const [selectedSymbol, setSelectedSymbol] = useState("AAPL")
     const [selectedTimeframe, setSelectedTimeframe] = useState("1d")
 
@@ -68,11 +69,57 @@ export default function ChartPage() {
     useEffect(() => {
         if (status !== 'authenticated' || !selectedSymbol) return
         const fetchMarketData = async () => {
-            const json = await safeFetchJson(`/api/v2/market-data?symbol=${selectedSymbol}&timeframe=${selectedTimeframe}`)
-            if (json && json.data) setData(json.data)
+            setDataMessage('Loading market data...')
+            const json = await safeFetchJson(`/api/trading/market-data?symbol=${selectedSymbol}&timeframe=${selectedTimeframe}`)
+
+            if (json && Array.isArray(json.data)) {
+                setData(json.data)
+
+                if (json.data.length === 0) {
+                    const warning = Array.isArray(json.metadata?.warnings) && json.metadata.warnings.length > 0
+                        ? json.metadata.warnings[0]
+                        : 'No bars are stored for this symbol and timeframe yet.'
+                    setDataMessage(warning)
+                } else {
+                    setDataMessage('')
+                }
+            } else {
+                setData([])
+                setDataMessage('Provider fetch failed or returned a non-JSON response.')
+            }
         }
         fetchMarketData()
     }, [selectedSymbol, selectedTimeframe, status, safeFetchJson])
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+        const params = new URLSearchParams(window.location.search)
+        params.set('symbol', selectedSymbol)
+        params.set('timeframe', selectedTimeframe)
+        const nextUrl = `${window.location.pathname}?${params.toString()}`
+        window.history.replaceState({}, '', nextUrl)
+    }, [selectedSymbol, selectedTimeframe])
+
+    const availableSymbols = Array.from(
+        new Set([selectedSymbol, ...inventory.map((item) => item.symbol)])
+    ).sort()
+
+    const availableTimeframes = Array.from(
+        new Set(
+            inventory
+                .filter((item) => item.symbol === selectedSymbol)
+                .map((item) => item.timeframe)
+        )
+    ).sort((left, right) => {
+        const order = ['1m', '3m', '5m', '10m', '15m', '30m', '45m', '1h', '2h', '3h', '4h', '1d', '1w', '1M']
+        return order.indexOf(left) - order.indexOf(right)
+    })
+
+    useEffect(() => {
+        if (availableTimeframes.length > 0 && !availableTimeframes.includes(selectedTimeframe)) {
+            setSelectedTimeframe(availableTimeframes[0])
+        }
+    }, [availableTimeframes, selectedTimeframe])
 
     if (status === 'loading') {
         return (
@@ -105,10 +152,14 @@ export default function ChartPage() {
                 <div className="flex-shrink-0">
                     <SymbolHeader
                         symbol={selectedSymbol}
+                        timeframe={selectedTimeframe}
                         price={data.length > 0 ? data[data.length - 1].close : 0}
                         change={data.length > 1 ? data[data.length - 1].close - data[data.length - 2].close : 0}
                         changePercent={data.length > 1 ? ((data[data.length - 1].close - data[data.length - 2].close) / data[data.length - 2].close) * 100 : 0}
+                        availableSymbols={availableSymbols}
+                        availableTimeframes={availableTimeframes.length > 0 ? availableTimeframes : undefined}
                         onSymbolChange={setSelectedSymbol}
+                        onTimeframeChange={setSelectedTimeframe}
                     />
                     <ChartToolbar />
                 </div>
@@ -124,7 +175,7 @@ export default function ChartPage() {
                             </div>
                         ) : (
                             <div className="flex-1 flex items-center justify-center text-gray-400">
-                                No data available
+                                {dataMessage || 'No data available'}
                             </div>
                         )}
                     </div>

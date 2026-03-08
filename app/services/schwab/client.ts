@@ -306,8 +306,9 @@ export class SchwabClient {
       if (params.startDate) queryParams.startDate = params.startDate.toString()
       if (params.endDate) queryParams.endDate = params.endDate.toString()
     }
-    const query = Object.keys(queryParams).length > 0 ? `?${new URLSearchParams(queryParams).toString()}` : ''
-    return await this.request(`${this.marketDataUrl}/pricehistory${query}&symbol=${symbol}`)
+    const searchParams = new URLSearchParams(queryParams)
+    searchParams.set('symbol', symbol)
+    return await this.request(`${this.marketDataUrl}/pricehistory?${searchParams.toString()}`)
   }
 
   /**

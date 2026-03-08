@@ -1,0 +1,6 @@
+# Optional custom symbols for the ingestion universe.
+# Add one symbol per line. Examples:
+# SPY
+# QQQ
+# EURUSD=X
+# BTC-USD

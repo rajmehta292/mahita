@@ -126,14 +126,20 @@ export default function PortfolioPage() {
             if (data.success) {
                 setPositions(data.positions)
                 setBalance(data.balance)
-            } else if (data.error) {
-                setError(`${data.error}${data.details ? ': ' + JSON.stringify(data.details) : ''}`)
             } else {
-                setError('Failed to fetch position data')
+                setError(`${data.error}${data.details ? ': ' + JSON.stringify(data.details) : ''}`)
+                // If the response fails with auth issues
+                if (response.status === 401 || data.error?.toLowerCase().includes('token') || data.error?.toLowerCase().includes('auth')) {
+                    setConnected(false)
+                    setSelectedAccountId('')
+                }
             }
         } catch (error) {
             console.error('Failed to fetch positions:', error)
             setError('Data retrieval error: API service unavailable')
+            // Network drop or total failure should also mark as disconnected
+            setConnected(false)
+            setSelectedAccountId('')
         } finally {
             setIsRefreshing(false)
         }

@@ -1,4 +1,110 @@
-import { MarketDataPoint } from './types'
+import { MarketDataPoint, TimeRange, Timeframe } from './types'
+
+export function timeframeToSeconds(timeframe: Timeframe): number {
+    const units: Record<string, number> = {
+        m: 60,
+        h: 3600,
+        d: 86400,
+        w: 604800,
+        M: 2592000
+    }
+
+    const value = parseInt(timeframe.slice(0, -1), 10)
+    const unit = timeframe.slice(-1)
+    return value * (units[unit] || 0)
+}
+
+export function isCryptoSymbol(symbol: string): boolean {
+    return symbol.includes('-USD')
+}
+
+export function shouldIgnoreMissingSpan(symbol: string, timeframe: Timeframe, diffSeconds: number): boolean {
+    const isCrypto = isCryptoSymbol(symbol)
+    if (isCrypto) return false
+
+    if (timeframe === '1d' && diffSeconds <= 4 * 86400) {
+        return true
+    }
+
+    if (timeframe.endsWith('m') || timeframe.endsWith('h')) {
+        const sessionBreakFloor = Math.max(4 * timeframeToSeconds(timeframe), 4 * 3600)
+        if (diffSeconds >= sessionBreakFloor && diffSeconds <= 84 * 3600) {
+            return true
+        }
+    }
+
+    return false
+}
+
+export function getMissingRanges(
+    symbol: string,
+    timeframe: Timeframe,
+    data: MarketDataPoint[],
+    startTime: number,
+    endTime: number
+): TimeRange[] {
+    if (startTime >= endTime) return []
+
+    const interval = timeframeToSeconds(timeframe)
+    if (interval <= 0) {
+        return [{ startTime, endTime }]
+    }
+
+    if (data.length === 0) {
+        return [{ startTime, endTime }]
+    }
+
+    const sortedData = [...data].sort((a, b) => a.time - b.time)
+    const ranges: TimeRange[] = []
+
+    const firstBarTime = sortedData[0].time
+    if (firstBarTime > startTime + Math.floor(interval * 0.5)) {
+        ranges.push({
+            startTime,
+            endTime: Math.min(endTime, Math.max(startTime, firstBarTime - interval))
+        })
+    }
+
+    for (let i = 1; i < sortedData.length; i++) {
+        const previous = sortedData[i - 1]
+        const current = sortedData[i]
+        const diff = current.time - previous.time
+
+        if (diff <= interval * 1.5 || shouldIgnoreMissingSpan(symbol, timeframe, diff)) {
+            continue
+        }
+
+        const gapStart = previous.time + interval
+        const gapEnd = current.time - interval
+
+        if (gapStart <= gapEnd) {
+            ranges.push({
+                startTime: Math.max(startTime, gapStart),
+                endTime: Math.min(endTime, gapEnd)
+            })
+        }
+    }
+
+    const lastBarTime = sortedData[sortedData.length - 1].time
+    if (lastBarTime < endTime - Math.floor(interval * 0.5)) {
+        ranges.push({
+            startTime: Math.max(startTime, lastBarTime + interval),
+            endTime
+        })
+    }
+
+    return ranges.filter(range => range.startTime <= range.endTime)
+}
+
+export function dedupeMarketDataPoints(points: MarketDataPoint[]): MarketDataPoint[] {
+    const byTime = new Map<number, MarketDataPoint>()
+
+    for (const point of points) {
+        byTime.set(point.time, point)
+    }
+
+    return [...byTime.values()].sort((a, b) => a.time - b.time)
+}
 
 export function calculateHeikinAshi(data: MarketDataPoint[]): MarketDataPoint[] {
     if (data.length === 0) return []
