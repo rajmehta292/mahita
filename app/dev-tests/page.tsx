@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { FlaskConical, Play, AlertCircle, CheckCircle2, ChevronRight, ChevronDown, Search, Plus, Trash2 } from 'lucide-react'
 
 // Base type for a diagnostic test card
@@ -62,6 +62,24 @@ const DIAGNOSTIC_TESTS: DiagnosticTest[] = [
         endpoint: '/api/schwab/orders',
         category: 'Trading & Orders',
         defaultParams: { accountId: '' }
+    },
+    {
+        id: 'schwab_place_order',
+        title: 'Place Schwab Order',
+        description: 'Submit a new trade order to Schwab. Requires accountId and a JSON stringified order object.',
+        method: 'POST',
+        endpoint: '/api/schwab/orders',
+        category: 'Trading & Orders',
+        defaultParams: { accountId: '', order: '{"orderType":"MARKET","session":"NORMAL","duration":"DAY","orderStrategyType":"SINGLE","orderLegCollection":[{"instruction":"BUY","quantity":1,"instrument":{"symbol":"AAPL","assetType":"EQUITY"}}]}' }
+    },
+    {
+        id: 'schwab_cancel_order',
+        title: 'Cancel open Schwab Order',
+        description: 'Cancel an open order by ID. Requires accountId and orderId.',
+        method: 'DELETE',
+        endpoint: '/api/schwab/orders',
+        category: 'Trading & Orders',
+        defaultParams: { accountId: '', orderId: '' }
     },
     {
         id: 'screener',
@@ -170,6 +188,24 @@ const DIAGNOSTIC_TESTS: DiagnosticTest[] = [
 export default function DevTestsPage() {
     const [searchQuery, setSearchQuery] = useState('')
     const [activeCategory, setActiveCategory] = useState<string>('All')
+    const [accounts, setAccounts] = useState<Array<{ id: string, label: string }>>([])
+
+    useEffect(() => {
+        fetch('/api/schwab/accounts')
+            .then(res => res.json())
+            .then(data => {
+                if (data.success && Array.isArray(data.accounts)) {
+                    const mapped = data.accounts
+                        .filter((a: any) => a.securitiesAccount?.hashValue)
+                        .map((a: any) => ({
+                            id: a.securitiesAccount.hashValue,
+                            label: `Account ${a.securitiesAccount.accountId || a.securitiesAccount.accountNumber || 'Unknown'}`
+                        }))
+                    setAccounts(mapped)
+                }
+            })
+            .catch(err => console.error('Failed to pre-fetch accounts for Dev Tests', err))
+    }, [])
 
     const filteredTests = useMemo(() => {
         return DIAGNOSTIC_TESTS.filter(test => {
@@ -248,7 +284,7 @@ export default function DevTestsPage() {
                                 </div>
                                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                                     {testsInCategory.map(test => (
-                                        <TestCard key={test.id} test={test} />
+                                        <TestCard key={test.id} test={test} accounts={accounts} />
                                     ))}
                                 </div>
                             </div>
@@ -265,7 +301,7 @@ export default function DevTestsPage() {
     )
 }
 
-function TestCard({ test }: { test: DiagnosticTest }) {
+function TestCard({ test, accounts }: { test: DiagnosticTest, accounts: Array<{ id: string, label: string }> }) {
     const [isExpanded, setIsExpanded] = useState(false)
     const [params, setParams] = useState<Array<{ key: string, value: string }>>(
         Object.entries(test.defaultParams || {}).map(([key, value]) => ({ key, value }))
@@ -376,8 +412,8 @@ function TestCard({ test }: { test: DiagnosticTest }) {
                         onClick={runTest}
                         disabled={status === 'loading'}
                         className={`p-2 rounded-lg transition-all ${status === 'loading'
-                                ? 'bg-blue-600/50 text-white/50 cursor-not-allowed'
-                                : 'bg-[#2A2E39] hover:bg-blue-600 text-gray-300 hover:text-white'
+                            ? 'bg-blue-600/50 text-white/50 cursor-not-allowed'
+                            : 'bg-[#2A2E39] hover:bg-blue-600 text-gray-300 hover:text-white'
                             }`}
                     >
                         <Play className={`w-4 h-4 ${status === 'loading' ? 'animate-pulse' : ''}`} />
@@ -404,25 +440,55 @@ function TestCard({ test }: { test: DiagnosticTest }) {
                             ) : (
                                 <div className="space-y-2">
                                     {params.map((param, idx) => (
-                                        <div key={idx} className="flex items-center gap-2 group">
+                                        <div key={idx} className="flex items-start gap-2 group flex-wrap sm:flex-nowrap">
                                             <input
                                                 type="text"
                                                 placeholder="Key"
                                                 value={param.key}
                                                 onChange={(e) => updateParam(idx, 'key', e.target.value)}
-                                                className="w-1/3 min-w-[100px] bg-[#131722] border border-[#2A2E39] rounded px-3 py-1.5 text-sm font-mono text-white focus:outline-none focus:border-blue-500"
+                                                className="w-full sm:w-1/3 min-w-[100px] bg-[#131722] border border-[#2A2E39] rounded px-3 py-1.5 text-sm font-mono text-white focus:outline-none focus:border-blue-500"
                                             />
-                                            <span className="text-gray-500">=</span>
-                                            <input
-                                                type="text"
-                                                placeholder="Value"
-                                                value={param.value}
-                                                onChange={(e) => updateParam(idx, 'value', e.target.value)}
-                                                className="flex-1 bg-[#131722] border border-[#2A2E39] rounded px-3 py-1.5 text-sm font-mono text-white focus:outline-none focus:border-blue-500"
-                                            />
+                                            <span className="text-gray-500 hidden sm:inline-block mt-2">=</span>
+
+                                            <div className="flex-1 flex flex-col gap-1 w-full relative">
+                                                {param.key.length > 5 && (test.method === 'POST' || test.method === 'PUT') ? (
+                                                    <textarea
+                                                        placeholder="Value (JSON or String)"
+                                                        value={param.value}
+                                                        onChange={(e) => updateParam(idx, 'value', e.target.value)}
+                                                        className="w-full bg-[#131722] border border-[#2A2E39] rounded px-3 py-1.5 text-sm font-mono text-white focus:outline-none focus:border-blue-500 min-h-[60px] resize-y"
+                                                    />
+                                                ) : (
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Value"
+                                                        value={param.value}
+                                                        onChange={(e) => updateParam(idx, 'value', e.target.value)}
+                                                        className="w-full bg-[#131722] border border-[#2A2E39] rounded px-3 py-1.5 text-sm font-mono text-white focus:outline-none focus:border-blue-500"
+                                                    />
+                                                )}
+
+                                                {param.key === 'accountId' && accounts.length > 0 && (
+                                                    <div className="flex gap-2 mt-1">
+                                                        <select
+                                                            className="bg-[#2A2E39] border border-[#363A45] rounded px-2 py-1 text-xs text-gray-300 focus:outline-none flex-1"
+                                                            onChange={(e) => {
+                                                                if (e.target.value) updateParam(idx, 'value', e.target.value)
+                                                            }}
+                                                            value={accounts.find(a => a.id === param.value) ? param.value : ''}
+                                                        >
+                                                            <option value="" disabled>Auto-inject account hash...</option>
+                                                            {accounts.map(acc => (
+                                                                <option key={acc.id} value={acc.id}>{acc.label}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                )}
+                                            </div>
+
                                             <button
                                                 onClick={() => removeParam(idx)}
-                                                className="p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors"
+                                                className="mt-1 sm:mt-0 p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded transition-colors self-start"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
@@ -436,8 +502,8 @@ function TestCard({ test }: { test: DiagnosticTest }) {
                                     onClick={runTest}
                                     disabled={status === 'loading'}
                                     className={`flex items-center gap-2 px-5 py-2 rounded-lg font-medium text-sm transition-all shadow-sm ${status === 'loading'
-                                            ? 'bg-blue-600/50 text-white/50 cursor-not-allowed'
-                                            : 'bg-blue-600 hover:bg-blue-500 text-white hover:shadow-blue-500/20'
+                                        ? 'bg-blue-600/50 text-white/50 cursor-not-allowed'
+                                        : 'bg-blue-600 hover:bg-blue-500 text-white hover:shadow-blue-500/20'
                                         }`}
                                 >
                                     <Play className={`w-4 h-4 ${status === 'loading' ? 'animate-pulse' : ''}`} />
