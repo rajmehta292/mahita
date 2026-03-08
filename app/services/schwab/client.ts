@@ -561,32 +561,14 @@ export class MockSchwabClient extends SchwabClient {
   }
 }
 
-// Singleton instance
-let schwabClient: SchwabClient | null = null
-
-export function getSchwabClient(config?: SchwabConfig): SchwabClient {
-  if (!schwabClient && config) {
-    if (process.env.USE_MOCK_DATA === 'true') {
-      console.log('⚠️ Using MOCK Schwab Client ⚠️')
-      schwabClient = new MockSchwabClient(config)
-    } else {
-      schwabClient = new SchwabClient(config)
-    }
+export function getSchwabClient(config: SchwabConfig): SchwabClient {
+  if (process.env.USE_MOCK_DATA === 'true') {
+    console.log('⚠️ Using MOCK Schwab Client ⚠️')
+    return new MockSchwabClient(config)
   }
-
-  if (!schwabClient) {
-    throw new Error('Schwab client not initialized. Please provide config.')
-  }
-
-  return schwabClient
+  return new SchwabClient(config)
 }
 
 export function initializeSchwabClient(config: SchwabConfig): SchwabClient {
-  if (process.env.USE_MOCK_DATA === 'true') {
-    console.log('⚠️ Initializing MOCK Schwab Client ⚠️')
-    schwabClient = new MockSchwabClient(config)
-  } else {
-    schwabClient = new SchwabClient(config)
-  }
-  return schwabClient
+  return getSchwabClient(config)
 }

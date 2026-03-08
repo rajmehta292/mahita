@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
+import { authOptions } from '@/lib/auth'
 import prisma from "@/lib/prisma"
 import { DataHealthManager } from "@/app/services/market-data/health"
 import { Timeframe } from "@/app/services/market-data/types"

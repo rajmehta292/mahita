@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { authOptions } from '../../auth/[...nextauth]/route'
+import { authOptions } from '@/lib/auth'
 import { BacktestEngine } from '@/app/services/trading-engine/backtester'
 import { marketDataStore } from '@/app/services/market-data/store'
 import { StrategyAST } from '@/app/services/trading-engine/types'

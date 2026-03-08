@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
+import { authOptions } from '@/lib/auth'
 import { DataHealthManager } from "@/app/services/market-data/health"
 
 export async function GET(req: NextRequest) {
