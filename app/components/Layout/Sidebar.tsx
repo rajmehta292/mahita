@@ -18,7 +18,8 @@ import {
     Briefcase,
     Code,
     BarChart2,
-    FileText
+    FileText,
+    FlaskConical
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -35,6 +36,7 @@ const menuItems = [
     { icon: BarChart3, label: 'Backtester', href: '/backtest' },
     { icon: BookOpen, label: 'Learn', href: '/learn' },
     { icon: Code, label: 'AI Chat', href: '/ai-chat' },
+    { icon: FlaskConical, label: 'Dev Tests', href: '/dev-tests' },
 ]
 
 interface SidebarProps {
