@@ -19,6 +19,57 @@ export default function DataDoctorPage() {
     const [refreshing, setRefreshing] = useState(false)
     const [syncing, setSyncing] = useState<string | null>(null)
     const [globalIngesting, setGlobalIngesting] = useState(false)
+    const [detailProviderOverride, setDetailProviderOverride] = useState<string>('')
+    const [ingestLogs, setIngestLogs] = useState<string[]>([])
+    const [isIngestingProgress, setIsIngestingProgress] = useState(false)
+    const terminalEndRef = React.useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        if (terminalEndRef.current) {
+            terminalEndRef.current.scrollIntoView({ behavior: 'smooth' })
+        }
+    }, [ingestLogs])
+
+    const processStream = async (res: Response, successMsg: string) => {
+        setIsIngestingProgress(true)
+        setIngestLogs([])
+        const reader = res.body?.getReader()
+        const decoder = new TextDecoder()
+        if (!reader) return
+
+        let currentLogs: string[] = []
+        const addLog = (msg: string) => {
+            currentLogs = [...currentLogs, msg]
+            setIngestLogs(currentLogs)
+        }
+
+        try {
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+                const chunk = decoder.decode(value)
+                const lines = chunk.split('\n').filter(Boolean)
+                for (const line of lines) {
+                    try {
+                        const parsed = JSON.parse(line)
+                        if (parsed.type === 'log') {
+                            addLog(parsed.data)
+                        } else if (parsed.type === 'error') {
+                            addLog(`[ERROR] ${parsed.data}`)
+                        } else if (parsed.type === 'result') {
+                            addLog(`[SUCCESS] ${successMsg} - Processed: ${parsed.data.processed}`)
+                        }
+                    } catch (e) { }
+                }
+            }
+        } finally {
+            setTimeout(() => {
+                setIsIngestingProgress(false)
+                setIngestLogs([])
+            }, 10000) // Keep logs visible for 10s after completion
+            await fetchReports()
+        }
+    }
 
     const fetchReports = useCallback(async () => {
         setLoading(true)
@@ -53,46 +104,43 @@ export default function DataDoctorPage() {
         setGlobalIngesting(true)
         try {
             const res = await fetch('/api/trading/ingest', { method: 'POST', body: JSON.stringify({}) })
-            const data = await res.json()
             if (res.ok) {
-                alert(`Ingestion triggered successfully! Prosessed ${data.processed} actions.`)
-                await fetchReports()
+                await processStream(res, "Global Ingestion Sweep Complete.")
             } else {
-                alert(data.error || 'Failed to start global ingestion')
+                alert('Server returned an error for global ingestion.')
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error(e)
-            alert('Failed to start global ingestion')
+            alert(e.message || 'Failed to start global ingestion')
         } finally {
             setGlobalIngesting(false)
         }
     }, [fetchReports])
 
-    const handleSyncGaps = useCallback(async (symbol: string, timeframe: string) => {
+    const handleSyncGaps = useCallback(async (symbol: string, timeframe: string, provider?: string) => {
         setSyncing(`${symbol}-${timeframe}`)
         try {
             const res = await fetch('/api/trading/ingest', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ symbol, overrideTimeframe: timeframe })
+                body: JSON.stringify({ symbol, overrideTimeframe: timeframe, provider })
             })
-            const data = await res.json()
+
             if (res.ok) {
-                alert('Symbol synchronization sweep complete.')
+                await processStream(res, `Target ${symbol} Sync Complete.`)
                 if (selectedAsset?.symbol === symbol) {
                     fetchInspect(symbol, timeframe)
                 }
-                await fetchReports()
             } else {
-                alert(data.error || 'Failed to sync gaps')
+                alert('Server returned an error for specific ingestion.')
             }
-        } catch (e) {
+        } catch (e: any) {
             console.error(e)
-            alert('Failed to sync gaps')
+            alert(e.message || 'Failed to sync gaps')
         } finally {
             setSyncing(null)
         }
-    }, [fetchReports])
+    }, [fetchReports, selectedAsset])
 
     const fetchInspect = useCallback(async (symbol: string, timeframe: string, p: number = 1) => {
         setInspectLoading(true)
@@ -136,7 +184,7 @@ export default function DataDoctorPage() {
                         <a href="/dashboard" className="p-2 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors">
                             <ArrowLeft className="w-4 h-4" />
                         </a>
-                        <h1 className="text-3xl font-bold tracking-tight">Data <span className="text-primary">Doctor</span></h1>
+                        <h1 className="text-3xl font-bold tracking-tight">Data <span className="text-primary">Command</span></h1>
                     </div>
                     <p className="text-white/40 text-sm">Visualize gaps, run background ingestion, and monitor multi-provider dataset health.</p>
                 </div>
@@ -194,7 +242,8 @@ export default function DataDoctorPage() {
                             <div className="text-4xl font-bold text-white relative z-10">
                                 {reports.length > 0 ? (reports.reduce((acc, r) => acc + (r.targetCoveragePercent || 0), 0) / reports.length).toFixed(1) : 0}%
                             </div>
-                            <p className="text-xs text-white/40 mt-2 relative z-10">Average horizon target coverage across {reports.length} tracked records.</p>
+                            <p className="text-xs text-white/40 mt-2 relative z-10 mb-2">Average horizon target coverage across {reports.length} tracked records.</p>
+                            <p className="text-[10px] text-white/30 uppercase tracking-widest font-bold">Total Records: {reports.reduce((acc, r) => acc + (r.count || 0), 0).toLocaleString()}</p>
                         </div>
                         <div className="glass-panel p-6 border-emerald-500/20 bg-emerald-500/5 relative overflow-hidden">
                             <CheckCircle2 className="absolute -right-4 -bottom-4 w-24 h-24 text-emerald-500 opacity-10" />
@@ -341,13 +390,23 @@ export default function DataDoctorPage() {
                                         </div>
 
                                         <div className="flex items-center gap-2">
+                                            <select
+                                                value={detailProviderOverride}
+                                                onChange={(e) => setDetailProviderOverride(e.target.value)}
+                                                className="bg-white/5 border border-white/10 rounded-lg text-xs py-1.5 px-3 text-white/60 focus:outline-none focus:border-primary"
+                                            >
+                                                <option value="">Auto Fallback (Best)</option>
+                                                <option value="yahoo">Yahoo Finance</option>
+                                                <option value="alphavantage">Alpha Vantage</option>
+                                            </select>
+
                                             <button
-                                                onClick={() => handleSyncGaps(selectedAsset.symbol, selectedAsset.timeframe)}
+                                                onClick={() => handleSyncGaps(selectedAsset.symbol, selectedAsset.timeframe, detailProviderOverride || undefined)}
                                                 disabled={!!syncing}
                                                 className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${syncing ? 'bg-white/5 text-white/20 border border-white/10' : 'bg-blue-500/10 text-blue-500 border border-blue-500/20 hover:bg-blue-500/20'}`}
                                             >
                                                 <RefreshCw className={`w-3 h-3 ${syncing === `${selectedAsset.symbol}-${selectedAsset.timeframe}` ? 'animate-spin' : ''}`} />
-                                                {syncing === `${selectedAsset.symbol}-${selectedAsset.timeframe}` ? 'Healing Gaps...' : 'Trigger Auto-Heal'}
+                                                {syncing === `${selectedAsset.symbol}-${selectedAsset.timeframe}` ? 'Healing Gaps...' : 'Force Ingest'}
                                             </button>
 
                                             <button
@@ -418,13 +477,28 @@ export default function DataDoctorPage() {
                     )}
                 </div>
             )}
+
+            {/* Live Ingestion Terminal Overlay */}
+            {isIngestingProgress && (
+                <div className="fixed bottom-6 right-6 w-[400px] h-[300px] bg-black/95 border border-primary/30 rounded-lg p-4 font-mono text-[10px] text-primary/80 overflow-y-auto flex flex-col gap-1 z-50 shadow-2xl shadow-primary/20 backdrop-blur-sm">
+                    <div className="text-white font-bold mb-3 uppercase tracking-widest border-b border-white/10 pb-2 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-primary animate-pulse" /> Live Ingestion Feed
+                    </div>
+                    {ingestLogs.map((log, i) => (
+                        <div key={i} className="leading-relaxed opacity-80 break-words">&gt; {log}</div>
+                    ))}
+                    <div ref={terminalEndRef} />
+                </div>
+            )}
         </div>
     )
 }
 
-function AcquisitionRoadmap({ reports, onSync, syncing }: { reports: HealthReport[], onSync: (s: string, t: string) => void, syncing: string | null }) {
+function AcquisitionRoadmap({ reports, onSync, syncing }: { reports: HealthReport[], onSync: (s: string, t: string, p?: string) => void, syncing: string | null }) {
     // Top dynamically generated from universe
     const dow30 = ["AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "BTC-USD", "ETH-USD", "EURUSD=X", "USDJPY=X", "JPM", "V", "WMT", "JNJ", "TSLA", "PG", "HD", "CVX", "MRK", "KO"]
+
+    const [providerOverrides, setProviderOverrides] = React.useState<Record<string, string>>({})
 
     return (
         <div className="space-y-6">
@@ -470,14 +544,25 @@ function AcquisitionRoadmap({ reports, onSync, syncing }: { reports: HealthRepor
                                 </div>
                             )}
 
-                            <button
-                                onClick={() => onSync(symbol, '1d')}
-                                disabled={!!syncing}
-                                className={`mt-2 w-full py-1.5 border border-white/5 rounded text-[10px] font-bold transition-colors uppercase tracking-widest flex items-center justify-center gap-2 ${syncing ? 'opacity-50' : 'hover:bg-primary/20 hover:text-primary'}`}
-                            >
-                                {isSyncing && <RefreshCw className="w-3 h-3 animate-spin" />}
-                                {isSyncing ? 'Syncing...' : 'Bootstrap Data'}
-                            </button>
+                            <div className="flex flex-col gap-2 mt-2">
+                                <select
+                                    value={providerOverrides[symbol] || ''}
+                                    onChange={(e) => setProviderOverrides(prev => ({ ...prev, [symbol]: e.target.value }))}
+                                    className="bg-white/5 border border-white/10 rounded-md text-[9px] py-1 px-2 text-white/60 focus:outline-none w-full"
+                                >
+                                    <option value="">Auto Fallback</option>
+                                    <option value="yahoo">Yahoo Finance</option>
+                                    <option value="alphavantage">Alpha Vantage</option>
+                                </select>
+                                <button
+                                    onClick={() => onSync(symbol, '1d', providerOverrides[symbol] || undefined)}
+                                    disabled={!!syncing}
+                                    className={`w-full py-1.5 border border-white/5 rounded text-[10px] font-bold transition-colors uppercase tracking-widest flex items-center justify-center gap-2 ${syncing ? 'opacity-50' : 'hover:bg-primary/20 hover:text-primary'}`}
+                                >
+                                    {isSyncing && <RefreshCw className="w-3 h-3 animate-spin" />}
+                                    {isSyncing ? 'Syncing...' : 'Bootstrap Data'}
+                                </button>
+                            </div>
                         </div>
                     )
                 })}

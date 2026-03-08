@@ -4,119 +4,144 @@ import { marketDataStore } from '@/app/services/market-data/store'
 import { DataHealthManager } from '@/app/services/market-data/health'
 import { Timeframe } from '@/app/services/market-data/types'
 
-// Prevent concurrent cron execution
+// Prevent concurrent global ingestion (but allow individual syncs to queue or run if small)
 let isIngesting = false
 
 export async function POST(request: NextRequest) {
-    if (isIngesting) {
-        return NextResponse.json({ error: 'Ingestion currently in progress.' }, { status: 429 })
+    const body = await request.json().catch(() => ({}))
+    const { symbol, overrideTimeframe, provider } = body
+
+    const isGlobal = !symbol;
+
+    if (isIngesting && isGlobal) {
+        return NextResponse.json({ error: 'Global ingestion currently in progress.' }, { status: 429 })
     }
 
-    try {
-        isIngesting = true
-        const body = await request.json().catch(() => ({}))
-        const { symbol, overrideTimeframe } = body
+    const timeframes: Timeframe[] = overrideTimeframe ? [overrideTimeframe as Timeframe] : ['1d', '1h']
+    const universe = symbol ? [symbol] : GLOBAL_UNIVERSE.slice(0, 10) // Limit to 10 for safety in cron mode
 
-        const timeframes: Timeframe[] = overrideTimeframe ? [overrideTimeframe as Timeframe] : ['1d', '1h']
-        const universe = symbol ? [symbol] : GLOBAL_UNIVERSE.slice(0, 10) // Limit to 10 for safety in cron mode
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+        async start(controller) {
+            const send = (type: 'log' | 'result' | 'error', data: any) => {
+                const message = JSON.stringify({ type, data }) + '\n';
+                controller.enqueue(encoder.encode(message));
+            }
 
-        const results = []
+            if (isGlobal) isIngesting = true;
 
-        for (const sym of universe) {
-            for (const tf of timeframes) {
-                console.log(`[IngestCron] Checking gaps for ${sym} @ ${tf}...`)
+            try {
+                send('log', `Starting ingestion sweep for ${universe.length} symbols...`);
+                let totalProcessed = 0;
 
-                // 1. Initial deep historical fetch if entirely missing
-                const health = await DataHealthManager.getHealth(sym, tf)
-                const targetStart = DataHealthManager.getTargetHorizon(tf)
-                const now = Math.floor(Date.now() / 1000)
-                const ONE_YEAR = 31536000
+                for (const sym of universe) {
+                    for (const tf of timeframes) {
+                        send('log', `Checking gaps for ${sym} @ ${tf}...`);
 
-                if (health.count === 0) {
-                    console.log(`[IngestCron] No data found for ${sym}. Bootstrapping from ${new Date(targetStart * 1000).toISOString()}...`)
-                    let currentStart = targetStart
-                    let totalFetched = 0
+                        const health = await DataHealthManager.getHealth(sym, tf)
+                        const targetStart = DataHealthManager.getTargetHorizon(tf)
+                        const now = Math.floor(Date.now() / 1000)
+                        const ONE_YEAR = 31536000
 
-                    while (currentStart < now) {
-                        const currentEnd = Math.min(currentStart + (ONE_YEAR * 2), now) // 2 year chunks to avoid rate limits/OOM
-                        try {
-                            console.log(`  -> Fetching chunk ${new Date(currentStart * 1000).toISOString()} to ${new Date(currentEnd * 1000).toISOString()}`)
-                            const fetched = await marketDataStore.getHistoricalData(sym, tf, currentStart, currentEnd)
-                            totalFetched += fetched.length
+                        if (health.count === 0) {
+                            send('log', `No data found for ${sym} (${tf}). Bootstrapping from ${new Date(targetStart * 1000).toISOString()}...`);
+                            let currentStart = targetStart
+                            let totalFetched = 0
 
-                            // Prevent infinite loops if provider returns empty for older ranges (e.g. IPO was recent)
-                            if (fetched.length === 0 && currentStart < now - (ONE_YEAR * 5)) {
-                                console.log(`  -> No data found for deep chunk, assumption: Asset did not exist yet (pre-IPO). Bailing early.`)
-                                break;
+                            while (currentStart < now) {
+                                const currentEnd = Math.min(currentStart + (ONE_YEAR * 2), now)
+                                try {
+                                    send('log', `-> Fetching chunk ${new Date(currentStart * 1000).toISOString()} to ${new Date(currentEnd * 1000).toISOString()} using provider: ${provider || 'auto'}`);
+                                    const fetched = await marketDataStore.getHistoricalData(sym, tf, currentStart, currentEnd, provider)
+                                    totalFetched += fetched.length
+
+                                    send('log', `-> Received ${fetched.length} bars.`);
+
+                                    // Break if no data and highly historical (Yahoo doesn't support deep intraday)
+                                    if (fetched.length === 0 && currentStart < now - (ONE_YEAR * 3)) {
+                                        send('log', `-> No data found for deep chunk. Bailing early to prevent infinite empty loop.`);
+                                        break;
+                                    }
+
+                                    await new Promise(resolve => setTimeout(resolve, 1500))
+                                } catch (e: any) {
+                                    send('log', `-> Chunk failed: ${e.message}`);
+                                    break;
+                                }
+                                currentStart = currentEnd
                             }
-                            await new Promise(resolve => setTimeout(resolve, 1500)) // Rate limit delay
-                        } catch (e) {
-                            console.error(`[IngestCron] Chunk failed for ${sym}:`, e)
-                            break;
+
+                            totalProcessed++;
+                            send('log', `Finished bootstrap for ${sym} (${tf}). Added ${totalFetched} total bars.`);
+                            continue
                         }
-                        currentStart = currentEnd
-                    }
 
-                    results.push({ symbol: sym, timeframe: tf, action: 'bootstrapped', newBars: totalFetched })
-                    continue
-                }
+                        if (health.targetCoveragePercent < 100 && health.startIndex) {
+                            const actualStart = Math.floor(health.startIndex.getTime() / 1000)
+                            if (actualStart > targetStart + (ONE_YEAR)) {
+                                send('log', `Low coverage (${health.targetCoveragePercent}%). Backfilling deep history for ${sym}...`);
 
-                // 2. Pre-pend missing deep historical data if coverage < 100%
-                if (health.targetCoveragePercent < 100 && health.startIndex) {
-                    const actualStart = Math.floor(health.startIndex.getTime() / 1000)
-                    if (actualStart > targetStart + (ONE_YEAR)) { // Only backfill if we're missing more than a year
-                        console.log(`[IngestCron] Low coverage (${health.targetCoveragePercent}%). Backfilling deep history for ${sym}...`)
+                                let currentStart = targetStart
+                                let totalFetched = 0
 
-                        let currentStart = targetStart
-                        let totalFetched = 0
+                                while (currentStart < actualStart) {
+                                    const currentEnd = Math.min(currentStart + (ONE_YEAR * 2), actualStart)
+                                    try {
+                                        send('log', `-> Fetching backfill chunk ${new Date(currentStart * 1000).toISOString()} to ${new Date(currentEnd * 1000).toISOString()}`);
+                                        const fetched = await marketDataStore.getHistoricalData(sym, tf, currentStart, currentEnd, provider)
+                                        totalFetched += fetched.length
 
-                        while (currentStart < actualStart) {
-                            const currentEnd = Math.min(currentStart + (ONE_YEAR * 2), actualStart)
-                            try {
-                                const fetched = await marketDataStore.getHistoricalData(sym, tf, currentStart, currentEnd)
-                                totalFetched += fetched.length
-                                if (fetched.length === 0 && currentStart < actualStart - (ONE_YEAR * 5)) break;
-                                await new Promise(resolve => setTimeout(resolve, 1500))
-                            } catch (e) {
-                                break;
+                                        if (fetched.length === 0 && currentStart < actualStart - (ONE_YEAR * 3)) break;
+                                        await new Promise(resolve => setTimeout(resolve, 1500))
+                                    } catch (e: any) {
+                                        send('log', `-> Backfill chunk failed: ${e.message}`);
+                                        break;
+                                    }
+                                    currentStart = currentEnd
+                                }
+                                totalProcessed++;
+                                send('log', `Finished backfill for ${sym} (${tf}). Added ${totalFetched} bars.`);
                             }
-                            currentStart = currentEnd
                         }
-                        results.push({ symbol: sym, timeframe: tf, action: 'historical_backfill', newBars: totalFetched })
+
+                        if (health.gaps && health.gaps.length > 0) {
+                            send('log', `Healing ${health.gaps.length} internal gaps for ${sym}...`);
+                            // We don't have stream logs in DataHealthManager.syncGaps easily, but let's log completion
+                            const fixReport = await DataHealthManager.syncGaps(sym, tf, provider)
+                            totalProcessed++;
+                            send('log', `Healed gaps. Gaps fixed: ${fixReport.gapsFixed}, Bars added: ${fixReport.barsAdded}`);
+                        } else {
+                            const lastBarUnix = Math.floor(health.endIndex!.getTime() / 1000)
+                            if (now - lastBarUnix > DataHealthManager.timeframeToSeconds(tf) * 2) {
+                                send('log', `Syncing tail for ${sym} (${tf}) up to present day...`);
+                                const fetched = await marketDataStore.getHistoricalData(sym, tf, lastBarUnix, now, provider)
+                                totalProcessed++;
+                                send('log', `Caught up context. Synchronized ${fetched.length} bars.`);
+                            }
+                        }
                     }
                 }
 
-                // 3. Continuous Sync Internal Gaps if data exists but is fragmented
-                if (health.gaps && health.gaps.length > 0) {
-                    console.log(`[IngestCron] Healing ${health.gaps.length} internal gaps for ${sym}...`)
-                    const fixReport = await DataHealthManager.syncGaps(sym, tf)
-                    results.push({ symbol: sym, timeframe: tf, action: 'healed', ...fixReport })
-                } else {
-                    // 4. Just catch up to present day (tail sync)
-                    const lastBarUnix = Math.floor(health.endIndex!.getTime() / 1000)
+                send('log', 'Refreshing robust inventory overview...');
+                await DataHealthManager.refreshInventory();
 
-                    if (now - lastBarUnix > DataHealthManager.timeframeToSeconds(tf) * 2) {
-                        const fetched = await marketDataStore.getHistoricalData(sym, tf, lastBarUnix, now)
-                        results.push({ symbol: sym, timeframe: tf, action: 'caught_up', newBars: fetched.length })
-                    }
-                }
+                send('log', 'Ingestion sweep complete.');
+                send('result', { processed: totalProcessed });
+
+            } catch (error: any) {
+                send('error', error.message || 'Fatal ingestion error');
+            } finally {
+                if (isGlobal) isIngesting = false;
+                controller.close();
             }
         }
+    });
 
-        // Compute final robust inventory
-        await DataHealthManager.refreshInventory()
-
-        return NextResponse.json({
-            success: true,
-            message: 'Ingestion sweep complete.',
-            processed: results.length,
-            details: results
-        })
-
-    } catch (error: any) {
-        console.error('[IngestCron] Error:', error)
-        return NextResponse.json({ error: error.message || 'Fatal ingestion error' }, { status: 500 })
-    } finally {
-        isIngesting = false
-    }
+    return new Response(stream, {
+        headers: {
+            'Content-Type': 'application/x-ndjson',
+            'Connection': 'keep-alive',
+            'Cache-Control': 'no-cache'
+        }
+    });
 }

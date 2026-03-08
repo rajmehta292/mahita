@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Search, Bell, Settings, User, TrendingUp, Menu, X } from 'lucide-react'
 import { useSession, signOut } from 'next-auth/react'
+import { useRouter } from 'next/navigation'
 
 interface TopBarProps {
     onMenuClick: () => void
@@ -10,8 +11,17 @@ interface TopBarProps {
 
 export function TopBar({ onMenuClick }: TopBarProps) {
     const { data: session } = useSession()
+    const router = useRouter()
     const [searchQuery, setSearchQuery] = useState('')
     const [isSearchOpen, setIsSearchOpen] = useState(false)
+
+    const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter' && searchQuery.trim()) {
+            router.push(`/data-doctor?symbol=${searchQuery.trim().toUpperCase()}`)
+            setIsSearchOpen(false)
+            setSearchQuery('')
+        }
+    }
 
     return (
         <div className="h-12 bg-[#1E222D] border-b border-[#2A2E39] flex items-center px-4 gap-4 sticky top-0 z-50">
@@ -40,6 +50,7 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                         autoFocus={isSearchOpen}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
+                        onKeyDown={handleSearch}
                         className="w-full bg-[#131722] text-white pl-10 pr-10 py-1.5 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                     {isSearchOpen && (

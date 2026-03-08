@@ -219,7 +219,7 @@ export class DataHealthManager {
     /**
      * Automatically syncs missing data gaps using the Multi-Provider MarketDataStore.
      */
-    static async syncGaps(symbol: string, timeframe: Timeframe): Promise<{ gapsFixed: number, barsAdded: number }> {
+    static async syncGaps(symbol: string, timeframe: Timeframe, providerOverride?: string): Promise<{ gapsFixed: number, barsAdded: number }> {
         const report = await this.getHealth(symbol, timeframe)
         let gapsFixed = 0
         let barsAdded = 0
@@ -233,7 +233,7 @@ export class DataHealthManager {
                 const startUnix = Math.floor(gap.start.getTime() / 1000)
                 const endUnix = Math.floor(gap.end.getTime() / 1000)
 
-                const fetchedData = await marketDataStore.getHistoricalData(symbol, timeframe, startUnix, endUnix)
+                const fetchedData = await marketDataStore.getHistoricalData(symbol, timeframe, startUnix, endUnix, providerOverride)
 
                 if (fetchedData.length > 0) {
                     gapsFixed++

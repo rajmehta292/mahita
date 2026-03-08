@@ -17,6 +17,16 @@ export default function ChartPage() {
     const [inventory, setInventory] = useState<any[]>([])
     const [selectedSymbol, setSelectedSymbol] = useState("AAPL")
     const [selectedTimeframe, setSelectedTimeframe] = useState("1d")
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const urlParams = new URLSearchParams(window.location.search)
+            const sym = urlParams.get('symbol')
+            const tf = urlParams.get('timeframe')
+            if (sym) setSelectedSymbol(sym.toUpperCase())
+            if (tf) setSelectedTimeframe(tf)
+        }
+    }, [])
     const [chartType, setChartType] = useState<'Standard' | 'HeikinAshi'>('Standard')
     const [activeIndicators, setActiveIndicators] = useState<string[]>(['Volume'])
 

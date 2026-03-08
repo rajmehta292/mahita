@@ -15,9 +15,14 @@ import {
     AlertCircle,
     ArrowUpRight,
     ArrowDownRight,
-    Zap
+    Zap,
+    MoreVertical,
+    Trash2,
+    Settings2,
+    Check
 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 interface MarketMover {
     symbol: string
@@ -49,11 +54,67 @@ export default function DashboardPage() {
         { title: 'Market volatility expected ahead of jobs report', source: 'WSJ', time: '6h ago', sentiment: 'negative' },
     ])
 
-    const [watchlist, setWatchlist] = useState([
-        { symbol: 'AAPL', price: 178.25, change: 1.39 },
-        { symbol: 'MSFT', price: 410.68, change: 1.36 },
-        { symbol: 'TSLA', price: 242.84, change: 3.46 },
-    ])
+    const [symbols, setSymbols] = useState<string[]>(['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA'])
+    const [watchlistQuotes, setWatchlistQuotes] = useState<any[]>([])
+    const [expandedWatchlistSymbol, setExpandedWatchlistSymbol] = useState<string | null>(null)
+    const [editingSymbol, setEditingSymbol] = useState<string | null>(null)
+    const [editInputValue, setEditInputValue] = useState('')
+    const [newSymbolInput, setNewSymbolInput] = useState('')
+    const [isAddingWatchlist, setIsAddingWatchlist] = useState(false)
+    const router = useRouter()
+
+    useEffect(() => {
+        const saved = localStorage.getItem('mahita_watchlist')
+        if (saved) {
+            try {
+                setSymbols(JSON.parse(saved))
+            } catch (e) { }
+        }
+    }, [])
+
+    useEffect(() => {
+        if (symbols.length === 0) {
+            setWatchlistQuotes([])
+            return
+        }
+        const fetchQuotes = async () => {
+            try {
+                const res = await fetch(`/api/trading/quotes?symbols=${symbols.join(',')}`)
+                const data = await res.json()
+                if (data.success) {
+                    setWatchlistQuotes(data.quotes)
+                }
+            } catch (error) { }
+        }
+        fetchQuotes()
+        const interval = setInterval(fetchQuotes, 5000)
+        return () => clearInterval(interval)
+    }, [symbols])
+
+    const saveWatchlist = (newSymbols: string[]) => {
+        setSymbols(newSymbols)
+        localStorage.setItem('mahita_watchlist', JSON.stringify(newSymbols))
+    }
+
+    const handleRemoveFromWatchlist = (sym: string) => {
+        saveWatchlist(symbols.filter(s => s !== sym))
+    }
+
+    const handleEditSubmit = (oldSym: string) => {
+        if (editInputValue.trim() && !symbols.includes(editInputValue.trim().toUpperCase())) {
+            const up = symbols.map(s => s === oldSym ? editInputValue.trim().toUpperCase() : s)
+            saveWatchlist(up)
+        }
+        setEditingSymbol(null)
+    }
+
+    const handleAddNewSymbol = () => {
+        if (newSymbolInput.trim() && !symbols.includes(newSymbolInput.trim().toUpperCase())) {
+            saveWatchlist([...symbols, newSymbolInput.trim().toUpperCase()])
+        }
+        setNewSymbolInput('')
+        setIsAddingWatchlist(false)
+    }
 
     const [aiInsights, setAiInsights] = useState([
         { text: 'Strong bullish momentum detected in tech sector', confidence: 85 },
@@ -228,29 +289,119 @@ export default function DashboardPage() {
                                     </Link>
                                 </div>
                                 <div className="p-4">
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-1 gap-2">
-                                        {watchlist.map((item) => (
+                                    <div className="flex flex-col gap-2">
+                                        {watchlistQuotes.map((item) => (
                                             <div
                                                 key={item.symbol}
-                                                className="flex items-center justify-between p-2 bg-[#131722] rounded border border-[#2A2E39] hover:border-blue-500/30 transition-colors cursor-pointer"
+                                                className="bg-[#131722] rounded border border-[#2A2E39] hover:border-blue-500/30 transition-colors group relative"
                                             >
-                                                <span className="text-white font-medium text-sm">{item.symbol}</span>
-                                                <div className="text-right">
-                                                    <div className="text-white text-xs">${item.price.toFixed(2)}</div>
-                                                    <div className={`text-[10px] ${item.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                                        {item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}%
+                                                <div
+                                                    className="flex items-center justify-between p-3 cursor-pointer"
+                                                    onClick={() => setExpandedWatchlistSymbol(expandedWatchlistSymbol === item.symbol ? null : item.symbol)}
+                                                >
+                                                    {editingSymbol === item.symbol ? (
+                                                        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                                            <input
+                                                                type="text"
+                                                                value={editInputValue}
+                                                                onChange={e => setEditInputValue(e.target.value)}
+                                                                onKeyDown={e => e.key === 'Enter' && handleEditSubmit(item.symbol)}
+                                                                autoFocus
+                                                                className="bg-black/20 text-white px-2 py-1 rounded text-xs w-16 focus:outline-none focus:border-blue-500 border border-[#2A2E39]"
+                                                            />
+                                                            <button onClick={() => handleEditSubmit(item.symbol)} className="text-blue-500"><Check className="w-3 h-3" /></button>
+                                                        </div>
+                                                    ) : (
+                                                        <span
+                                                            className="text-white font-medium text-sm hover:text-blue-400 transition-colors"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation()
+                                                                router.push(`/chart?symbol=${item.symbol}`)
+                                                            }}
+                                                        >
+                                                            {item.symbol}
+                                                        </span>
+                                                    )}
+
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="text-right">
+                                                            <div className="text-white text-xs">${(item.price || 0).toFixed(2)}</div>
+                                                            <div className={`text-[10px] ${item.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                                {item.change >= 0 ? '+' : ''}{(item.changePercent || 0).toFixed(2)}%
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Hover Actions */}
+                                                        <div className="opacity-0 group-hover:opacity-100 flex flex-col gap-1 transition-opacity" onClick={e => e.stopPropagation()}>
+                                                            <Settings2
+                                                                className="w-3 h-3 text-gray-400 hover:text-white cursor-pointer"
+                                                                onClick={(e) => {
+                                                                    setEditingSymbol(item.symbol)
+                                                                    setEditInputValue(item.symbol)
+                                                                }}
+                                                            />
+                                                            <Trash2
+                                                                className="w-3 h-3 text-gray-400 hover:text-red-500 cursor-pointer"
+                                                                onClick={(e) => {
+                                                                    handleRemoveFromWatchlist(item.symbol)
+                                                                }}
+                                                            />
+                                                        </div>
                                                     </div>
                                                 </div>
+
+                                                {/* Expanded Card Details */}
+                                                {expandedWatchlistSymbol === item.symbol && (
+                                                    <div className="px-3 pb-3 pt-1 border-t border-[#2A2E39] bg-[#161A25] rounded-b animate-in slide-in-from-top-2 duration-200">
+                                                        <div className="flex justify-between items-center mt-2">
+                                                            <div className="text-[10px] text-gray-400 truncate pr-2">{item.name}</div>
+                                                            <div className="flex items-center gap-2">
+                                                                <button
+                                                                    onClick={() => router.push(`/chart?symbol=${item.symbol}`)}
+                                                                    className="px-2 py-1 bg-[#2A2E39] hover:bg-blue-500/20 text-white text-[10px] font-bold rounded uppercase transition-colors"
+                                                                >
+                                                                    Chart
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => router.push(`/active-trader?symbol=${item.symbol}`)}
+                                                                    className="px-2 py-1 bg-green-500/20 hover:bg-green-500/30 text-green-500 text-[10px] font-bold rounded uppercase transition-colors"
+                                                                >
+                                                                    Trade
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
+                                        {watchlistQuotes.length === 0 && (
+                                            <div className="text-center py-6 text-gray-500 text-xs">Loading quotes...</div>
+                                        )}
                                     </div>
-                                    <Link
-                                        href="/watchlist"
-                                        className="mt-3 w-full py-2 bg-blue-500/20 hover:bg-blue-500/30 text-blue-500 rounded text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        <Star className="w-4 h-4" />
-                                        Add Symbol
-                                    </Link>
+
+                                    {isAddingWatchlist ? (
+                                        <div className="mt-3 flex items-center gap-2 relative z-20">
+                                            <input
+                                                type="text"
+                                                autoFocus
+                                                value={newSymbolInput}
+                                                onChange={e => setNewSymbolInput(e.target.value)}
+                                                onKeyDown={e => e.key === 'Enter' && handleAddNewSymbol()}
+                                                placeholder="Symbol..."
+                                                className="flex-1 bg-black/20 border border-[#2A2E39] text-white px-2 py-1.5 rounded text-xs focus:outline-none focus:border-blue-500"
+                                            />
+                                            <button onClick={handleAddNewSymbol} className="px-2 py-1.5 bg-blue-500 text-white rounded text-xs">Add</button>
+                                            <button onClick={() => setIsAddingWatchlist(false)} className="px-2 py-1.5 text-gray-400 hover:text-white rounded text-xs">Cancel</button>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            onClick={() => setIsAddingWatchlist(true)}
+                                            className="mt-3 w-full py-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-500 rounded text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            <Star className="w-4 h-4" />
+                                            Add Symbol
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 

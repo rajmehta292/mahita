@@ -380,8 +380,7 @@ export default function BacktestPage() {
                                                         lineNumbers: 'on',
                                                         scrollBeyondLastLine: false,
                                                         automaticLayout: true,
-                                                        padding: { top: 15 },
-                                                        backgroundColor: '#0d0e12'
+                                                        padding: { top: 15 }
                                                     }}
                                                 />
                                             </div>

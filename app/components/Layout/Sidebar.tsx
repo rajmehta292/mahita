@@ -16,7 +16,9 @@ import {
     BookOpen,
     X,
     Briefcase,
-    Code
+    Code,
+    BarChart2,
+    FileText
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -25,9 +27,9 @@ const menuItems = [
     { icon: LayoutGrid, label: 'Dashboard', href: '/dashboard' },
     { icon: Briefcase, label: 'Portfolio', href: '/portfolio' },
     { icon: Zap, label: 'Active Trader', href: '/active-trader' },
-    { icon: TrendingUp, label: 'Chart', href: '/chart' },
-    { icon: Activity, label: 'Data Doctor', href: '/data-doctor' },
-    { icon: List, label: 'Orders', href: '/orders' },
+    { icon: BarChart2, label: 'Screener', href: '/screener' },
+    { icon: Activity, label: 'Data Command', href: '/data-doctor' },
+    { icon: FileText, label: 'Trade History', href: '/history' },
     { icon: Star, label: 'Watchlist', href: '/watchlist' },
     { icon: Code, label: 'Script Editor', href: '/script-editor' },
     { icon: BarChart3, label: 'Backtester', href: '/backtest' },
