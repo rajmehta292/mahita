@@ -3,6 +3,7 @@ import { marketDataStore } from './store'
 import { providerTelemetryBus } from './provider-telemetry'
 import { getGlobalUniverse } from './universe-loader'
 import { ChunkIngestionReport, Timeframe } from './types'
+import { timeframeToSeconds } from './utils'
 
 const ONE_YEAR = 31536000
 
@@ -28,6 +29,7 @@ export interface IngestionSweepOptions {
     overrideTimeframe?: Timeframe | Timeframe[]
     provider?: string
     pauseMs?: number
+    limit?: number
 }
 
 export interface IngestionSweepResult {
@@ -89,7 +91,14 @@ class IngestionService {
             let totalProcessed = 0
             let totalPersisted = 0
 
+            const maxLimit = options.limit ?? universe.length
+
             for (const symbol of universe) {
+                if (totalProcessed >= maxLimit) {
+                    await logger({ message: `Reached requested batch limit of ${maxLimit}. Stopping sweep.` })
+                    break
+                }
+
                 for (const timeframe of timeframes) {
                     await logger({ message: `Checking ${symbol} @ ${timeframe}...`, symbol, timeframe })
 
@@ -186,7 +195,7 @@ class IngestionService {
                     if (health.endIndex) {
                         const lastBarUnix = Math.floor(health.endIndex.getTime() / 1000)
 
-                        if (now - lastBarUnix > DataHealthManager.timeframeToSeconds(timeframe) * 2) {
+                        if (now - lastBarUnix > timeframeToSeconds(timeframe) * 2) {
                             await logger({
                                 message: `Syncing recent tail for ${symbol} (${timeframe})...`,
                                 symbol,

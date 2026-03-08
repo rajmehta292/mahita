@@ -92,7 +92,11 @@ class ContinuousIngestController {
             this.currentPhase = `running cycle ${this.cycleCount}`
 
             try {
-                await ingestionService.runSweep({ provider: this.providerOverride || undefined })
+                // Throttle sweeps to 15 symbols per cycle to avoid API bans and server timeouts
+                await ingestionService.runSweep({
+                    provider: this.providerOverride || undefined,
+                    limit: 15
+                })
                 this.lastCompletedAt = new Date()
                 this.lastError = null
             } catch (error) {

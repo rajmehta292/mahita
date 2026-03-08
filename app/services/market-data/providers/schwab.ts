@@ -80,6 +80,14 @@ export class SchwabProvider implements IDataProvider {
             return await client.getPriceHistory(symbol, params)
         } catch (error) {
             const message = error instanceof Error ? error.message : ''
+
+            // Handle Schwab Rate Limits
+            if (message.includes('429')) {
+                console.warn(`[SchwabProvider] Rate limit hit for ${symbol}. Sleeping 60s...`)
+                await new Promise(resolve => setTimeout(resolve, 60000))
+                return await client.getPriceHistory(symbol, params)
+            }
+
             if (!message.includes('401')) {
                 throw error
             }
