@@ -87,7 +87,7 @@ Exported: 3/6/2026, 7:41:50 AM
   * Sign in/Get started buttons that trigger Google OAuth
   * File was just created but not yet tested
 - **NEXT STEPS**:
-  * Test the landing page at https://mahita.ai or http://localhost:3000
+  * Test the landing page at https://mahita.ai or https://mahita.ai
   * Verify all navigation links work correctly
   * Check mobile responsive menu functionality
   * Ensure Google OAuth sign-in flow works from landing page
@@ -369,7 +369,7 @@ All documentation is comprehensive and ready:
 
 The Active Trader page is now accessible at:
 - **Production**: https://mahita.ai/active-trader
-- **Local**: http://localhost:3000/active-trader
+- **Local**: https://mahita.ai/active-trader
 
 Both the Next.js dev server and Cloudflare Tunnel are running smoothly, and the site is live!
 

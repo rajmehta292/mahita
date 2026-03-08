@@ -4,7 +4,7 @@ import { getSchwabClient, SchwabClient } from './client'
 const EXPIRY_BUFFER_MS = 5 * 60 * 1000
 
 function getCallbackUrl(): string {
-    const baseUrl = process.env.NEXTAUTH_URL || 'http://localhost:6244'
+    const baseUrl = process.env.NEXTAUTH_URL || 'https://mahita.ai'
     return `${baseUrl.replace(/\/$/, '')}/schwab/callback`
 }
 
@@ -59,7 +59,9 @@ export async function getRuntimeSchwabClientWithOptions(options: { forceRefresh?
     try {
         const refreshed = await client.refreshAccessToken(config.refreshToken)
         const accessTokenExpiry = new Date(Date.now() + refreshed.expires_in * 1000)
-        const refreshTokenExpiry = new Date(Date.now() + refreshed.refresh_token_expires_in * 1000)
+        const refreshTokenExpiry = refreshed.refresh_token_expires_in
+            ? new Date(Date.now() + refreshed.refresh_token_expires_in * 1000)
+            : config.refreshTokenExpiry
 
         await prisma.schwabConfig.update({
             where: { id: config.id },

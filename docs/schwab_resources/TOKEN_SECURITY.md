@@ -261,7 +261,7 @@ async function getTokens(userId: string) {
 # .env.local
 
 # NextAuth (REQUIRED)
-NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_URL=http://mahita.ai
 NEXTAUTH_SECRET=your-super-secret-key-min-32-chars
 
 # Google OAuth (REQUIRED)

@@ -21,7 +21,9 @@ import {
     Square,
     Table,
     Trash2,
-    Zap
+    Zap,
+    CloudLightning,
+    Target as LucideTarget
 } from 'lucide-react'
 import { HealthReport } from '../services/market-data/health'
 import { Timeframe } from '../services/market-data/types'
@@ -89,7 +91,7 @@ function toDateTimeLocal(date: Date) {
 }
 
 function sortEvents(events: ProviderEvent[]) {
-    return [...events].sort((left, right) => left.timestamp.localeCompare(right.timestamp))
+    return [...events].sort((left, right) => right.timestamp.localeCompare(left.timestamp))
 }
 
 function formatEventMeta(event: ProviderEvent) {
@@ -139,6 +141,12 @@ export default function DataDoctorPage() {
     const [verifying, setVerifying] = useState(false)
     const [verificationResult, setVerificationResult] = useState<VerificationResponse | null>(null)
     const [verificationError, setVerificationError] = useState<string | null>(null)
+
+    // Vault & Health Heatmap State
+    const [vaults, setVaults] = useState<any[]>([])
+    const [selectedVault, setSelectedVault] = useState<string>('schwab')
+    const [multiIntervalHealth, setMultiIntervalHealth] = useState<Record<string, any>>({})
+    const [isConsolidating, setIsConsolidating] = useState(false)
     const [verifyForm, setVerifyForm] = useState({
         symbol: 'AAPL',
         timeframe: '1d' as Timeframe,
@@ -150,28 +158,41 @@ export default function DataDoctorPage() {
     const terminalEndRef = React.useRef<HTMLDivElement>(null)
     const trafficEndRef = React.useRef<HTMLDivElement>(null)
 
-    useEffect(() => {
-        if (terminalEndRef.current) {
-            terminalEndRef.current.scrollIntoView({ behavior: 'smooth' })
-        }
-    }, [ingestLogs])
+    // Auto-scroll removed to prevent view-jumping as requested.
 
-    useEffect(() => {
-        if (trafficEndRef.current) {
-            trafficEndRef.current.scrollIntoView({ behavior: 'smooth' })
-        }
-    }, [providerEvents])
+    // Auto-scroll removed to prevent view-jumping as requested.
 
-    const fetchReports = useCallback(async () => {
+    const fetchReports = useCallback(async (vault?: string) => {
         setLoading(true)
         try {
-            const res = await fetch('/api/trading/data-health')
+            const v = vault || selectedVault
+            const res = await fetch(`/api/trading/data-health?vault=${v}`)
             const data = await res.json()
             if (Array.isArray(data)) setReports(data)
         } catch (e) {
             console.error(e)
         } finally {
             setLoading(false)
+        }
+    }, [selectedVault])
+
+    const fetchVaults = useCallback(async () => {
+        try {
+            const res = await fetch('/api/trading/vaults')
+            const data = await res.json()
+            setVaults(data)
+        } catch (e) {
+            console.error(e)
+        }
+    }, [])
+
+    const fetchMultiInterval = useCallback(async (symbol: string, vault: string) => {
+        try {
+            const res = await fetch(`/api/trading/data-health?symbol=${symbol}&vault=${vault}`)
+            const data = await res.json()
+            setMultiIntervalHealth(prev => ({ ...prev, [`${symbol}:${vault}`]: data }))
+        } catch (e) {
+            console.error(e)
         }
     }, [])
 
@@ -209,7 +230,7 @@ export default function DataDoctorPage() {
 
         let currentLogs: string[] = []
         const addLog = (msg: string) => {
-            currentLogs = [...currentLogs, msg]
+            currentLogs = [msg, ...currentLogs]
             setIngestLogs(currentLogs)
         }
 
@@ -480,10 +501,11 @@ export default function DataDoctorPage() {
     }, [])
 
     useEffect(() => {
+        fetchVaults()
         fetchReports()
         fetchTraffic()
         fetchContinuousStatus()
-    }, [fetchReports, fetchTraffic, fetchContinuousStatus])
+    }, [fetchReports, fetchTraffic, fetchContinuousStatus, fetchVaults])
 
     useEffect(() => {
         if (!initialQuerySelection || reports.length === 0 || selectedAsset) return
@@ -559,458 +581,266 @@ export default function DataDoctorPage() {
         : '0.0'
 
     return (
-        <div className="min-h-screen bg-[#0d0e12] text-white p-6 md:p-10">
-            <header className="flex flex-col gap-6 mb-10">
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
-                    <div className="flex flex-col gap-2">
-                        <div className="flex items-center gap-3">
-                            <a href="/dashboard" className="p-2 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors">
-                                <ArrowLeft className="w-4 h-4" />
-                            </a>
-                            <h1 className="text-3xl font-bold tracking-tight">Data <span className="text-primary">Command</span></h1>
-                        </div>
-                        <p className="text-white/40 text-sm max-w-3xl">Reset market data, run one-off or continuous ingestion, inspect persisted bars, and watch live provider traffic and verification checks from the same console.</p>
+        <div className="min-h-screen bg-[#0d0e12] text-white flex flex-col">
+            <header className="px-6 py-4 border-b border-white/5 bg-[#0d0e12]/80 backdrop-blur-xl sticky top-0 z-50">
+                <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-4">
+                        <a href="/dashboard" className="p-2 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors">
+                            <ArrowLeft className="w-4 h-4" />
+                        </a>
+                        <h1 className="text-xl font-bold tracking-tight">Data <span className="text-primary">Command</span></h1>
+                        <div className="h-4 w-[1px] bg-white/10 mx-2" />
+                        <p className="text-white/40 text-xs hidden md:block">Multi-Vault Data Architecture v2</p>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-3">
-                        <button
-                            onClick={handleGlobalIngest}
-                            disabled={globalIngesting || continuousBusy}
-                            className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${globalIngesting ? 'bg-white/5 text-white/20 border-white/10' : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'}`}
-                        >
-                            <Zap className={`w-4 h-4 ${globalIngesting ? 'animate-pulse' : ''}`} />
-                            {globalIngesting ? 'Running Sweep...' : 'Run One Sweep'}
-                        </button>
-                        <button
-                            onClick={() => handleContinuousAction('start')}
-                            disabled={continuousBusy || continuousStatus?.running}
-                            className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${continuousStatus?.running ? 'bg-white/5 text-white/20 border-white/10' : 'bg-blue-500/10 text-blue-400 border-blue-500/20 hover:bg-blue-500/20'}`}
-                        >
-                            <Play className="w-4 h-4" />
-                            Start Continuous
-                        </button>
-                        <button
-                            onClick={() => handleContinuousAction('stop')}
-                            disabled={continuousBusy || !continuousStatus?.running}
-                            className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${!continuousStatus?.running ? 'bg-white/5 text-white/20 border-white/10' : 'bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20'}`}
-                        >
-                            <Square className="w-4 h-4" />
-                            Stop Continuous
-                        </button>
-                        <button
-                            onClick={() => handleReset(false)}
-                            disabled={resetting}
-                            className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${resetting ? 'bg-white/5 text-white/20 border-white/10' : 'bg-rose-500/10 text-rose-400 border-rose-500/20 hover:bg-rose-500/20'}`}
-                        >
-                            <Trash2 className="w-4 h-4" />
-                            Clear Data
-                        </button>
-                        <button
-                            onClick={() => handleReset(true)}
-                            disabled={resetting}
-                            className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${resetting ? 'bg-white/5 text-white/20 border-white/10' : 'bg-fuchsia-500/10 text-fuchsia-400 border-fuchsia-500/20 hover:bg-fuchsia-500/20'}`}
-                        >
-                            <Radio className="w-4 h-4" />
-                            Reset + Restart
-                        </button>
-                        <button
-                            onClick={handleRefresh}
-                            disabled={refreshing}
-                            className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${refreshing ? 'bg-white/5 text-white/20 border-white/10' : 'bg-primary/10 text-primary border-primary/20 hover:bg-primary/20'}`}
-                        >
-                            <Clock className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-                            {refreshing ? 'Scanning...' : 'Scan Inventory'}
-                        </button>
-                    </div>
-                </div>
-
-                <div className="flex flex-col xl:flex-row xl:items-center gap-4 xl:justify-between">
-                    <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
-                        <button
-                            onClick={() => { setView('summary') }}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === 'summary' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-white/40 hover:text-white/60'}`}
-                        >
-                            Health Monitor
-                        </button>
-                        <button
-                            onClick={() => { setView('roadmap'); setSelectedAsset(null) }}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === 'roadmap' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-white/40 hover:text-white/60'}`}
-                        >
-                            Ingestion Targets
-                        </button>
-                        <button
-                            onClick={() => { setView('traffic'); setSelectedAsset(null) }}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === 'traffic' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-white/40 hover:text-white/60'}`}
-                        >
-                            Provider Traffic
-                        </button>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-3">
-                        <select
-                            value={continuousProviderOverride}
-                            onChange={(e) => setContinuousProviderOverride(e.target.value)}
-                            className="bg-white/5 border border-white/10 rounded-xl py-2.5 px-4 text-sm text-white/70 focus:outline-none focus:border-primary"
-                        >
-                            <option value="">Continuous Provider: Auto</option>
-                            {providers.map((provider) => (
-                                <option key={provider} value={provider}>{provider}</option>
-                            ))}
-                        </select>
-                        <div className="relative w-full md:w-80">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
-                            <input
-                                type="text"
-                                placeholder="Search assets..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="w-full bg-white/5 border border-white/10 rounded-xl py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:border-primary transition-colors"
-                            />
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg">
+                            <div className={`w-2 h-2 rounded-full ${continuousStatus?.running ? 'bg-emerald-500 animate-pulse' : 'bg-white/20'}`} />
+                            <span className="text-[10px] font-medium text-white/60 uppercase tracking-wider">
+                                {continuousStatus?.running ? 'Live Ingestion active' : 'Continuous Idle'}
+                            </span>
                         </div>
                     </div>
                 </div>
             </header>
 
-            {view === 'traffic' ? (
-                <div className="space-y-8">
-                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                        <StatusCard
-                            icon={<Database className="w-5 h-5 text-primary" />}
-                            title="Stored Records"
-                            value={reports.reduce((acc, report) => acc + report.count, 0).toLocaleString()}
-                            subtitle={`${reports.length} symbol/timeframe datasets`}
-                            accent="primary"
-                        />
-                        <StatusCard
-                            icon={<Radio className={`w-5 h-5 ${continuousStatus?.running ? 'text-emerald-400' : 'text-white/40'}`} />}
-                            title="Continuous Engine"
-                            value={continuousStatus?.running ? 'Running' : 'Stopped'}
-                            subtitle={continuousStatus?.currentPhase || 'idle'}
-                            accent={continuousStatus?.running ? 'emerald' : 'slate'}
-                        />
-                        <StatusCard
-                            icon={<Activity className="w-5 h-5 text-blue-400" />}
-                            title="Provider Events"
-                            value={providerEvents.length.toLocaleString()}
-                            subtitle={providerEvents.length > 0 ? `Latest: ${new Date(providerEvents[providerEvents.length - 1].timestamp).toLocaleTimeString()}` : 'No provider traffic yet'}
-                            accent="blue"
-                        />
-                        <StatusCard
-                            icon={<ShieldCheck className="w-5 h-5 text-fuchsia-400" />}
-                            title="Verification"
-                            value={verificationResult ? `${verificationResult.comparison.accuracyScore.toFixed(1)}%` : 'Idle'}
-                            subtitle={verificationResult ? `${verificationResult.symbol} ${verificationResult.timeframe}` : 'Run a cross-provider check'}
-                            accent="fuchsia"
-                        />
-                    </div>
-
-                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-                        <div className="xl:col-span-1 space-y-6">
-                            <div className="glass-panel p-6">
-                                <h3 className="text-sm font-bold uppercase tracking-widest text-white/40 mb-4">Engine Status</h3>
-                                <div className="space-y-4 text-sm">
-                                    <div className="flex justify-between gap-4">
-                                        <span className="text-white/40">Started</span>
-                                        <span className="font-mono text-white/80">{continuousStatus?.startedAt ? new Date(continuousStatus.startedAt).toLocaleString() : 'N/A'}</span>
-                                    </div>
-                                    <div className="flex justify-between gap-4">
-                                        <span className="text-white/40">Last Completed</span>
-                                        <span className="font-mono text-white/80">{continuousStatus?.lastCompletedAt ? new Date(continuousStatus.lastCompletedAt).toLocaleString() : 'N/A'}</span>
-                                    </div>
-                                    <div className="flex justify-between gap-4">
-                                        <span className="text-white/40">Cycles</span>
-                                        <span className="font-mono text-white/80">{continuousStatus?.cycleCount ?? 0}</span>
-                                    </div>
-                                    <div className="flex justify-between gap-4">
-                                        <span className="text-white/40">Provider Override</span>
-                                        <span className="font-mono text-white/80 uppercase">{continuousStatus?.providerOverride || 'auto'}</span>
-                                    </div>
-                                    <div className="flex justify-between gap-4">
-                                        <span className="text-white/40">Interval</span>
-                                        <span className="font-mono text-white/80">{Math.round((continuousStatus?.intervalMs || 0) / 1000)}s</span>
-                                    </div>
-                                    <div className="pt-3 border-t border-white/10">
-                                        <div className="text-[10px] uppercase tracking-widest text-white/30 mb-2">Last Error</div>
-                                        <div className="text-xs text-rose-300/80 min-h-[40px]">{continuousStatus?.lastError || 'None'}</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="glass-panel p-6 border-fuchsia-500/20 bg-fuchsia-500/5">
-                                <h3 className="text-sm font-bold uppercase tracking-widest text-fuchsia-400/70 mb-4">Verification</h3>
-                                <div className="space-y-3">
-                                    <input
-                                        value={verifyForm.symbol}
-                                        onChange={(e) => setVerifyForm((current) => ({ ...current, symbol: e.target.value.toUpperCase() }))}
-                                        placeholder="Symbol"
-                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-400"
-                                    />
-                                    <select
-                                        value={verifyForm.timeframe}
-                                        onChange={(e) => setVerifyForm((current) => ({ ...current, timeframe: e.target.value as Timeframe }))}
-                                        className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-400"
-                                    >
-                                        {['1m', '5m', '15m', '30m', '1h', '1d', '1w', '1M'].map((timeframe) => (
-                                            <option key={timeframe} value={timeframe}>{timeframe}</option>
-                                        ))}
-                                    </select>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <select
-                                            value={verifyForm.primaryProvider}
-                                            onChange={(e) => setVerifyForm((current) => ({ ...current, primaryProvider: e.target.value }))}
-                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-400"
-                                        >
-                                            {providers.map((provider) => (
-                                                <option key={`primary-${provider}`} value={provider}>{provider}</option>
-                                            ))}
-                                        </select>
-                                        <select
-                                            value={verifyForm.secondaryProvider}
-                                            onChange={(e) => setVerifyForm((current) => ({ ...current, secondaryProvider: e.target.value }))}
-                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-400"
-                                        >
-                                            {providers.map((provider) => (
-                                                <option key={`secondary-${provider}`} value={provider}>{provider}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div className="grid grid-cols-1 gap-3">
-                                        <input
-                                            type="datetime-local"
-                                            value={verifyForm.startTime}
-                                            onChange={(e) => setVerifyForm((current) => ({ ...current, startTime: e.target.value }))}
-                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-400"
-                                        />
-                                        <input
-                                            type="datetime-local"
-                                            value={verifyForm.endTime}
-                                            onChange={(e) => setVerifyForm((current) => ({ ...current, endTime: e.target.value }))}
-                                            className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-fuchsia-400"
-                                        />
-                                    </div>
+            {!selectedAsset ? (
+                <div className="flex-1 flex overflow-hidden">
+                    {/* Vault Sidebar */}
+                    <aside className="w-64 border-r border-white/5 flex flex-col bg-[#0b0c10]">
+                        <div className="p-4 border-b border-white/5">
+                            <h2 className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-4">Storage Vaults</h2>
+                            <div className="flex flex-col gap-1">
+                                {Array.isArray(vaults) && vaults.map(v => (
                                     <button
-                                        onClick={handleVerify}
-                                        disabled={verifying || providers.length < 2}
-                                        className={`w-full py-2.5 rounded-lg text-sm font-bold border transition-all flex items-center justify-center gap-2 ${verifying ? 'bg-white/5 text-white/20 border-white/10' : 'bg-fuchsia-500/10 text-fuchsia-300 border-fuchsia-500/20 hover:bg-fuchsia-500/20'}`}
+                                        key={v.id}
+                                        onClick={() => {
+                                            setSelectedVault(v.name)
+                                            fetchReports(v.name)
+                                        }}
+                                        className={`flex items-center justify-between p-3 rounded-xl transition-all group ${selectedVault === v.name ? 'bg-primary/10 border border-primary/20 text-primary' : 'hover:bg-white/5 text-white/60 border border-transparent'}`}
                                     >
-                                        <ShieldCheck className={`w-4 h-4 ${verifying ? 'animate-pulse' : ''}`} />
-                                        {verifying ? 'Verifying...' : 'Run Verification'}
-                                    </button>
-                                    {verificationError && (
-                                        <div className="text-xs text-rose-300/80">{verificationError}</div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="xl:col-span-2 space-y-6">
-                            <div className="glass-panel p-0 overflow-hidden min-h-[420px] flex flex-col">
-                                <div className="px-5 py-4 border-b border-white/5 bg-white/5 flex items-center justify-between gap-4">
-                                    <div>
-                                        <div className="text-sm font-bold flex items-center gap-2"><Radio className="w-4 h-4 text-primary" /> Live Provider Traffic</div>
-                                        <div className="text-[11px] text-white/40 mt-1">Request/response/error events streamed from Schwab, Yahoo, Alpha Vantage, and verification jobs.</div>
-                                    </div>
-                                    <div className="text-[10px] uppercase tracking-widest text-white/30">{providerEvents.length} events</div>
-                                </div>
-                                <div className="flex-1 overflow-y-auto p-4 space-y-3 font-mono text-[11px]">
-                                    {providerEvents.slice().reverse().map((event) => (
-                                        <div key={event.id} className={`rounded-lg border p-3 ${event.kind === 'error' ? 'border-rose-500/20 bg-rose-500/5' : event.kind === 'verification' ? 'border-fuchsia-500/20 bg-fuchsia-500/5' : event.kind === 'control' ? 'border-blue-500/20 bg-blue-500/5' : 'border-white/10 bg-white/[0.03]'}`}>
-                                            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 mb-2">
-                                                <div className="text-white/90">{event.message}</div>
-                                                <div className="text-white/30">{new Date(event.timestamp).toLocaleString()}</div>
+                                        <div className="flex items-center gap-3">
+                                            <Database className={`w-4 h-4 ${selectedVault === v.name ? 'text-primary' : 'text-white/20'}`} />
+                                            <div className="flex flex-col items-start text-left">
+                                                <span className="text-sm font-semibold capitalize">{v.name}</span>
+                                                <span className="text-[10px] opacity-40 uppercase">{v.type}</span>
                                             </div>
-                                            <div className="text-white/40 mb-2">{formatEventMeta(event)}</div>
-                                            {event.request && (
-                                                <pre className="text-white/30 whitespace-pre-wrap break-words">request: {JSON.stringify(event.request, null, 2)}</pre>
-                                            )}
-                                            {event.response && (
-                                                <pre className="text-white/30 whitespace-pre-wrap break-words">response: {JSON.stringify(event.response, null, 2)}</pre>
-                                            )}
                                         </div>
-                                    ))}
-                                    {providerEvents.length === 0 && (
-                                        <div className="h-full flex items-center justify-center text-white/20 uppercase tracking-widest">No provider traffic captured yet.</div>
-                                    )}
-                                    <div ref={trafficEndRef} />
-                                </div>
-                            </div>
-
-                            <div className="glass-panel p-6 border-fuchsia-500/20 bg-fuchsia-500/5">
-                                <h3 className="text-sm font-bold uppercase tracking-widest text-fuchsia-400/70 mb-4">Latest Verification Result</h3>
-                                {verificationResult ? (
-                                    <div className="space-y-4">
-                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                            <Metric label="Primary Bars" value={verificationResult.primaryCount.toLocaleString()} />
-                                            <Metric label="Secondary Bars" value={verificationResult.secondaryCount.toLocaleString()} />
-                                            <Metric label="Overlap" value={verificationResult.comparison.overlapCount.toLocaleString()} />
-                                            <Metric label="Accuracy" value={`${verificationResult.comparison.accuracyScore.toFixed(1)}%`} />
-                                        </div>
-                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                            <Metric label="Missing From Primary" value={verificationResult.comparison.missingFromPrimary.toLocaleString()} />
-                                            <Metric label="Missing From Secondary" value={verificationResult.comparison.missingFromSecondary.toLocaleString()} />
-                                            <Metric label="Max Close Diff" value={verificationResult.comparison.maxCloseDiff.toFixed(4)} />
-                                        </div>
-                                        <div className="border border-white/10 rounded-xl overflow-hidden">
-                                            <table className="w-full text-left text-xs">
-                                                <thead className="bg-white/5 text-white/40 uppercase text-[10px]">
-                                                    <tr>
-                                                        <th className="px-4 py-3">Time</th>
-                                                        <th className="px-4 py-3">Primary Close</th>
-                                                        <th className="px-4 py-3">Secondary Close</th>
-                                                        <th className="px-4 py-3">Close Diff</th>
-                                                        <th className="px-4 py-3">Volume Diff</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody className="divide-y divide-white/5">
-                                                    {verificationResult.comparison.samples.map((sample) => (
-                                                        <tr key={sample.time}>
-                                                            <td className="px-4 py-3 font-mono text-white/50">{new Date(sample.time * 1000).toLocaleString()}</td>
-                                                            <td className="px-4 py-3">{sample.primaryClose.toFixed(4)}</td>
-                                                            <td className="px-4 py-3">{sample.secondaryClose.toFixed(4)}</td>
-                                                            <td className="px-4 py-3 text-amber-300">{sample.closeDiff.toFixed(4)}</td>
-                                                            <td className="px-4 py-3 text-amber-300">{sample.volumeDiff.toFixed(2)}</td>
-                                                        </tr>
-                                                    ))}
-                                                    {verificationResult.comparison.samples.length === 0 && (
-                                                        <tr>
-                                                            <td colSpan={5} className="px-4 py-8 text-center text-white/30 uppercase tracking-widest">No mismatches sampled.</td>
-                                                        </tr>
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="text-sm text-white/40">No verification run yet.</div>
+                                        {v._count?.inventories > 0 && (
+                                            <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${selectedVault === v.name ? 'bg-primary/20 text-primary' : 'bg-white/5 text-white/40'}`}>
+                                                {v._count.inventories}
+                                            </span>
+                                        )}
+                                    </button>
+                                ))}
+                                {(!Array.isArray(vaults) || vaults.length === 0) && (
+                                    <div className="p-4 text-center text-[10px] text-white/20 italic">No vaults available</div>
                                 )}
                             </div>
                         </div>
-                    </div>
-                </div>
-            ) : view === 'roadmap' ? (
-                <div className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-2">
-                        <div className="glass-panel p-6 border-primary/20 bg-primary/5 relative overflow-hidden">
-                            <Activity className="absolute -right-4 -bottom-4 w-24 h-24 text-primary opacity-10" />
-                            <h3 className="text-sm font-bold uppercase tracking-widest text-primary/60 mb-2 relative z-10">Global Readiness</h3>
-                            <div className="text-4xl font-bold text-white relative z-10">{averageCoverage}%</div>
-                            <p className="text-xs text-white/40 mt-2 relative z-10 mb-2">Average horizon target coverage across {reports.length} tracked records.</p>
-                            <p className="text-[10px] text-white/30 uppercase tracking-widest font-bold">Total Records: {reports.reduce((acc, report) => acc + report.count, 0).toLocaleString()}</p>
-                        </div>
-                        <div className="glass-panel p-6 border-emerald-500/20 bg-emerald-500/5 relative overflow-hidden">
-                            <CheckCircle2 className="absolute -right-4 -bottom-4 w-24 h-24 text-emerald-500 opacity-10" />
-                            <h3 className="text-sm font-bold uppercase tracking-widest text-emerald-500/60 mb-2 relative z-10">Fully Indexed</h3>
-                            <div className="text-4xl font-bold text-emerald-400 relative z-10">
-                                {reports.filter((report) => (report.targetCoveragePercent || 0) === 100).length} <span className="text-lg text-emerald-500/40">/ {reports.length}</span>
-                            </div>
-                            <p className="text-xs text-emerald-400/60 mt-2 relative z-10">Datasets meeting their configured history targets.</p>
-                        </div>
-                        <div className="glass-panel p-6 border-blue-500/20 bg-blue-500/5 relative overflow-hidden">
-                            <Radio className="absolute -right-4 -bottom-4 w-24 h-24 text-blue-500 opacity-10" />
-                            <h3 className="text-sm font-bold uppercase tracking-widest text-blue-500/60 mb-2 relative z-10">Aggregator Engine</h3>
-                            <div className="text-4xl font-bold text-blue-400 relative z-10">{continuousStatus?.running ? 'Active' : 'Stopped'}</div>
-                            <p className="text-xs text-blue-400/60 mt-2 relative z-10">{continuousStatus?.currentPhase || 'Continuous ingestion not running.'}</p>
-                        </div>
-                    </div>
-                    <AcquisitionRoadmap reports={reports} providers={providers} onSync={handleSyncGaps} syncing={syncing} />
-                </div>
-            ) : !selectedAsset ? (
-                <>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 mt-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="glass-panel p-6 border-primary/20 bg-primary/5 relative overflow-hidden">
-                            <Activity className="absolute -right-4 -bottom-4 w-24 h-24 text-primary opacity-10" />
-                            <h3 className="text-sm font-bold uppercase tracking-widest text-primary/60 mb-2 relative z-10">Global Readiness</h3>
-                            <div className="text-4xl font-bold text-white relative z-10">{averageCoverage}%</div>
-                            <p className="text-xs text-white/40 mt-2 relative z-10 mb-2">Average horizon target coverage across {reports.length} tracked records.</p>
-                            <p className="text-[10px] text-white/30 uppercase tracking-widest font-bold">Total Records: {reports.reduce((acc, report) => acc + report.count, 0).toLocaleString()}</p>
-                        </div>
-                        <div className="glass-panel p-6 border-emerald-500/20 bg-emerald-500/5 relative overflow-hidden">
-                            <CheckCircle2 className="absolute -right-4 -bottom-4 w-24 h-24 text-emerald-500 opacity-10" />
-                            <h3 className="text-sm font-bold uppercase tracking-widest text-emerald-500/60 mb-2 relative z-10">Fully Indexed</h3>
-                            <div className="text-4xl font-bold text-emerald-400 relative z-10">
-                                {reports.filter((report) => (report.targetCoveragePercent || 0) === 100).length} <span className="text-lg text-emerald-500/40">/ {reports.length}</span>
-                            </div>
-                            <p className="text-xs text-emerald-400/60 mt-2 relative z-10">Tracking timelines meeting 100% of their historical targets.</p>
-                        </div>
-                        <div className="glass-panel p-6 border-blue-500/20 bg-blue-500/5 relative overflow-hidden">
-                            <Radio className="absolute -right-4 -bottom-4 w-24 h-24 text-blue-500 opacity-10" />
-                            <h3 className="text-sm font-bold uppercase tracking-widest text-blue-500/60 mb-2 relative z-10">Aggregator Engine</h3>
-                            <div className="text-4xl font-bold text-blue-400 relative z-10">{continuousStatus?.running ? 'Active' : 'Stopped'}</div>
-                            <p className="text-xs text-blue-400/60 mt-2 relative z-10">{continuousStatus?.currentPhase || 'Continuous ingestion not running.'}</p>
-                        </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-500 delay-100">
-                        {filteredReports.map((report) => (
-                            <div
-                                key={`${report.symbol}-${report.timeframe}`}
-                                onClick={() => {
-                                    setSelectedAsset({ symbol: report.symbol, timeframe: report.timeframe })
-                                    fetchInspect(report.symbol, report.timeframe)
-                                }}
-                                className="glass-panel p-6 cursor-pointer hover:border-primary/40 transition-all group relative overflow-hidden"
-                            >
-                                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none transition-transform group-hover:scale-110">
-                                    <Activity className="w-24 h-24" />
+                        <div className="p-4 mt-auto">
+                            <div className="p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col gap-1">
+                                <div className="flex items-center gap-2 text-white/40 mb-1">
+                                    <Activity className="w-3.5 h-3.5 text-primary" />
+                                    <span className="text-[10px] font-bold uppercase tracking-wider">Feed Status</span>
                                 </div>
-                                <div className="flex justify-between items-start mb-6 relative z-10">
-                                    <div>
-                                        <h3 className="text-xl font-bold">{report.symbol}</h3>
-                                        <span className="text-[10px] font-bold uppercase tracking-widest text-primary px-2 py-0.5 bg-primary/10 rounded">{report.timeframe}</span>
-                                    </div>
-                                    <div className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full ${report.healthScore > 90 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
-                                        {report.healthScore > 90 ? <CheckCircle2 className="w-3 h-3" /> : <AlertCircle className="w-3 h-3" />}
-                                        {report.healthScore}%
-                                    </div>
+                                <div className="flex items-baseline gap-2">
+                                    <span className="text-xl font-bold">{providerEvents.length}</span>
+                                    <span className="text-white/40 text-[10px]">LATEST</span>
                                 </div>
+                            </div>
+                        </div>
+                    </aside>
 
-                                <div className="space-y-4 relative z-10">
-                                    <div className="flex justify-between text-xs">
-                                        <span className="text-white/40">Continuity Health</span>
-                                        <span className={`font-medium ${report.healthScore > 90 ? 'text-emerald-400' : 'text-amber-400'}`}>{report.healthScore}%</span>
+                    {/* Main Work Area */}
+                    <main className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+                        {/* Multi-Interval Heatmap Header */}
+                        <section className="bg-white/[0.02] border border-white/5 rounded-3xl p-6">
+                            <div className="flex items-center justify-between mb-8">
+                                <div>
+                                    <h3 className="text-lg font-bold mb-1">Global Health Heatmap</h3>
+                                    <p className="text-white/40 text-xs">At-a-glance data coverage across all time intervals for current vault: <span className="text-primary font-bold uppercase">{selectedVault}</span></p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div className="relative w-64">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/20" />
+                                        <input
+                                            type="text"
+                                            placeholder="Filter assets..."
+                                            value={search}
+                                            onChange={(e) => setSearch(e.target.value)}
+                                            className="w-full bg-white/5 border border-white/10 rounded-xl py-2 pl-10 pr-4 text-xs focus:outline-none focus:border-primary transition-colors"
+                                        />
                                     </div>
-                                    <div className="flex justify-between text-xs">
-                                        <span className="text-white/40">Provider</span>
-                                        <span className="font-mono text-primary/80 uppercase tracking-tighter">{report.source || 'Unknown'}</span>
-                                    </div>
-                                    <div className="flex justify-between text-xs">
-                                        <span className="text-white/40">Internal Gaps</span>
-                                        <span className={`font-bold ${report.gaps?.length > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>{report.gaps?.length || 0}</span>
-                                    </div>
-                                    <div className="pt-2">
-                                        <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-white/40 mb-1">
-                                            <span>Target Horizon</span>
-                                            <span className={(report.targetCoveragePercent || 0) === 100 ? 'text-indigo-400' : 'text-primary'}>{report.targetCoveragePercent || 0}%</span>
-                                        </div>
-                                        <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden relative">
-                                            <div
-                                                className={`absolute top-0 left-0 h-full transition-all duration-1000 ${(report.targetCoveragePercent || 0) === 100 ? 'bg-indigo-500' : 'bg-primary'}`}
-                                                style={{ width: `${Math.min(report.targetCoveragePercent || 0, 100)}%` }}
-                                            />
-                                        </div>
-                                        <div className="mt-2 text-[8px] text-white/20 uppercase tracking-widest flex justify-between">
-                                            <span>{report.startIndex ? new Date(report.startIndex).getFullYear() : 'N/A'} - {report.endIndex ? new Date(report.endIndex).getFullYear() : 'N/A'}</span>
-                                            <span>Bars: {report.count.toLocaleString()}</span>
-                                        </div>
-                                    </div>
+                                    <button
+                                        onClick={handleRefresh}
+                                        disabled={refreshing}
+                                        className={`p-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 transition-all ${refreshing ? 'animate-spin opacity-50' : ''}`}
+                                    >
+                                        <RefreshCw className="w-4 h-4" />
+                                    </button>
                                 </div>
                             </div>
-                        ))}
-                        {filteredReports.length === 0 && (
-                            <div className="col-span-full py-24 text-center text-white/20 font-bold uppercase tracking-widest">
-                                No data found. Try syncing a target.
+
+                            {filteredReports.length === 0 ? (
+                                <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-2xl">
+                                    <AlertCircle className="w-8 h-8 text-white/10 mb-3" />
+                                    <p className="text-white/20 text-sm">No inventory found for this vault.</p>
+                                    <p className="text-white/10 text-[10px] mt-2 italic">Run a scan or ingestion to populate.</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                                    {filteredReports.map((report) => (
+                                        <div key={`${report.symbol}-${report.timeframe}`} className="p-4 bg-white/5 border border-white/10 rounded-2xl flex flex-col gap-3 group hover:border-primary/20 transition-all">
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="p-2 bg-primary/10 rounded-lg group-hover:scale-110 transition-transform">
+                                                        <Zap className="w-4 h-4 text-primary" />
+                                                    </div>
+                                                    <span className="font-bold text-lg">{report.symbol}</span>
+                                                </div>
+                                                <div className="flex flex-col items-end">
+                                                    <span className="text-[10px] text-white/40 uppercase font-bold tracking-wider">{report.timeframe}</span>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className={`w-1.5 h-1.5 rounded-full ${report.healthScore > 90 ? 'bg-emerald-500' : report.healthScore > 70 ? 'bg-amber-500' : 'bg-rose-500'}`} />
+                                                        <span className="text-sm font-mono font-bold">{report.healthScore}%</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Interval Grid */}
+                                            <div className="flex gap-1.5">
+                                                {['1s', '1m', '1h', '1d', '1w', '1M'].map(tf => {
+                                                    const isActive = tf === report.timeframe
+                                                    return (
+                                                        <div
+                                                            key={tf}
+                                                            title={`${tf} coverage`}
+                                                            className={`h-4 flex-1 rounded-sm ${isActive ? 'bg-primary shadow-[0_0_10px_rgba(var(--primary-rgb),0.3)]' : 'bg-white/10'} hover:bg-white/20 transition-all cursor-pointer`}
+                                                        />
+                                                    )
+                                                })}
+                                            </div>
+
+                                            <div className="flex justify-between items-center mt-2 border-t border-white/5 pt-2">
+                                                <span className="text-[10px] text-white/20 font-bold tracking-tighter uppercase">Pool: {report.count.toLocaleString()} BARS</span>
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedAsset({ symbol: report.symbol, timeframe: report.timeframe })
+                                                        setView('roadmap')
+                                                    }}
+                                                    className="text-[10px] font-bold text-primary hover:text-white transition-colors flex items-center gap-1"
+                                                >
+                                                    Inspection <ChevronRight className="w-2.5 h-2.5" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </section>
+
+                        {/* Provider Actions Panel */}
+                        <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                                <h3 className="text-sm font-bold uppercase tracking-widest text-primary mb-4 flex items-center gap-2">
+                                    <CloudLightning className="w-4 h-4" /> Operations Control
+                                </h3>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        onClick={handleGlobalIngest}
+                                        disabled={globalIngesting}
+                                        className="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl text-xs font-bold hover:bg-primary/20 transition-all flex items-center gap-2"
+                                    >
+                                        <RefreshCw className={`w-3.5 h-3.5 ${globalIngesting ? 'animate-spin' : ''}`} />
+                                        Run Global Sync
+                                    </button>
+                                    <button
+                                        disabled={continuousBusy}
+                                        onClick={() => handleContinuousAction(continuousStatus?.running ? 'stop' : 'start')}
+                                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${continuousStatus?.running ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20 hover:bg-rose-500/20' : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 hover:bg-emerald-500/20'}`}
+                                    >
+                                        {continuousStatus?.running ? <Square className="w-3.5 h-3.5 fill-current" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                                        {continuousStatus?.running ? 'Stop Continuous Ingest' : 'Start Continuous Ingest'}
+                                    </button>
+                                    <button
+                                        onClick={() => setIsConsolidating(true)}
+                                        className="px-4 py-2 bg-white/5 text-white/60 border border-white/10 rounded-xl text-xs font-bold hover:bg-white/10 transition-all flex items-center gap-2"
+                                    >
+                                        <Activity className="w-3.5 h-3.5 text-blue-400" />
+                                        Consolidate & Verify
+                                    </button>
+                                </div>
                             </div>
-                        )}
-                    </div>
-                </>
+
+                            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+                                <h3 className="text-sm font-bold uppercase tracking-widest text-white/40 mb-4 flex items-center gap-2">
+                                    <Trash2 className="w-4 h-4 text-rose-500" /> Danger Zone
+                                </h3>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => handleReset(false)}
+                                        disabled={resetting}
+                                        className="px-4 py-2 bg-rose-500/10 text-rose-500 border border-rose-500/20 rounded-xl text-xs font-bold hover:bg-rose-500/20 transition-all"
+                                    >
+                                        Wipe Current Vault
+                                    </button>
+                                </div>
+                            </div>
+                        </section>
+
+                        {/* Secondary Detail Views (Roadmap / Traffic) */}
+                        <section className="flex flex-col gap-6">
+                            <div className="flex items-center justify-between">
+                                <div className="flex bg-white/5 p-1 rounded-xl border border-white/10">
+                                    <button
+                                        onClick={() => { setView('traffic') }}
+                                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${view === 'traffic' ? 'bg-white/10 text-white' : 'text-white/40'}`}
+                                    >
+                                        Live Traffic
+                                    </button>
+                                </div>
+                            </div>
+
+                            {view === 'traffic' && (
+                                <div className="p-6 bg-white/5 border border-white/10 rounded-3xl flex flex-col gap-4">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-lg font-bold">Provider Live Traffic</h3>
+                                        <div className="text-[10px] text-white/20 font-bold uppercase tracking-widest">
+                                            Latest 250 Events
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col gap-2 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+                                        {providerEvents.map((event) => (
+                                            <div key={event.id} className="p-3 bg-white/[0.02] border border-white/5 rounded-xl flex flex-col gap-1.5 hover:bg-white/5 transition-colors">
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${event.kind === 'error' ? 'bg-rose-500' : event.kind === 'response' ? 'bg-emerald-500' : 'bg-primary'}`} />
+                                                        <span className="text-[10px] font-bold uppercase text-white/60 tracking-tighter">{event.kind}</span>
+                                                        <span className="text-[10px] text-white/20">|</span>
+                                                        <span className="text-[10px] text-white/40 font-mono">{new Date(event.timestamp).toLocaleTimeString()}</span>
+                                                    </div>
+                                                    <span className="text-[10px] font-bold uppercase text-primary/60">{event.provider}</span>
+                                                </div>
+                                                <p className="text-xs text-white/80 leading-relaxed">{event.message}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </section>
+                    </main>
+                </div>
             ) : (
-                <div className="flex flex-col gap-8 animate-in fade-in slide-in-from-left-4 duration-500">
+                <main className="flex-1 overflow-y-auto p-8 flex flex-col gap-8 animate-in fade-in slide-in-from-left-4 duration-500">
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => setSelectedAsset(null)}
                             className="text-white/40 hover:text-white transition-colors flex items-center gap-2 text-sm"
                         >
-                            <ChevronLeft className="w-4 h-4" /> Back to Monitor
+                            <ChevronLeft className="w-4 h-4" /> Back to Command Center
                         </button>
                         <h2 className="text-2xl font-bold">{selectedAsset.symbol} <span className="text-white/20">/</span> {selectedAsset.timeframe}</h2>
                     </div>
@@ -1083,7 +913,7 @@ export default function DataDoctorPage() {
                                         >
                                             <ChevronLeft className="w-4 h-4" />
                                         </button>
-                                        <span className="text-xs font-mono text-white/40">PAGE {page} / {inspectData?.pagination.totalPages}</span>
+                                        <span className="text-xs font-mono text-white/40">PAGE {page} / {inspectData?.pagination.totalPages || 1}</span>
                                         <button
                                             disabled={page === inspectData?.pagination.totalPages}
                                             onClick={() => fetchInspect(selectedAsset.symbol, selectedAsset.timeframe, page + 1)}
@@ -1139,18 +969,17 @@ export default function DataDoctorPage() {
                             </div>
                         </div>
                     </div>
-                </div>
+                </main>
             )}
 
             {isIngestingProgress && (
-                <div className="fixed bottom-6 right-6 w-[460px] h-[320px] bg-black/95 border border-primary/30 rounded-lg p-4 font-mono text-[10px] text-primary/80 overflow-y-auto flex flex-col gap-1 z-50 shadow-2xl shadow-primary/20 backdrop-blur-sm">
+                <div className="fixed bottom-6 right-6 w-[460px] h-[320px] bg-black/95 border border-primary/30 rounded-lg p-4 font-mono text-[10px] text-primary/80 overflow-y-auto flex flex-col gap-1 z-[100] shadow-2xl shadow-primary/20 backdrop-blur-sm">
                     <div className="text-white font-bold mb-3 uppercase tracking-widest border-b border-white/10 pb-2 flex items-center gap-2">
                         <Zap className="w-4 h-4 text-primary animate-pulse" /> Live Ingestion Feed
                     </div>
                     {ingestLogs.map((log, i) => (
                         <div key={i} className="leading-relaxed opacity-80 break-words">&gt; {log}</div>
                     ))}
-                    <div ref={terminalEndRef} />
                 </div>
             )}
         </div>
@@ -1164,7 +993,7 @@ function AcquisitionRoadmap({ reports, providers, onSync, syncing }: { reports: 
     return (
         <div className="space-y-6">
             <h3 className="text-xl font-bold flex items-center gap-2">
-                <TargetIcon className="w-5 h-5 text-primary" /> Target Universe
+                <LucideTarget className="w-5 h-5 text-primary" /> Target Universe
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 animate-in fade-in zoom-in-95 duration-500">
                 {targetSymbols.map((symbol) => {
@@ -1269,10 +1098,5 @@ function StatItem({ icon, label, value }: { icon: React.ReactNode, label: string
     )
 }
 
-const TargetIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
-        <circle cx="12" cy="12" r="10" />
-        <circle cx="12" cy="12" r="6" />
-        <circle cx="12" cy="12" r="2" />
-    </svg>
-)
+
+// End of file

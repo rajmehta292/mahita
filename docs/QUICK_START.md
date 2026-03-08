@@ -28,7 +28,7 @@ DATABASE_URL="file:./dev.db"
 GOOGLE_CLIENT_ID="your_google_client_id_here"
 GOOGLE_CLIENT_SECRET="your_google_client_secret_here"
 NEXTAUTH_SECRET="generate_a_random_secret_here"
-NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_URL="http://mahita.ai"
 ALLOWED_EMAIL="your@email.com"
 ```
 
@@ -38,7 +38,7 @@ ALLOWED_EMAIL="your@email.com"
 2. Create a new project or select existing
 3. Enable Google+ API
 4. Go to "Credentials" → "Create Credentials" → "OAuth 2.0 Client ID"
-5. Set authorized redirect URI: `http://localhost:3000/api/auth/callback/google`
+5. Set authorized redirect URI: `http://mahita.ai/api/auth/callback/google`
 6. Copy Client ID and Client Secret to `.env.local`
 
 ### Generating NextAuth Secret
@@ -70,7 +70,7 @@ npx tsx scripts/seed-dow30.ts
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://mahita.ai](http://mahita.ai) in your browser.
 
 ## First Steps
 

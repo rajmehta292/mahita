@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Please connect your Schwab account first' }, { status: 400 })
     }
 
-    const callbackUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/schwab/callback`
+    const callbackUrl = `${process.env.NEXTAUTH_URL || 'https://mahita.ai'}/schwab/callback`
     const client = getSchwabClient({
       clientId: config.clientId,
       callbackUrl
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     }
 
     const config = user.schwabConfig
-    const callbackUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/schwab/callback`
+    const callbackUrl = `${process.env.NEXTAUTH_URL || 'https://mahita.ai'}/schwab/callback`
     const client = getSchwabClient({
       clientId: config.clientId,
       callbackUrl
@@ -173,7 +173,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const config = user.schwabConfig
-    const callbackUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/schwab/callback`
+    const callbackUrl = `${process.env.NEXTAUTH_URL || 'https://mahita.ai'}/schwab/callback`
     const client = getSchwabClient({
       clientId: config.clientId,
       callbackUrl

@@ -6,6 +6,10 @@ import { marketDataStore } from '@/app/services/market-data/store'
 import { Timeframe } from '@/app/services/market-data/types'
 
 const DEFAULT_LOOKBACKS: Record<Timeframe, number> = {
+    '1s': 86400,
+    '5s': 3 * 86400,
+    '15s': 3 * 86400,
+    '30s': 3 * 86400,
     '1m': 7 * 86400,
     '3m': 21 * 86400,
     '5m': 30 * 86400,

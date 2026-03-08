@@ -9,7 +9,7 @@ import { Timeframe } from "@/app/services/market-data/timeframe-math"
  * Validates timeframe string
  */
 function isValidTimeframe(tf: string): tf is Timeframe {
-    const valid = ['1s', '1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w', '1M']
+    const valid = ['1s', '5s', '15s', '30s', '1m', '3m', '5m', '10m', '15m', '30m', '45m', '1h', '2h', '3h', '4h', '1d', '1w', '1M']
     return valid.includes(tf)
 }
 
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
         }
 
         if (!isValidTimeframe(timeframe)) {
-            return new NextResponse(`Invalid timeframe. Supported: 1m, 5m, 15m, 1h, 4h, 1d, 1w, 1M`, { status: 400 })
+            return new NextResponse(`Invalid timeframe.`, { status: 400 })
         }
 
         const assetClass = 'equity' // Fixed for MVP

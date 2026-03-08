@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
         // 2. Initialize Schwab client
         const client = getSchwabClient({
             clientId: user.schwabConfig.clientId,
-            callbackUrl: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/schwab/callback`,
+            callbackUrl: `${process.env.NEXTAUTH_URL || 'https://mahita.ai'}/schwab/callback`,
             accessToken: user.schwabConfig.accessToken,
             refreshToken: user.schwabConfig.refreshToken || undefined
         })

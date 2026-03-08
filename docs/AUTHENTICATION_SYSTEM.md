@@ -279,7 +279,7 @@ GOOGLE_CLIENT_SECRET=your_google_client_secret
 
 # NextAuth
 NEXTAUTH_SECRET=your_nextauth_secret
-NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_URL=http://mahita.ai
 
 # Database
 DATABASE_URL="file:./dev.db"

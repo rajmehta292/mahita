@@ -50,7 +50,7 @@ The Active Trader feature enables live trading through Charles Schwab's brokerag
 4. Fill in the application details:
    - **App Name**: Mahita Terminal
    - **API Products**: Select "Market Data Production" and "Accounts and Trading Production"
-   - **Callback URL**: `https://mahita.ai/schwab/callback` (or `http://localhost:3000/schwab/callback` for development)
+   - **Callback URL**: `https://mahita.ai/schwab/callback` (or `http://mahita.ai/schwab/callback` for development)
 5. Submit the application
 
 ### Step 3: Get API Credentials
@@ -72,7 +72,7 @@ SCHWAB_CALLBACK_URL=https://mahita.ai/schwab/callback
 
 For local development:
 ```env
-SCHWAB_CALLBACK_URL=http://localhost:3000/schwab/callback
+SCHWAB_CALLBACK_URL=http://mahita.ai/schwab/callback
 ```
 
 ### Step 5: Restart the Application

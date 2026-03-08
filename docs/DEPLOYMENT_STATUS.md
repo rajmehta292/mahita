@@ -5,7 +5,7 @@
 ### 1. Next.js Development Server
 - **Status**: ✅ Running
 - **Port**: 3000
-- **Local URL**: http://localhost:3000
+- **Local URL**: http://mahita.ai
 - **Network URL**: http://192.168.1.221:3000
 
 ### 2. Cloudflare Tunnel
@@ -22,7 +22,7 @@
 - **Status**: ✅ Live and accessible worldwide
 
 ### Local Access (Development)
-- **Localhost**: http://localhost:3000
+- **Localhost**: http://mahita.ai
 - **Network**: http://192.168.1.221:3000
 - **Status**: ✅ Available on local network
 
@@ -77,7 +77,7 @@ All pages are accessible via both URLs:
 │      (4 connections)                    │
 │              ↓                          │
 │      Cloudflare Tunnel                  │
-│      (localhost:3000)                   │
+│      (mahita.ai)                   │
 │              ↓                          │
 │      Next.js Dev Server                 │
 │      (Port 3000)                        │
@@ -133,7 +133,7 @@ cloudflared tunnel --config cloudflared/config.yml run
 
 **Local**:
 ```bash
-curl http://localhost:3000
+curl http://mahita.ai
 ```
 
 **Public**:
@@ -155,7 +155,7 @@ curl https://mahita.ai
 
 ### Next.js Not Responding
 
-**Symptoms**: Connection refused on localhost:3000
+**Symptoms**: Connection refused on mahita.ai
 
 **Solutions**:
 1. Check if dev server is running: `lsof -i :3000`

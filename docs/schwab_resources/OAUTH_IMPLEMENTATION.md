@@ -913,7 +913,7 @@ app/
 
 ```env
 # NextAuth Configuration
-NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_URL=http://mahita.ai
 NEXTAUTH_SECRET=your_nextauth_secret
 
 # Google OAuth (for authentication)

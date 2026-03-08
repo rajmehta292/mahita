@@ -1,4 +1,3 @@
-import prisma from '@/lib/prisma'
 import {
     ChunkIngestionReport,
     IDataProvider,
@@ -11,9 +10,12 @@ import {
 import { AlphaVantageProvider } from './providers/alphavantage'
 import { SchwabProvider } from './providers/schwab'
 import { YahooProvider } from './providers/yahoo'
+import { GoogleProvider } from './providers/google'
 import { MockDataProvider } from './mock-provider'
 import { providerTelemetryBus } from './provider-telemetry'
 import { dedupeMarketDataPoints, getMissingRanges } from './utils'
+import { getBaseRequirement, deriveBars } from './timeframe-math'
+import { vaultManager } from './vault-manager'
 
 interface ProviderEntry {
     name: string
@@ -32,6 +34,7 @@ export class MarketDataStore {
         this.providers = [
             { name: 'schwab', provider: new SchwabProvider() },
             { name: 'yahoo', provider: new YahooProvider() },
+            { name: 'google', provider: new GoogleProvider() },
             { name: 'alphavantage', provider: new AlphaVantageProvider() }
         ]
 
@@ -49,10 +52,12 @@ export class MarketDataStore {
         timeframe: Timeframe,
         startTime: number,
         endTime: number,
-        providerOverride?: string
+        providerOverride?: string,
+        vaultName?: string
     ): Promise<MarketDataPoint[]> {
         const result = await this.getHistoricalDataWithReport(symbol, timeframe, startTime, endTime, {
-            providerOverride
+            providerOverride,
+            vaultName
         })
 
         return result.data
@@ -63,24 +68,32 @@ export class MarketDataStore {
         timeframe: Timeframe,
         startTime: number,
         endTime: number,
-        options: FetchOptions = {}
+        options: FetchOptions & { vaultName?: string } = {}
     ): Promise<MarketDataFetchResult> {
+        const requiredBaseTimeframe = getBaseRequirement(timeframe)
+        const isDerived = requiredBaseTimeframe !== timeframe
+
+        const targetVault = options.vaultName || options.providerOverride || 'schwab'
         const normalizedSymbol = symbol.trim().toUpperCase()
-        const cachedData = await this.readFromDb(normalizedSymbol, timeframe, startTime, endTime)
+
+        // ALWAYS fetch the underlying base timeframe from storage, even if a derived view was requested
+        const cachedData = await this.readFromDb(normalizedSymbol, requiredBaseTimeframe, startTime, endTime, targetVault)
         const missingRanges = options.forceRefresh
             ? [{ startTime, endTime }]
-            : getMissingRanges(normalizedSymbol, timeframe, cachedData, startTime, endTime)
+            : getMissingRanges(normalizedSymbol, requiredBaseTimeframe, cachedData, startTime, endTime)
+
+        const client = await vaultManager.getClient(targetVault)
 
         const report: MarketDataFetchReport = {
             symbol: normalizedSymbol,
-            timeframe,
+            timeframe,  // Report the originally requested timeframe outward
             rangeStart: startTime,
             rangeEnd: endTime,
             cacheBars: cachedData.length,
             fetchedBars: 0,
             persistedBars: 0,
-            dbTotalAfterFetch: await prisma.marketData.count({
-                where: { symbol: normalizedSymbol, timeframe }
+            dbTotalAfterFetch: await client.marketData.count({
+                where: { symbol: normalizedSymbol, timeframe: requiredBaseTimeframe }
             }),
             chunkReports: [],
             warnings: []
@@ -89,10 +102,11 @@ export class MarketDataStore {
         for (const range of missingRanges) {
             const chunkReport = await this.fetchMissingRange(
                 normalizedSymbol,
-                timeframe,
+                requiredBaseTimeframe, // Save internal requests onto the DB as base
                 range,
                 options.providerOverride,
-                !!options.forceRefresh
+                !!options.forceRefresh,
+                targetVault
             )
 
             report.chunkReports.push(chunkReport)
@@ -102,9 +116,13 @@ export class MarketDataStore {
             report.warnings.push(...chunkReport.warnings)
         }
 
-        const finalData = await this.readFromDb(normalizedSymbol, timeframe, startTime, endTime)
+        const finalData = await this.readFromDb(normalizedSymbol, requiredBaseTimeframe, startTime, endTime, targetVault)
+
+        // If a derived timeframe was requested (e.g. 5m), aggregate the 1m base array now
+        const derivedFinalData = isDerived ? deriveBars(finalData, timeframe) : finalData
+
         return {
-            data: finalData,
+            data: derivedFinalData,
             report
         }
     }
@@ -139,9 +157,11 @@ export class MarketDataStore {
         symbol: string,
         timeframe: Timeframe,
         startTime: number,
-        endTime: number
+        endTime: number,
+        vaultName = 'schwab'
     ): Promise<MarketDataPoint[]> {
-        const rows = await prisma.marketData.findMany({
+        const client = await vaultManager.getClient(vaultName)
+        const rows = await client.marketData.findMany({
             where: {
                 symbol,
                 timeframe,
@@ -168,13 +188,15 @@ export class MarketDataStore {
         timeframe: Timeframe,
         range: TimeRange,
         providerOverride?: string,
-        forceRefresh = false
+        forceRefresh = false,
+        vaultName = 'schwab'
     ): Promise<ChunkIngestionReport> {
         const warnings: string[] = []
         const providers = this.getProviders(providerOverride)
+        const client = await vaultManager.getClient(vaultName)
 
         if (providers.length === 0) {
-            const dbTotalAfterChunk = await prisma.marketData.count({
+            const dbTotalAfterChunk = await client.marketData.count({
                 where: { symbol, timeframe }
             })
 
@@ -197,10 +219,11 @@ export class MarketDataStore {
                     timeframe,
                     fetchedData,
                     entry.name,
-                    forceRefresh
+                    forceRefresh,
+                    vaultName
                 )
 
-                const dbTotalAfterChunk = await prisma.marketData.count({
+                const dbTotalAfterChunk = await client.marketData.count({
                     where: { symbol, timeframe }
                 })
 
@@ -229,7 +252,7 @@ export class MarketDataStore {
             }
         }
 
-        const dbTotalAfterChunk = await prisma.marketData.count({
+        const dbTotalAfterChunk = await client.marketData.count({
             where: { symbol, timeframe }
         })
 
@@ -306,24 +329,26 @@ export class MarketDataStore {
         }
     }
 
-    private async persistBars(
+    async persistBars(
         symbol: string,
         timeframe: Timeframe,
         points: MarketDataPoint[],
         source: string,
-        overwriteExisting = false
+        overwriteExisting = false,
+        vaultName = 'schwab'
     ): Promise<number> {
         if (points.length === 0) {
             return 0
         }
 
+        const client = await vaultManager.getClient(vaultName)
         const normalizedPoints = dedupeMarketDataPoints(points)
         const startDate = new Date(normalizedPoints[0].time * 1000)
         const endDate = new Date(normalizedPoints[normalizedPoints.length - 1].time * 1000)
 
         const existingRows = overwriteExisting
             ? []
-            : await prisma.marketData.findMany({
+            : await client.marketData.findMany({
                 where: {
                     symbol,
                     timeframe,
@@ -348,7 +373,7 @@ export class MarketDataStore {
         }
 
         if (overwriteExisting) {
-            await prisma.marketData.deleteMany({
+            await client.marketData.deleteMany({
                 where: {
                     symbol,
                     timeframe,
@@ -362,7 +387,7 @@ export class MarketDataStore {
 
         const CHUNK_SIZE = 250
         let persistedBars = 0
-        let totalRowsBefore = await prisma.marketData.count({
+        let totalRowsBefore = await client.marketData.count({
             where: { symbol, timeframe }
         })
 
@@ -381,12 +406,12 @@ export class MarketDataStore {
             }))
 
             try {
-                await prisma.marketData.createMany({
+                await client.marketData.createMany({
                     data: dbChunk
                 })
             } catch (error) {
                 for (const row of dbChunk) {
-                    await prisma.marketData.upsert({
+                    await client.marketData.upsert({
                         where: {
                             symbol_timeframe_time: {
                                 symbol: row.symbol,
@@ -405,10 +430,9 @@ export class MarketDataStore {
                         create: row
                     })
                 }
-                console.warn('[MarketDataStore] Falling back to row upserts after chunk insert failure:', error)
             }
 
-            const totalRowsAfter = await prisma.marketData.count({
+            const totalRowsAfter = await client.marketData.count({
                 where: { symbol, timeframe }
             })
             persistedBars += Math.max(0, totalRowsAfter - totalRowsBefore)

@@ -1,13 +1,15 @@
 // app/services/market-data/timeframe-math.ts
 
-export type BaseTimeframe = '1s' | '1m' | '1d';
-export type DerivedTimeframe = '5s' | '15s' | '30s' | '5m' | '15m' | '30m' | '1h' | '4h' | '1w' | '1M';
-export type Timeframe = BaseTimeframe | DerivedTimeframe;
+import { Timeframe } from './types'
+
+export type BaseTimeframe = '1s' | '1m' | '1h' | '1d' | '1w' | '1M'
+export type DerivedTimeframe = Timeframe
+export type { Timeframe }
 
 /**
  * Returns the duration of a timeframe in seconds.
  */
-export function timeframeToSeconds(tf: Timeframe): number {
+export function timeframeToSeconds(tf: string): number {
     const value = parseInt(tf.slice(0, -1));
     const unit = tf.slice(-1);
 
@@ -23,14 +25,17 @@ export function timeframeToSeconds(tf: Timeframe): number {
 /**
  * Determines the required base timeframe format to derive the requested timeframe.
  */
-export function getBaseRequirement(tf: Timeframe): BaseTimeframe {
+export function getBaseRequirement(tf: string): BaseTimeframe {
     const unit = tf.slice(-1);
 
     if (unit === 's') return '1s';
-    if (unit === 'm' || unit === 'h') return '1m';
-    if (unit === 'd' || unit === 'w' || unit === 'M') return '1d';
+    if (unit === 'm') return '1m';
+    if (unit === 'h') return '1h';
+    if (unit === 'd') return '1d';
+    if (unit === 'w') return '1w';
+    if (unit === 'M') return '1M';
 
-    return '1m'; // Default fallback
+    return '1d'; // Default fallback
 }
 
 /**

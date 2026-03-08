@@ -11,18 +11,31 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        // Get unique symbols and their date ranges
-        const inventory = await prisma.marketData.groupBy({
-            by: ['symbol', 'timeframe'],
-            _min: {
-                time: true
-            },
-            _max: {
-                time: true
-            },
-            _count: {
-                _all: true
+        const { searchParams } = new URL(req.url)
+        const vaultName = searchParams.get('vault')
+
+        const where: any = {}
+        if (vaultName) {
+            const vault = await prisma.vault.findUnique({ where: { name: vaultName } })
+            if (vault) {
+                where.vaultId = vault.id
             }
+        }
+
+        const inventory = await prisma.dataInventory.findMany({
+            where,
+            include: {
+                vault: {
+                    select: {
+                        name: true,
+                        type: true
+                    }
+                }
+            },
+            orderBy: [
+                { symbol: 'asc' },
+                { timeframe: 'asc' }
+            ]
         })
 
         return NextResponse.json(inventory)

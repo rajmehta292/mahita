@@ -11,7 +11,16 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const reports = await DataHealthManager.getAllHealth()
+        const { searchParams } = new URL(req.url)
+        const vault = searchParams.get('vault') || 'schwab'
+        const symbol = searchParams.get('symbol')
+
+        if (symbol) {
+            const report = await DataHealthManager.getMultiIntervalHealth(symbol, vault)
+            return NextResponse.json(report)
+        }
+
+        const reports = await DataHealthManager.getAllHealth(vault)
         return NextResponse.json(reports)
     } catch (error) {
         console.error("Data Health Error:", error)

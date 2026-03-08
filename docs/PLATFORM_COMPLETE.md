@@ -370,7 +370,7 @@ DATABASE_URL=file:./dev.db
 GOOGLE_CLIENT_ID=your_client_id
 GOOGLE_CLIENT_SECRET=your_client_secret
 NEXTAUTH_SECRET=your_secret
-NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_URL=http://mahita.ai
 ALLOWED_EMAIL=your@email.com
 ```
 

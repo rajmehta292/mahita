@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
         // We provide the provider's config. If USE_MOCK_DATA=true, the factory handles returning the mock.
         const client = getSchwabClient(providerConfig ? {
             clientId: providerConfig.clientId,
-            callbackUrl: `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/schwab/callback`,
+            callbackUrl: `${process.env.NEXTAUTH_URL || 'https://mahita.ai'}/schwab/callback`,
             accessToken: providerConfig.accessToken,
             refreshToken: providerConfig.refreshToken || undefined
         } : { clientId: 'mock', callbackUrl: 'mock' })

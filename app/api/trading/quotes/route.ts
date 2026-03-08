@@ -15,7 +15,8 @@ export async function GET(request: NextRequest) {
         const quotes = await Promise.all(
             symbols.map(async (sym) => {
                 try {
-                    const result = await (YahooFinance as any).quote(sym)
+                    const yahooFinance = new (YahooFinance as any)()
+                    const result = await yahooFinance.quote(sym)
                     return {
                         symbol: sym,
                         name: result.shortName || result.longName || sym,

@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const callbackUrl = `${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/schwab/callback`
+    const callbackUrl = `${process.env.NEXTAUTH_URL || 'https://mahita.ai'}/schwab/callback`
     const client = getSchwabClient({
       clientId: config.clientId,
       clientSecret: config.clientSecret,
@@ -80,13 +80,15 @@ export async function GET(request: NextRequest) {
           where: { id: config.id },
           data: {
             accessToken: newTokens.access_token,
-            refreshToken: newTokens.refresh_token,
+            refreshToken: newTokens.refresh_token || config.refreshToken,
             accessTokenExpiry: new Date(Date.now() + newTokens.expires_in * 1000),
-            refreshTokenExpiry: new Date(Date.now() + newTokens.refresh_token_expires_in * 1000)
+            refreshTokenExpiry: newTokens.refresh_token_expires_in
+              ? new Date(Date.now() + newTokens.refresh_token_expires_in * 1000)
+              : config.refreshTokenExpiry
           }
         })
 
-        client.setAccessToken(newTokens.access_token, newTokens.refresh_token)
+        client.setAccessToken(newTokens.access_token, newTokens.refresh_token || config.refreshToken)
         console.log('Schwab token refreshed successfully')
       } catch (refreshError) {
         console.error('Failed to refresh Schwab token:', refreshError)

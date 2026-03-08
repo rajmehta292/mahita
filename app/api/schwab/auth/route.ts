@@ -40,10 +40,11 @@ export async function GET(request: NextRequest) {
 
     const { clientId, clientSecret } = user.schwabConfig
 
-    // Robust Callback URL detection
-    const protocol = request.headers.get('x-forwarded-proto') || 'http'
-    const host = request.headers.get('host') || 'localhost:6244'
-    const callbackUrl = `${protocol}://${host}/schwab/callback`
+    // Robust Callback URL detection - prefer NEXTAUTH_URL for consistent redirect URIs
+    const nextAuthUrl = process.env.NEXTAUTH_URL
+    const callbackUrl = nextAuthUrl
+      ? `${nextAuthUrl.replace(/\/$/, '')}/schwab/callback`
+      : `${request.headers.get('x-forwarded-proto') || 'https'}://${request.headers.get('host') || 'mahita.ai'}/schwab/callback`
 
     console.log(`[Schwab Auth] Using dynamic authorize callback: ${callbackUrl}`)
 
@@ -113,10 +114,11 @@ export async function POST(request: NextRequest) {
 
     const { clientId, clientSecret } = user.schwabConfig
 
-    // Robust Callback URL detection
-    const protocol = request.headers.get('x-forwarded-proto') || 'http'
-    const host = request.headers.get('host') || 'localhost:6244'
-    const callbackUrl = `${protocol}://${host}/schwab/callback`
+    // Robust Callback URL detection - prefer NEXTAUTH_URL for consistent redirect URIs
+    const nextAuthUrl = process.env.NEXTAUTH_URL
+    const callbackUrl = nextAuthUrl
+      ? `${nextAuthUrl.replace(/\/$/, '')}/schwab/callback`
+      : `${request.headers.get('x-forwarded-proto') || 'https'}://${request.headers.get('host') || 'mahita.ai'}/schwab/callback`
 
     console.log(`[Schwab Auth] Using dynamic exchange callback: ${callbackUrl}`)
 

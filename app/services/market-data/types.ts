@@ -1,5 +1,6 @@
-export type Timeframe = '1m' | '3m' | '5m' | '10m' | '15m' | '30m' | '45m' | '1h' | '2h' | '3h' | '4h' | '1d' | '1w' | '1M'
-
+export type BaseTimeframe = '1s' | '1m' | '1h' | '1d' | '1w' | '1M'
+export type DerivedTimeframe = '1s' | '5s' | '15s' | '30s' | '1m' | '3m' | '5m' | '10m' | '15m' | '30m' | '45m' | '1h' | '2h' | '3h' | '4h' | '1d' | '1w' | '1M'
+export type Timeframe = DerivedTimeframe
 export interface MarketDataPoint {
     time: number;       // Unix timestamp (seconds)
     open: number;

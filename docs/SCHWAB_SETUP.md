@@ -41,7 +41,7 @@ This guide will help you set up Charles Schwab API integration for live trading 
 
    **OAuth Settings:**
    - **Redirect URI**: `https://mahita.ai/schwab/callback`
-   - For local development: `http://localhost:3000/schwab/callback`
+   - For local development: `http://mahita.ai/schwab/callback`
 
 5. Click **Submit** or **Create App**
 
@@ -84,7 +84,7 @@ SCHWAB_CALLBACK_URL=https://mahita.ai/schwab/callback
 ```env
 SCHWAB_CLIENT_ID=your_client_id_here
 SCHWAB_CLIENT_SECRET=your_client_secret_here
-SCHWAB_CALLBACK_URL=http://localhost:3000/schwab/callback
+SCHWAB_CALLBACK_URL=http://mahita.ai/schwab/callback
 ```
 
 ### 6. Restart the Application
@@ -126,7 +126,7 @@ npm run dev
 - Verify the callback URL in your app settings matches exactly
 - Check for trailing slashes (should not have one)
 - Ensure protocol matches (http vs https)
-- For local dev, use `http://localhost:3000/schwab/callback`
+- For local dev, use `http://mahita.ai/schwab/callback`
 - For production, use `https://mahita.ai/schwab/callback`
 
 ### Authorization Window Doesn't Open

@@ -121,8 +121,23 @@ model MarketData {
   @@index([symbol, timeframe, time])
 }
 
+model Vault {
+  id          String   @id @default(cuid())
+  name        String   @unique // "schwab", "yahoo", "google", "ollama", "csv", "master"
+  type        String   // "provider", "ai", "manual", "master"
+  dbPath      String?  // Path to the sqlite file
+  isEnabled   Boolean  @default(true)
+  lastSyncAt  DateTime?
+  metadata    String?  // JSON for extra config
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  inventories DataInventory[]
+}
+
 model DataInventory {
   id                    String    @id @default(cuid())
+  vaultId               String?   // Link to the vault this inventory belongs to
   symbol                String
   timeframe             String
   lastSynced            DateTime  @default(now())
@@ -134,7 +149,9 @@ model DataInventory {
   barCount              Int       @default(0)
   gapCount              Int       @default(0)
 
-  @@unique([symbol, timeframe])
+  vault Vault? @relation(fields: [vaultId], references: [id], onDelete: SetNull)
+
+  @@unique([vaultId, symbol, timeframe])
 }
 
 // V2 Data Engine Metadata Catalog

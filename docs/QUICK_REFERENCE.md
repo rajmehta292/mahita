@@ -22,7 +22,7 @@ npm run dev
 ```
 
 ### Access URLs
-- **Local**: http://localhost:3000
+- **Local**: http://mahita.ai
 - **Production**: https://mahita.ai
 
 ## 📱 Pages Overview
@@ -47,7 +47,7 @@ DATABASE_URL="file:./dev.db"
 GOOGLE_CLIENT_ID="your_google_client_id"
 GOOGLE_CLIENT_SECRET="your_google_client_secret"
 NEXTAUTH_SECRET="your_nextauth_secret"
-NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_URL="http://mahita.ai"
 ALLOWED_EMAIL="your@email.com"
 ```
 
@@ -55,7 +55,7 @@ ALLOWED_EMAIL="your@email.com"
 ```env
 SCHWAB_CLIENT_ID="your_schwab_client_id"
 SCHWAB_CLIENT_SECRET="your_schwab_client_secret"
-SCHWAB_CALLBACK_URL="http://localhost:3000/schwab/callback"
+SCHWAB_CALLBACK_URL="http://mahita.ai/schwab/callback"
 ```
 
 ## 🎨 Key Features

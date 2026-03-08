@@ -95,8 +95,8 @@ export async function POST(request: NextRequest) {
     const clientSecret = body.clientSecret?.trim()
 
     // Robust Callback URL detection
-    const protocol = request.headers.get('x-forwarded-proto') || 'http'
-    const host = request.headers.get('host') || 'localhost:6244'
+    const protocol = request.headers.get('x-forwarded-proto') || 'https'
+    const host = request.headers.get('host') || 'mahita.ai'
     const callbackUrl = `${protocol}://${host}/schwab/callback`
 
     console.log(`[Schwab Auth] Using dynamic callback URL: ${callbackUrl}`)
