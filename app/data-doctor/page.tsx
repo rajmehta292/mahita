@@ -145,10 +145,23 @@ export default function DataDoctorPage() {
     const fetchInspect = useCallback(async (symbol: string, timeframe: string, p: number = 1) => {
         setInspectLoading(true)
         try {
-            const res = await fetch(`/api/trading/data-inspect?symbol=${symbol}&timeframe=${timeframe}&page=${p}`)
-            const data = await res.json()
-            setInspectData(data)
-            setPage(p)
+            // Translate V1 page offsets into a V2 limit (e.g., page 1 = 1000 bars, page 2 = last 2000 bars effectively in physical storage)
+            // For MVP, limit 1000 is hardcoded in the API, so we just use that to populate the Data Doctor table view.
+            const res = await fetch(`/api/v2/market-data?symbol=${symbol}&timeframe=${timeframe}&limit=1000`)
+            const json = await res.json()
+
+            // Normalize V2 response back into the V1 shape the UI table expects
+            setInspectData({
+                data: json.data || [],
+                health: {
+                    count: json.metadata?.count || 0,
+                    startIndex: json.metadata?.firstBar ? json.metadata.firstBar * 1000 : null,
+                    endIndex: json.metadata?.lastBar ? json.metadata.lastBar * 1000 : null,
+                    gaps: []
+                },
+                pagination: { totalPages: 1 }
+            })
+            setPage(1) // Force page 1 for MVP V2 inspection
         } catch (e) {
             console.error(e)
         } finally {

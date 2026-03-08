@@ -11,8 +11,13 @@ export async function GET(req: NextRequest) {
     }
 
     try {
-        const reports = await DataHealthManager.getAllHealth()
-        return NextResponse.json(reports)
+        // V1 SQLite Deprecation Proxy
+        // For MVP V2, we return a mock health array so the Data Command doesn't crash 
+        // while we map out actual Parquet metadata parsing.
+        const mockReports = [
+            { symbol: 'AAPL', timeframe: '1d', healthScore: 100, gaps: [], source: 'yahoo', count: 1255, targetCoveragePercent: 100, startIndex: Date.now() - (5 * 365 * 86400 * 1000), endIndex: Date.now() }
+        ]
+        return NextResponse.json(mockReports)
     } catch (error) {
         console.error("Data Health Error:", error)
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })

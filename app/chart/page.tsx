@@ -68,8 +68,8 @@ export default function ChartPage() {
     useEffect(() => {
         if (status !== 'authenticated' || !selectedSymbol) return
         const fetchMarketData = async () => {
-            const json = await safeFetchJson(`/api/trading/market-data?symbol=${selectedSymbol}&timeframe=${selectedTimeframe}`)
-            if (json) setData(json)
+            const json = await safeFetchJson(`/api/v2/market-data?symbol=${selectedSymbol}&timeframe=${selectedTimeframe}`)
+            if (json && json.data) setData(json.data)
         }
         fetchMarketData()
     }, [selectedSymbol, selectedTimeframe, status, safeFetchJson])
