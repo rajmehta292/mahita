@@ -16,7 +16,7 @@ graph TD
     Server --> MDE[Market Data Engine]
     Server --> TE[Trading Engine Backtesting & Live]
     Server --> BE[Broker Emulator]
-    Server --> DB[(Local PostgreSQL / SQLite DB)]
+    Server --> DD[Data Doctor Heatmap UI]
     
     MDE --> SchwabAPI[Schwab API Client]
     MDE --> AlpacaAPI[Alpaca API Client]
@@ -24,8 +24,9 @@ graph TD
     TE --> Paper[Paper Trading Provider]
     TE --> Live[Live Trading Provider]
    
-    DB -.-> MDE
-    DB -.-> TE
+    Vaults[(Multi-Vault SQLite / data/vaults/)] -.-> MDE
+    Vaults -.-> DD
+    Vaults -.-> TE
 ```
 
 ## 2. Technology Stack
@@ -34,9 +35,9 @@ graph TD
 *   **Infrastructure**: Hosted locally, served publicly over Cloudflare Tunnel over `mahita.ai`.
 
 ## 3. Core System Components
-*   **MarketDataStore**: Proxy caching service handling all external ticker HTTP REST requests and WebSockets.
+*   **MarketDataStore**: Proxy caching service that orchestrates all external ticker HTTP REST requests and WebSockets. Fetches data, dynamically aggregates custom timeframes (e.g. `15m` from `1m`), and isolates vendor interactions.
+*   **VaultManager**: Dedicated SQLite registry isolating database files by source (e.g., `schwab.db`, `yahoo.db`, `master.db`) to ensure data integrity and prevent corruption.
+*   **Data Doctor**: Command center web UI running constant health checks on local datasets vs remote truth endpoints, displaying findings in a matrix.
 *   **TradingEngine**: Evaluates JSON-structured logic ASTs to issue synchronous buy/sell events.
 *   **BrokerageProvider**: Interface standard allowing the engine to seamlessly switch between Paper/Mock and Schwab/Live accounts.
-*   **AnalyticsLayer**: Client-side computation engine for technical indicators (MACD, RSI) and alternative price representations (Heikin-Ashi).
-*   **ChartSynchronizer**: Coordinated orchestration of multiple `lightweight-charts` instances for synced oscillator/price panels.
 

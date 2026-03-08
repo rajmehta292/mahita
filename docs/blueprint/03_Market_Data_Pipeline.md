@@ -16,13 +16,15 @@ export interface MarketDataPoint {
 }
 ```
 
-## 2. Retrieval Logistics Architecture
+## 2. Retrieval Logistics & Multi-Vault Architecture
 When an engine requests parameters `(Symbol, Timeframe, StartDate, EndDate)`:
-1.  Query local SQLite cache via Prisma.
-2.  Identify temporal cache-misses or blank gaps.
-3.  Query generic `IDataProvider` for only the missing gaps.
-4.  Upsert delta into local cache via `skipDuplicates` or Prisma bulk-update.
-5.  Return the seamlessly merged and linearly sorted temporal array to the caller.
+1.  **Timeframe Analysis**: The engine explicitly prevents storing weird derivative frames (`15m`). It intercepts requests and maps them to a strictly tracked Base Timeframe (`1s, 1m, 1h, 1d, 1w, 1M`).
+2.  **Vault Selection**: `VaultManager` creates dedicated SQLite `.db` instances mapping to explicit external sources (Schwab, Yahoo, AI, CSV).
+3.  **Local Cache Check**: Query localized SQLite Vault cache via Prisma using the Base Timeframe.
+4.  **Gap Healing**: Identify temporal cache-misses or blank gaps.
+5.  **External Polling**: Query generic `IDataProvider` for only the missing gaps.
+6.  **Persistence & Aggregation**: Upsert gap delta into local Vault, then dynamically derive up (aggregate bars) if the originating caller needed a multi-minute layout (`15m`).
+7.  **Return**: Serve the seamlessly merged, linearly sorted array back.
 
 ## 3. Connectivity Protocols
 *   **REST Polling**: Standard historic gap-fill mechanisms relying on the provider HTTP wrappers.

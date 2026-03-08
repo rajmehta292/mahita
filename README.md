@@ -36,10 +36,12 @@ A professional-grade algorithmic trading platform inspired by TradingView, built
 - **Trade Visualization** - See entry/exit points directly on charts
 
 ### Market Intelligence
+- **Data Command Center (Data Doctor)** - Visual global heatmap mapping all internal system knowledge and API health.
 - **Stock Screener** - Filter stocks by technical and fundamental criteria
+- **Live News Feed & AI Insights** - Real-time market context via Yahoo Finance and dynamic AI summary generations.
 - **Watchlist Management** - Track your favorite symbols
-- **Real-Time Quotes** - Live price updates
-- **Market Data Caching** - Fast data retrieval with intelligent caching
+- **Multi-Vault Data Caching** - Localized storage orchestrator saving data natively to SQLite files (`schwab.db`, `yahoo.db`, `master.db`).
+- **Standardized Timeframes** - Data stored strictly in `1s, 1m, 1h, 1d, 1w, 1M` arrays, aggregating derived timeframes (`15m`, `4h`) on-the-fly in memory.
 
 ### Portfolio & Risk Management
 - **Trade History** - Complete log of all trades
@@ -71,14 +73,17 @@ mahita/
 │   ├── api/
 │   │   ├── auth/                   # Authentication
 │   │   └── trading/                # Trading APIs
-│   ├── dashboard/                  # Dashboard page
+│   ├── dashboard/                  # Realistic Live Performance Dashboard
 │   ├── chart/                      # Chart page
 │   ├── backtest/                   # Backtest page
 │   ├── active-trader/              # Live trading page
+│   ├── data-doctor/                # Data Command Center (Vault Management)
 │   ├── screener/                   # Screener page
 │   ├── orders/                     # Orders page
 │   ├── history/                    # History page
 │   └── watchlist/                  # Watchlist page
+├── data/                           
+│   └── vaults/                     # Sandbox area for isolated SQLite db files
 ├── docs/                           # Documentation
 ├── prisma/                         # Database schema
 └── public/                         # Static assets
@@ -115,13 +120,13 @@ DATABASE_URL="file:./dev.db"
 GOOGLE_CLIENT_ID="your_google_client_id"
 GOOGLE_CLIENT_SECRET="your_google_client_secret"
 NEXTAUTH_SECRET="your_nextauth_secret"
-NEXTAUTH_URL="http://localhost:3000"
+NEXTAUTH_URL="http://mahita.ai"
 ALLOWED_EMAIL="your@email.com"
 
 # Optional: For live trading with Schwab
 SCHWAB_CLIENT_ID="your_schwab_client_id"
 SCHWAB_CLIENT_SECRET="your_schwab_client_secret"
-SCHWAB_CALLBACK_URL="http://localhost:3000/schwab/callback"
+SCHWAB_CALLBACK_URL="http://mahita.ai/schwab/callback"
 ```
 
 4. **Initialize the database**
@@ -141,7 +146,7 @@ npm run dev
 ```
 
 7. **Open your browser**
-Navigate to [http://localhost:3000](http://localhost:3000)
+Navigate to [http://mahita.ai](http://mahita.ai)
 
 ## 📖 Usage
 
@@ -327,8 +332,8 @@ For support, email support@mahita.com or join our Discord server.
 ### Q4 2026
 - [ ] AI-powered strategy suggestions
 - [ ] Automated trading bots
-- [ ] Sentiment analysis
-- [ ] News integration
+- [x] Sentiment analysis & AI Market Insights
+- [x] News integration
 
 ---
 
