@@ -1,18 +1,6 @@
 import { MarketDataPoint, TimeRange, Timeframe } from './types'
-
-export function timeframeToSeconds(timeframe: Timeframe): number {
-    const units: Record<string, number> = {
-        m: 60,
-        h: 3600,
-        d: 86400,
-        w: 604800,
-        M: 2592000
-    }
-
-    const value = parseInt(timeframe.slice(0, -1), 10)
-    const unit = timeframe.slice(-1)
-    return value * (units[unit] || 0)
-}
+import { timeframeToSeconds } from './timeframe-math'
+export { timeframeToSeconds }
 
 export function isCryptoSymbol(symbol: string): boolean {
     return symbol.includes('-USD')

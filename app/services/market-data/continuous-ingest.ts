@@ -56,7 +56,7 @@ class ContinuousIngestController {
 
         this.running = true
         this.startedAt = new Date()
-        this.providerOverride = options.provider || null
+        this.providerOverride = options.provider || 'schwab'
         this.intervalMs = Math.max(15_000, options.intervalMs || 60_000)
         this.lastError = null
         this.currentPhase = 'starting'
