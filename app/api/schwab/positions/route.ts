@@ -12,19 +12,18 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams
-    const accountId = searchParams.get('accountId')
-
-    if (!accountId) {
-      return NextResponse.json(
-        { error: 'Account ID required' },
-        { status: 400 }
-      )
-    }
+    let accountId = searchParams.get('accountId')
 
     if (process.env.USE_MOCK_DATA === 'true') {
       const client = getSchwabClient({ clientId: 'mock', clientSecret: 'mock', callbackUrl: 'mock' })
       client.setAccessToken('mock', 'mock')
-      const positions = await client.getPositions(accountId)
+
+      if (!accountId) {
+        const accs = await client.getAccounts()
+        accountId = (accs as any).data?.[0]?.securitiesAccount?.hashValue || 'mock-hash'
+      }
+
+      const positions = await client.getPositions(accountId!)
       const balance = await client.getBalance(accountId)
       return NextResponse.json({ success: true, positions, balance })
     }
@@ -97,7 +96,19 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log(`[Schwab Positions] Fetching for account: ${accountId}`)
+    console.log(`[Schwab Positions] Ensuring account ID exists...`)
+
+    if (!accountId) {
+      const accountsRes = await client.getAccounts()
+      const accountsList = (accountsRes as any).data || accountsRes
+      if (Array.isArray(accountsList) && accountsList.length > 0) {
+        accountId = accountsList[0].securitiesAccount?.hashValue || accountsList[0].hashValue
+      }
+
+      if (!accountId) {
+        return NextResponse.json({ error: 'No linked accounts found to fetch positions' }, { status: 400 })
+      }
+    }
 
     try {
       const positions = await client.getPositions(accountId)

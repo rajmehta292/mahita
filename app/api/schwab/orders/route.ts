@@ -18,16 +18,18 @@ export async function GET(request: NextRequest) {
     }
 
     const searchParams = request.nextUrl.searchParams
-    const accountId = searchParams.get('accountId')
-
-    if (!accountId) {
-      return NextResponse.json({ error: 'Account ID required' }, { status: 400 })
-    }
+    let accountId = searchParams.get('accountId')
 
     if (process.env.USE_MOCK_DATA === 'true') {
       const client = getSchwabClient({ clientId: 'mock', clientSecret: 'mock', callbackUrl: 'mock' })
       client.setAccessToken('mock', 'mock')
-      const orders = await client.getOrders(accountId)
+
+      if (!accountId) {
+        const accs = await client.getAccounts()
+        accountId = (accs as any).data?.[0]?.securitiesAccount?.hashValue || 'mock-hash'
+      }
+
+      const orders = await client.getOrders(accountId!)
       return NextResponse.json({ success: true, orders: orders.data })
     }
 
@@ -59,6 +61,18 @@ export async function GET(request: NextRequest) {
       config.accessTokenExpiry ? Math.floor((config.accessTokenExpiry.getTime() - Date.now()) / 1000) : undefined,
       config.refreshTokenExpiry ? Math.floor((config.refreshTokenExpiry.getTime() - Date.now()) / 1000) : undefined
     )
+
+    if (!accountId) {
+      const accountsRes = await client.getAccounts()
+      const accountsList = (accountsRes as any).data || accountsRes
+      if (Array.isArray(accountsList) && accountsList.length > 0) {
+        accountId = accountsList[0].securitiesAccount?.hashValue || accountsList[0].hashValue
+      }
+
+      if (!accountId) {
+        return NextResponse.json({ error: 'No linked accounts found to fetch orders' }, { status: 400 })
+      }
+    }
 
     const orders = await client.getOrders(accountId)
 
