@@ -3,5 +3,5 @@ credentials-file: /Users/rmehta01/.cloudflared/84a020a6-a24f-427e-b040-80fd8c4d9
 
 ingress:
   - hostname: mahita.ai
-    service: http://localhost:3000
+    service: http://localhost:6244
   - service: http_status:404

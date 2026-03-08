@@ -34,6 +34,7 @@ const menuItems = [
     { icon: Code, label: 'Script Editor', href: '/script-editor' },
     { icon: BarChart3, label: 'Backtester', href: '/backtest' },
     { icon: BookOpen, label: 'Learn', href: '/learn' },
+    { icon: Code, label: 'AI Chat', href: '/ai-chat' },
 ]
 
 interface SidebarProps {
