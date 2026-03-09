@@ -346,27 +346,8 @@ export class MarketDataStore {
         const startDate = new Date(normalizedPoints[0].time * 1000)
         const endDate = new Date(normalizedPoints[normalizedPoints.length - 1].time * 1000)
 
-        const existingRows = overwriteExisting
-            ? []
-            : await client.marketData.findMany({
-                where: {
-                    symbol,
-                    timeframe,
-                    time: {
-                        gte: startDate,
-                        lte: endDate
-                    }
-                },
-                select: { time: true }
-            })
-
-        const existingTimes = new Set(
-            existingRows.map((row) => Math.floor(row.time.getTime() / 1000))
-        )
-
-        const barsToPersist = overwriteExisting
-            ? normalizedPoints
-            : normalizedPoints.filter((point) => !existingTimes.has(point.time))
+        // Trust SQLite upserts to handle deduplication natively
+        const barsToPersist = normalizedPoints
 
         if (barsToPersist.length === 0) {
             return 0

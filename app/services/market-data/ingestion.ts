@@ -69,6 +69,20 @@ class IngestionService {
             throw new Error('An ingestion sweep is already running.')
         }
 
+        // --- Production Blueprint: Pre-Flight Middleware ---
+        if (!options.provider || options.provider === 'schwab') {
+            const { checkSchwabTokenHealth } = await import('@/app/services/schwab/runtime')
+            const tokenHealth = await checkSchwabTokenHealth()
+            if (!tokenHealth.isValid) {
+                await providerTelemetryBus.log({
+                    kind: 'error',
+                    message: `SYS-CRITICAL: Pre-flight Auth Check Failed. Halting Sweep.`,
+                    response: { error: tokenHealth.error }
+                })
+                throw new Error(`SchwabTokenManager Halted Sweep: ${tokenHealth.error}`)
+            }
+        }
+
         this.running = true
 
         const timeframes = resolveTimeframes(options.overrideTimeframe)
@@ -99,137 +113,150 @@ class IngestionService {
                     break
                 }
 
-                for (const timeframe of timeframes) {
-                    await logger({ message: `Checking ${symbol} @ ${timeframe}...`, symbol, timeframe })
+                try {
+                    for (const timeframe of timeframes) {
+                        await logger({ message: `Checking ${symbol} @ ${timeframe}...`, symbol, timeframe })
 
-                    const health = await DataHealthManager.getHealth(symbol, timeframe)
-                    const targetStart = DataHealthManager.getTargetHorizon(timeframe)
-                    const now = Math.floor(Date.now() / 1000)
+                        const health = await DataHealthManager.getHealth(symbol, timeframe)
+                        const targetStart = DataHealthManager.getTargetHorizon(timeframe)
+                        const now = Math.floor(Date.now() / 1000)
 
-                    if (health.count === 0) {
-                        await logger({
-                            message: `No local data found for ${symbol} (${timeframe}). Bootstrapping...`,
-                            symbol,
-                            timeframe,
-                            rangeStart: targetStart,
-                            rangeEnd: now
-                        })
-
-                        const bootstrapResult = await this.fillRange(symbol, timeframe, targetStart, now, options.provider, pauseMs, logger)
-                        totalPersisted += bootstrapResult.persistedBars
-                        totalProcessed++
-
-                        await DataHealthManager.refreshInventory()
-                        const postBootstrapHealth = await DataHealthManager.getHealth(symbol, timeframe)
-
-                        await logger({
-                            message: `Finished bootstrap for ${symbol} (${timeframe}).`,
-                            symbol,
-                            timeframe,
-                            fetchedBars: bootstrapResult.fetchedBars,
-                            persistedBars: bootstrapResult.persistedBars,
-                            dbTotalAfterChunk: postBootstrapHealth.count,
-                            gapCount: postBootstrapHealth.gapCount || postBootstrapHealth.gaps.length
-                        })
-                        continue
-                    }
-
-                    if (health.targetCoveragePercent < 100 && health.startIndex) {
-                        const actualStart = Math.floor(health.startIndex.getTime() / 1000)
-
-                        if (actualStart > targetStart + ONE_YEAR) {
+                        if (health.count === 0) {
                             await logger({
-                                message: `Backfilling ${symbol} (${timeframe}) due to low coverage.`,
+                                message: `No local data found for ${symbol} (${timeframe}). Bootstrapping...`,
                                 symbol,
                                 timeframe,
-                                targetCoveragePercent: health.targetCoveragePercent,
                                 rangeStart: targetStart,
-                                rangeEnd: actualStart
-                            })
-
-                            const backfillResult = await this.fillRange(symbol, timeframe, targetStart, actualStart, options.provider, pauseMs, logger)
-                            totalPersisted += backfillResult.persistedBars
-                            totalProcessed++
-
-                            await DataHealthManager.refreshInventory()
-                            const postBackfillHealth = await DataHealthManager.getHealth(symbol, timeframe)
-
-                            await logger({
-                                message: `Finished backfill for ${symbol} (${timeframe}).`,
-                                symbol,
-                                timeframe,
-                                fetchedBars: backfillResult.fetchedBars,
-                                persistedBars: backfillResult.persistedBars,
-                                dbTotalAfterChunk: postBackfillHealth.count,
-                                gapCount: postBackfillHealth.gapCount || postBackfillHealth.gaps.length
-                            })
-                        }
-                    }
-
-                    if (health.gaps.length > 0) {
-                        await logger({
-                            message: `Healing ${health.gaps.length} internal gaps for ${symbol} (${timeframe})...`,
-                            symbol,
-                            timeframe
-                        })
-
-                        const fixReport = await DataHealthManager.syncGaps(symbol, timeframe, options.provider)
-                        totalProcessed++
-                        totalPersisted += fixReport.barsAdded
-
-                        await DataHealthManager.refreshInventory()
-                        const postGapHealth = await DataHealthManager.getHealth(symbol, timeframe)
-
-                        await logger({
-                            message: `Gap healing finished for ${symbol} (${timeframe}).`,
-                            symbol,
-                            timeframe,
-                            fetchedBars: fixReport.barsAdded,
-                            persistedBars: fixReport.barsAdded,
-                            dbTotalAfterChunk: postGapHealth.count,
-                            gapCount: postGapHealth.gapCount || postGapHealth.gaps.length
-                        })
-                        continue
-                    }
-
-                    if (health.endIndex) {
-                        const lastBarUnix = Math.floor(health.endIndex.getTime() / 1000)
-
-                        if (now - lastBarUnix > timeframeToSeconds(timeframe) * 2) {
-                            await logger({
-                                message: `Syncing recent tail for ${symbol} (${timeframe})...`,
-                                symbol,
-                                timeframe,
-                                rangeStart: lastBarUnix,
                                 rangeEnd: now
                             })
 
-                            const tailResult = await marketDataStore.getHistoricalDataWithReport(symbol, timeframe, lastBarUnix, now, {
-                                providerOverride: options.provider
-                            })
-
-                            for (const chunkReport of tailResult.report.chunkReports) {
-                                await this.logChunk(logger, 'Tail chunk synchronized.', symbol, timeframe, chunkReport)
-                            }
-
+                            const bootstrapResult = await this.fillRange(symbol, timeframe, targetStart, now, options.provider, pauseMs, logger)
+                            totalPersisted += bootstrapResult.persistedBars
                             totalProcessed++
-                            totalPersisted += tailResult.report.persistedBars
 
                             await DataHealthManager.refreshInventory()
-                            const postTailHealth = await DataHealthManager.getHealth(symbol, timeframe)
+                            const postBootstrapHealth = await DataHealthManager.getHealth(symbol, timeframe)
 
                             await logger({
-                                message: `Tail sync finished for ${symbol} (${timeframe}).`,
+                                message: `Finished bootstrap for ${symbol} (${timeframe}).`,
                                 symbol,
                                 timeframe,
-                                fetchedBars: tailResult.report.fetchedBars,
-                                persistedBars: tailResult.report.persistedBars,
-                                dbTotalAfterChunk: postTailHealth.count,
-                                gapCount: postTailHealth.gapCount || postTailHealth.gaps.length,
-                                warnings: tailResult.report.warnings
+                                fetchedBars: bootstrapResult.fetchedBars,
+                                persistedBars: bootstrapResult.persistedBars,
+                                dbTotalAfterChunk: postBootstrapHealth.count,
+                                gapCount: postBootstrapHealth.gapCount || postBootstrapHealth.gaps.length
                             })
+                            continue
+                        }
+
+                        if (health.targetCoveragePercent < 100 && health.startIndex) {
+                            const actualStart = Math.floor(health.startIndex.getTime() / 1000)
+
+                            if (actualStart > targetStart + ONE_YEAR) {
+                                await logger({
+                                    message: `Backfilling ${symbol} (${timeframe}) due to low coverage.`,
+                                    symbol,
+                                    timeframe,
+                                    targetCoveragePercent: health.targetCoveragePercent,
+                                    rangeStart: targetStart,
+                                    rangeEnd: actualStart
+                                })
+
+                                const backfillResult = await this.fillRange(symbol, timeframe, targetStart, actualStart, options.provider, pauseMs, logger)
+                                totalPersisted += backfillResult.persistedBars
+                                totalProcessed++
+
+                                await DataHealthManager.refreshInventory()
+                                const postBackfillHealth = await DataHealthManager.getHealth(symbol, timeframe)
+
+                                await logger({
+                                    message: `Finished backfill for ${symbol} (${timeframe}).`,
+                                    symbol,
+                                    timeframe,
+                                    fetchedBars: backfillResult.fetchedBars,
+                                    persistedBars: backfillResult.persistedBars,
+                                    dbTotalAfterChunk: postBackfillHealth.count,
+                                    gapCount: postBackfillHealth.gapCount || postBackfillHealth.gaps.length
+                                })
+                            }
+                        }
+
+                        if (health.gaps.length > 0) {
+                            await logger({
+                                message: `Healing ${health.gaps.length} internal gaps for ${symbol} (${timeframe})...`,
+                                symbol,
+                                timeframe
+                            })
+
+                            const fixReport = await DataHealthManager.syncGaps(symbol, timeframe, options.provider)
+                            totalProcessed++
+                            totalPersisted += fixReport.barsAdded
+
+                            await DataHealthManager.refreshInventory()
+                            const postGapHealth = await DataHealthManager.getHealth(symbol, timeframe)
+
+                            await logger({
+                                message: `Gap healing finished for ${symbol} (${timeframe}).`,
+                                symbol,
+                                timeframe,
+                                fetchedBars: fixReport.barsAdded,
+                                persistedBars: fixReport.barsAdded,
+                                dbTotalAfterChunk: postGapHealth.count,
+                                gapCount: postGapHealth.gapCount || postGapHealth.gaps.length
+                            })
+                            continue
+                        }
+
+                        if (health.endIndex) {
+                            const lastBarUnix = Math.floor(health.endIndex.getTime() / 1000)
+
+                            if (now - lastBarUnix > timeframeToSeconds(timeframe) * 2) {
+                                await logger({
+                                    message: `Syncing recent tail for ${symbol} (${timeframe})...`,
+                                    symbol,
+                                    timeframe,
+                                    rangeStart: lastBarUnix,
+                                    rangeEnd: now
+                                })
+
+                                const tailResult = await marketDataStore.getHistoricalDataWithReport(symbol, timeframe, lastBarUnix, now, {
+                                    providerOverride: options.provider
+                                })
+
+                                for (const chunkReport of tailResult.report.chunkReports) {
+                                    await this.logChunk(logger, 'Tail chunk synchronized.', symbol, timeframe, chunkReport)
+                                }
+
+                                totalProcessed++
+                                totalPersisted += tailResult.report.persistedBars
+
+                                await DataHealthManager.refreshInventory()
+                                const postTailHealth = await DataHealthManager.getHealth(symbol, timeframe)
+
+                                await logger({
+                                    message: `Tail sync finished for ${symbol} (${timeframe}).`,
+                                    symbol,
+                                    timeframe,
+                                    fetchedBars: tailResult.report.fetchedBars,
+                                    persistedBars: tailResult.report.persistedBars,
+                                    dbTotalAfterChunk: postTailHealth.count,
+                                    gapCount: postTailHealth.gapCount || postTailHealth.gaps.length,
+                                    warnings: tailResult.report.warnings
+                                })
+                            }
                         }
                     }
+                } catch (error) {
+                    const msg = error instanceof Error ? error.message : 'Unknown error'
+                    if (msg.includes('RATE_LIMITED')) {
+                        await logger({
+                            message: `Symbol throttled due to RATE_LIMITED lock. Skipping to next symbol in batch.`,
+                            symbol
+                        }, 'error')
+                        continue
+                    }
+                    console.error(`[Ingestion] Unknown fatal error for ${symbol}: ${msg}`)
+                    throw error
                 }
             }
 
@@ -311,14 +338,19 @@ class IngestionService {
                     }
                 }
             } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error'
                 await logger({
                     message: 'Chunk failed.',
                     symbol,
                     timeframe,
                     rangeStart: currentStart,
                     rangeEnd: currentEnd,
-                    warnings: [error instanceof Error ? error.message : 'Unknown error']
-                }, 'error')
+                    warnings: [errorMessage]
+                })
+
+                if (errorMessage.includes('RATE_LIMITED')) {
+                    throw error
+                }
             }
 
             currentStart = currentEnd

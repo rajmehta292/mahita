@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
-import prisma from "@/lib/prisma"
+import { vaultManager } from "@/app/services/market-data/vault-manager"
+import { DataHealthManager } from "@/app/services/market-data/health"
 
 interface ScreenerQueryRow {
     symbol: string
@@ -21,47 +22,44 @@ export async function GET() {
     }
 
     try {
-        const [rows, inventory] = await Promise.all([
-            prisma.$queryRaw<ScreenerQueryRow[]>`
-                WITH ranked AS (
-                    SELECT
-                        symbol,
-                        close,
-                        open,
-                        volume,
-                        source,
-                        CAST(strftime('%s', time) AS INTEGER) AS unix_time,
-                        ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY time DESC) AS rn
-                    FROM MarketData
-                    WHERE timeframe = '1d'
-                )
+        const vaultClient = await vaultManager.getClient('schwab')
+
+        const rows = await vaultClient.$queryRaw<ScreenerQueryRow[]>`
+            WITH ranked AS (
                 SELECT
-                    curr.symbol AS symbol,
-                    curr.close AS price,
-                    curr.open AS open,
-                    curr.volume AS volume,
-                    curr.source AS source,
-                    curr.unix_time AS lastBarTime,
-                    prev.close AS previousClose
-                FROM ranked curr
-                LEFT JOIN ranked prev
-                    ON prev.symbol = curr.symbol
-                    AND prev.rn = 2
-                WHERE curr.rn = 1
-                ORDER BY curr.symbol ASC
-            `,
-            prisma.dataInventory.findMany({
-                where: { timeframe: '1d' },
-                select: {
-                    symbol: true,
-                    healthScore: true,
-                    targetCoveragePercent: true
-                }
-            })
-        ])
+                    symbol,
+                    close AS price,
+                    open,
+                    volume,
+                    source,
+                    CAST(strftime('%s', time) AS INTEGER) AS lastBarTime,
+                    ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY time DESC) AS rn
+                FROM MarketData
+                WHERE timeframe = '1d'
+            )
+            SELECT
+                curr.symbol AS symbol,
+                curr.price AS price,
+                curr.open AS open,
+                curr.volume AS volume,
+                curr.source AS source,
+                curr.lastBarTime AS lastBarTime,
+                prev.price AS previousClose
+            FROM ranked curr
+            LEFT JOIN ranked prev
+                ON prev.symbol = curr.symbol
+                AND prev.rn = 2
+            WHERE curr.rn = 1
+            ORDER BY curr.symbol ASC
+        `
+
+        // Health arrays are now calculated on the fly as inventory isn't stored centrally
+        const healthReports = await Promise.all(
+            rows.map(row => DataHealthManager.getHealth(row.symbol, '1d', 'schwab'))
+        )
 
         const inventoryBySymbol = new Map(
-            inventory.map((item) => [item.symbol, item])
+            healthReports.map((item) => [item.symbol, item])
         )
 
         return NextResponse.json({

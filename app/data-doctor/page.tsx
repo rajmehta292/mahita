@@ -25,6 +25,8 @@ import {
     CloudLightning,
     Target as LucideTarget
 } from 'lucide-react'
+import { DataInventory, Vault } from '@prisma/client'
+import Link from 'next/link'
 import { HealthReport } from '../services/market-data/health'
 import { Timeframe } from '../services/market-data/types'
 
@@ -428,7 +430,7 @@ export default function DataDoctorPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     restartContinuous,
-                    provider: continuousProviderOverride || undefined
+                    provider: selectedVault || continuousProviderOverride || undefined
                 })
             })
 
@@ -594,12 +596,15 @@ export default function DataDoctorPage() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg">
+                        <Link
+                            href="/data-doctor/logs"
+                            className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                        >
                             <div className={`w-2 h-2 rounded-full ${continuousStatus?.running ? 'bg-emerald-500 animate-pulse' : 'bg-white/20'}`} />
                             <span className="text-[10px] font-medium text-white/60 uppercase tracking-wider">
                                 {continuousStatus?.running ? 'Live Ingestion active' : 'Continuous Idle'}
                             </span>
-                        </div>
+                        </Link>
                     </div>
                 </div>
             </header>
@@ -710,18 +715,29 @@ export default function DataDoctorPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Interval Grid */}
-                                            <div className="flex gap-1.5">
-                                                {['1s', '1m', '1h', '1d', '1w', '1M'].map(tf => {
-                                                    const isActive = tf === report.timeframe
-                                                    return (
-                                                        <div
-                                                            key={tf}
-                                                            title={`${tf} coverage`}
-                                                            className={`h-4 flex-1 rounded-sm ${isActive ? 'bg-primary shadow-[0_0_10px_rgba(var(--primary-rgb),0.3)]' : 'bg-white/10'} hover:bg-white/20 transition-all cursor-pointer`}
-                                                        />
-                                                    )
-                                                })}
+                                            {/* Activity Bar Chart (Phase 12 Observability) */}
+                                            <div className="flex flex-col gap-1.5 mt-2">
+                                                <div className="flex justify-between items-center text-[9px] text-white/30 uppercase font-bold tracking-widest">
+                                                    <span>{report.startIndex ? new Date(report.startIndex).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'Genesis'}</span>
+                                                    <span className={report.gaps?.length > 0 ? "text-rose-400" : "text-emerald-400"}>
+                                                        {report.gaps?.length || 0} Gaps
+                                                    </span>
+                                                    <span>Present</span>
+                                                </div>
+                                                <div className="flex gap-0.5 h-4 items-end group-hover:gap-[1px] transition-all cursor-crosshair">
+                                                    {Array.from({ length: 40 }).map((_, i) => {
+                                                        const missingBlocks = 40 - Math.round((report.targetCoveragePercent / 100) * 40);
+                                                        // We align identified gaps mathematically toward the left (older data) to represent the horizon
+                                                        const isGap = i < missingBlocks;
+                                                        return (
+                                                            <div
+                                                                key={i}
+                                                                title={isGap ? 'Missing Telemetry Block' : 'Verified Yield'}
+                                                                className={`flex-1 rounded-[1px] transition-all hover:bg-white ${isGap ? 'h-full bg-rose-500/80 shadow-[0_0_6px_rgba(244,63,94,0.4)]' : 'h-[60%] bg-emerald-500/30'}`}
+                                                            />
+                                                        )
+                                                    })}
+                                                </div>
                                             </div>
 
                                             <div className="flex justify-between items-center mt-2 border-t border-white/5 pt-2">

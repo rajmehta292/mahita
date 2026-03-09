@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       }
 
       const positions = await client.getPositions(accountId!)
-      const balance = await client.getBalance(accountId)
+      const balance = await client.getBalance(accountId!)
       return NextResponse.json({ success: true, positions, balance })
     }
 
@@ -106,14 +106,16 @@ export async function GET(request: NextRequest) {
       }
 
       if (!accountId) {
-        return NextResponse.json({ error: 'No linked accounts found to fetch positions' }, { status: 400 })
+        return NextResponse.json({ error: 'Account ID is strictly required' }, { status: 400 })
       }
     }
 
     try {
-      const positions = await client.getPositions(accountId)
-      const balance = await client.getBalance(accountId)
-
+      // Get positions and balance in parallel
+      const [positions, balance] = await Promise.all([
+        client.getPositions(accountId as string),
+        client.getBalance(accountId as string)
+      ])
       console.log(`[Schwab Positions] Successfully fetched ${positions.length} positions for ${accountId}`)
 
       return NextResponse.json({

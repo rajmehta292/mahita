@@ -61,6 +61,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ authUrl })
     }
 
+    if (action === 'status' || !action) {
+      const isConnected = !!user.schwabConfig.accessToken && !!user.schwabConfig.refreshToken
+      const isExpired = user.schwabConfig.accessTokenExpiry && (user.schwabConfig.accessTokenExpiry.getTime() - Date.now() < 0)
+
+      return NextResponse.json({
+        isConnected,
+        isExpired,
+        tokenExpiry: user.schwabConfig.accessTokenExpiry
+      })
+    }
+
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch (error: any) {
     console.error('Schwab auth error:', error)

@@ -8,7 +8,7 @@ export interface DiagnosticTest {
     id: string
     title: string
     description: string
-    method: 'GET' | 'POST'
+    method: 'GET' | 'POST' | 'DELETE' | 'PUT'
     endpoint: string
     category: string
     defaultParams?: Record<string, string>

@@ -46,12 +46,12 @@ export class DataHealthManager {
             case '1w':
             case '1M':
             case '1d':
-                return now - (15 * ONE_YEAR)
+                return now - (4 * ONE_YEAR) // Reduced from 15Y to 4Y to prevent Schwab REST payload truncation
             case '1h':
             case '2h':
             case '3h':
             case '4h':
-                return now - (700 * 86400)
+                return now - (35 * 86400) // Schwab caps minute intervals to ~30-40 days. 700 days triggers HTTP 400.
             case '1m':
             case '3m':
             case '5m':

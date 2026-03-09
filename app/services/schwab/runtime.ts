@@ -85,3 +85,46 @@ export async function getRuntimeSchwabClientWithOptions(options: { forceRefresh?
 
     return client
 }
+
+export async function checkSchwabTokenHealth(): Promise<{ isValid: boolean; error?: string }> {
+    if (process.env.USE_MOCK_DATA === 'true') return { isValid: true }
+
+    const config = await prisma.schwabConfig.findFirst({
+        where: {
+            clientId: { not: '' },
+            accessToken: { not: null }
+        },
+        orderBy: { updatedAt: 'desc' }
+    })
+
+    if (!config || !config.accessToken) {
+        return { isValid: false, error: 'No active Schwab configuration or access token found.' }
+    }
+
+    const now = Date.now()
+
+    // 1. Is the master refresh token permanently expired?
+    if (config.refreshTokenExpiry && config.refreshTokenExpiry.getTime() <= now) {
+        return { isValid: false, error: 'Schwab Refresh Token is permanently expired. User must physically re-authenticate.' }
+    }
+
+    // 2. Is the immediate access token expired or close to expiry? 
+    if (config.accessTokenExpiry && (config.accessTokenExpiry.getTime() - now < EXPIRY_BUFFER_MS)) {
+        try {
+            // Attempt to refresh it right now rather than letting the engine sweep fail
+            const client = getSchwabClient({
+                clientId: config.clientId,
+                clientSecret: config.clientSecret,
+                callbackUrl: getCallbackUrl(),
+                accessToken: config.accessToken
+            })
+            if (!config.refreshToken) throw new Error('No refresh token available')
+
+            await client.refreshAccessToken(config.refreshToken)
+        } catch (error) {
+            return { isValid: false, error: `Proactive Pre-Flight token refresh failed: ${error instanceof Error ? error.message : 'Unknown'}` }
+        }
+    }
+
+    return { isValid: true }
+}

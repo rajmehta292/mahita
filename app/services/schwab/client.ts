@@ -299,12 +299,20 @@ export class SchwabClient {
   }) {
     const queryParams: Record<string, string> = {}
     if (params) {
-      if (params.periodType) queryParams.periodType = params.periodType
-      if (params.period) queryParams.period = params.period.toString()
-      if (params.frequencyType) queryParams.frequencyType = params.frequencyType
-      if (params.frequency) queryParams.frequency = params.frequency.toString()
-      if (params.startDate) queryParams.startDate = params.startDate.toString()
-      if (params.endDate) queryParams.endDate = params.endDate.toString()
+      // If we have explicit date boundaries, we ONLY provide frequency, startDate, and endDate.
+      // Providing periodType + startDate simultaneously causes HTTP 400 Bad Request on some symbol queries.
+      if (params.startDate && params.endDate) {
+        if (params.frequencyType) queryParams.frequencyType = params.frequencyType
+        if (params.frequency) queryParams.frequency = params.frequency.toString()
+        queryParams.startDate = params.startDate.toString()
+        queryParams.endDate = params.endDate.toString()
+      } else {
+        // Standard offset query
+        if (params.periodType) queryParams.periodType = params.periodType
+        if (params.period) queryParams.period = params.period.toString()
+        if (params.frequencyType) queryParams.frequencyType = params.frequencyType
+        if (params.frequency) queryParams.frequency = params.frequency.toString()
+      }
     }
     const searchParams = new URLSearchParams(queryParams)
     searchParams.set('symbol', symbol)

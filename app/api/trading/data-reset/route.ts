@@ -5,6 +5,7 @@ import prisma from '@/lib/prisma'
 import { continuousIngestController } from '@/app/services/market-data/continuous-ingest'
 import { ingestionService } from '@/app/services/market-data/ingestion'
 import { providerTelemetryBus } from '@/app/services/market-data/provider-telemetry'
+import { vaultManager } from '@/app/services/market-data/vault-manager'
 
 export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions)
@@ -23,15 +24,17 @@ export async function POST(request: NextRequest) {
 
     await continuousIngestController.stop()
 
-    await prisma.$transaction([
-        prisma.ingestionEvent.deleteMany({}),
-        prisma.ingestionJob.deleteMany({}),
-        prisma.dataSpan.deleteMany({}),
-        prisma.dataPartition.deleteMany({}),
-        prisma.symbolRegistry.deleteMany({}),
-        prisma.dataInventory.deleteMany({}),
-        prisma.marketData.deleteMany({})
-    ])
+    try {
+        const vaultClient = await vaultManager.getClient(providerOverride || 'schwab')
+        await vaultClient.marketData.deleteMany({})
+
+        // Clear associated telemetry locally
+        await prisma.dataInventory.deleteMany({
+            where: { vaultId: (await prisma.vault.findUnique({ where: { name: providerOverride || 'schwab' } }))?.id }
+        })
+    } catch (e) {
+        console.error('Vault purge error:', e)
+    }
 
     await providerTelemetryBus.clear()
     await providerTelemetryBus.log({
