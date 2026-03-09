@@ -1003,7 +1003,11 @@ export default function DataDoctorPage() {
 }
 
 function AcquisitionRoadmap({ reports, providers, onSync, syncing }: { reports: HealthReport[], providers: string[], onSync: (symbol: string, timeframe: string, provider?: string) => void, syncing: string | null }) {
-    const targetSymbols = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'META', 'GOOGL', 'BTC-USD', 'ETH-USD', 'EURUSD=X', 'USDJPY=X', 'JPM', 'V', 'WMT', 'JNJ', 'TSLA', 'PG', 'HD', 'CVX', 'MRK', 'KO']
+    const defaultSymbols = ['AAPL', 'MSFT', 'NVDA', 'AMZN', 'META', 'GOOGL', 'BTC-USD', 'ETH-USD', 'EURUSD=X', 'USDJPY=X', 'JPM', 'V', 'WMT', 'JNJ', 'TSLA', 'PG', 'HD', 'CVX', 'MRK', 'KO']
+    const targetSymbols = reports.length > 0
+        ? Array.from(new Set(reports.map(r => r.symbol))).slice(0, 200)
+        : defaultSymbols
+
     const [providerOverrides, setProviderOverrides] = React.useState<Record<string, string>>({})
 
     return (

@@ -59,6 +59,7 @@ function resolveTimeframes(override?: Timeframe | Timeframe[]): Timeframe[] {
 
 class IngestionService {
     private running = false
+    private cursor: number = 0 // Persistent rotation index for continuous polling
 
     isRunning() {
         return this.running
@@ -100,14 +101,20 @@ class IngestionService {
         })
 
         try {
-            await logger({ message: `Starting ingestion sweep for ${universe.length} symbols...` })
+            await logger({ message: `Starting ingestion sweep for ${universe.length} symbols (Cursor Start: ${this.cursor})...` })
 
             let totalProcessed = 0
             let totalPersisted = 0
 
             const maxLimit = options.limit ?? universe.length
 
-            for (const symbol of universe) {
+            // Build a dynamically rotated queue starting from the persistent cursor
+            const rotatedUniverse = [
+                ...universe.slice(this.cursor),
+                ...universe.slice(0, this.cursor)
+            ]
+
+            for (const symbol of rotatedUniverse) {
                 if (totalProcessed >= maxLimit) {
                     await logger({ message: `Reached requested batch limit of ${maxLimit}. Stopping sweep.` })
                     break
@@ -259,6 +266,9 @@ class IngestionService {
                     throw error
                 }
             }
+
+            // Advance the cursor by exactly how many items we evaluated globally
+            this.cursor = (this.cursor + totalProcessed) % universe.length
 
             await DataHealthManager.refreshInventory()
             await logger({
