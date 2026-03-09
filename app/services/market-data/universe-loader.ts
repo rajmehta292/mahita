@@ -3,7 +3,7 @@ import path from 'node:path'
 import { GLOBAL_UNIVERSE } from './universe'
 
 const CUSTOM_UNIVERSE_PATH = path.join(process.cwd(), 'data', 'symbol-universe.txt')
-const TOP_1000_CSV_PATH = path.join(process.cwd(), 'data', 'top_1000_assets_by_market_cap.csv')
+const TOP_1000_CSV_PATH = path.join(process.cwd(), 'data', 'resolved_top_1000.csv')
 
 function normalizeLines(lines: string[]): string[] {
     return lines
