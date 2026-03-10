@@ -86,6 +86,37 @@ export async function getRuntimeSchwabClientWithOptions(options: { forceRefresh?
     return client
 }
 
+export async function getSchwabClientPool(): Promise<SchwabClient[]> {
+    if (process.env.USE_MOCK_DATA === 'true') {
+        const mock = await getRuntimeSchwabClient()
+        return mock ? [mock] : []
+    }
+
+    const configs = await prisma.schwabConfig.findMany({
+        where: {
+            clientId: { not: '' },
+            accessToken: { not: null },
+            refreshTokenExpiry: { gt: new Date() } // Only valid refresh tokens
+        }
+    })
+
+    const pool: SchwabClient[] = []
+    for (const config of configs) {
+        const client = getSchwabClient({
+            clientId: config.clientId,
+            clientSecret: config.clientSecret,
+            callbackUrl: getCallbackUrl(),
+            accessToken: config.accessToken!,
+            refreshToken: config.refreshToken || undefined,
+            accessTokenExpiry: config.accessTokenExpiry || undefined,
+            refreshTokenExpiry: config.refreshTokenExpiry || undefined
+        })
+        pool.push(client)
+    }
+
+    return pool
+}
+
 export async function checkSchwabTokenHealth(): Promise<{ isValid: boolean; error?: string }> {
     if (process.env.USE_MOCK_DATA === 'true') return { isValid: true }
 

@@ -70,21 +70,20 @@ class IngestionService {
             throw new Error('An ingestion sweep is already running.')
         }
 
-        // --- Production Blueprint: Pre-Flight Middleware ---
-        if (!options.provider || options.provider === 'schwab') {
-            const { checkSchwabTokenHealth } = await import('@/app/services/schwab/runtime')
-            const tokenHealth = await checkSchwabTokenHealth()
-            if (!tokenHealth.isValid) {
-                await providerTelemetryBus.log({
-                    kind: 'error',
-                    message: `SYS-CRITICAL: Pre-flight Auth Check Failed. Halting Sweep.`,
-                    response: { error: tokenHealth.error }
-                })
-                throw new Error(`SchwabTokenManager Halted Sweep: ${tokenHealth.error}`)
-            }
+        // --- Multi-Key Pooling Implementation ---
+        const { getSchwabClientPool } = await import('@/app/services/schwab/runtime')
+        const clientPool = await getSchwabClientPool()
+
+        if (clientPool.length === 0 && process.env.USE_MOCK_DATA !== 'true') {
+            await providerTelemetryBus.log({
+                kind: 'error',
+                message: `SYS-CRITICAL: No valid Schwab keys in pool. Halting Sweep.`,
+            })
+            throw new Error(`IngestionService Halted: No valid keys found in pool.`)
         }
 
         this.running = true
+        let poolIndex = 0
 
         const timeframes = resolveTimeframes(options.overrideTimeframe)
         const universe = normalizeSymbols(options.symbols?.length ? options.symbols : await getGlobalUniverse())
@@ -121,6 +120,10 @@ class IngestionService {
                 }
 
                 try {
+                    // Rotate provider throughout the pool for each symbol to balance load
+                    const activeClient = clientPool[poolIndex % clientPool.length]
+                    poolIndex++
+
                     for (const timeframe of timeframes) {
                         await logger({ message: `Checking ${symbol} @ ${timeframe}...`, symbol, timeframe })
 
@@ -137,7 +140,7 @@ class IngestionService {
                                 rangeEnd: now
                             })
 
-                            const bootstrapResult = await this.fillRange(symbol, timeframe, targetStart, now, options.provider, pauseMs, logger)
+                            const bootstrapResult = await this.fillRange(symbol, timeframe, targetStart, now, options.provider, pauseMs, logger, activeClient)
                             totalPersisted += bootstrapResult.persistedBars
                             totalProcessed++
 
@@ -227,7 +230,8 @@ class IngestionService {
                                 })
 
                                 const tailResult = await marketDataStore.getHistoricalDataWithReport(symbol, timeframe, lastBarUnix, now, {
-                                    providerOverride: options.provider
+                                    providerOverride: options.provider,
+                                    providerClient: activeClient
                                 })
 
                                 for (const chunkReport of tailResult.report.chunkReports) {
@@ -313,7 +317,8 @@ class IngestionService {
         endTime: number,
         provider: string | undefined,
         pauseMs: number,
-        logger: IngestionLogger
+        logger: IngestionLogger,
+        providerClient?: any
     ): Promise<{ fetchedBars: number, persistedBars: number }> {
         let currentStart = startTime
         let fetchedBars = 0
@@ -324,7 +329,8 @@ class IngestionService {
 
             try {
                 const result = await marketDataStore.getHistoricalDataWithReport(symbol, timeframe, currentStart, currentEnd, {
-                    providerOverride: provider
+                    providerOverride: provider,
+                    providerClient
                 })
 
                 fetchedBars += result.report.fetchedBars

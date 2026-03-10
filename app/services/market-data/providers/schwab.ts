@@ -52,7 +52,7 @@ export class SchwabProvider implements IDataProvider {
         return !symbol.includes('=') && !symbol.includes('-USD')
     }
 
-    async getHistoricalData(symbol: string, timeframe: Timeframe, startTime: number, endTime: number): Promise<MarketDataPoint[]> {
+    async getHistoricalData(symbol: string, timeframe: Timeframe, startTime: number, endTime: number, options?: { providerClient?: any }): Promise<MarketDataPoint[]> {
         if (!this.supportsSymbol(symbol)) {
             return []
         }
@@ -75,7 +75,7 @@ export class SchwabProvider implements IDataProvider {
                     const currentEnd = Math.min(currentStart + CHUNK_SIZE_MS, finalEnd)
                     const chunkParams = { ...params, startDate: currentStart, endDate: currentEnd }
 
-                    const response = await this.fetchPriceHistoryWithRetry(symbol, chunkParams)
+                    const response = await this.fetchPriceHistoryWithRetry(symbol, chunkParams, options?.providerClient)
                     const candles = Array.isArray(response.data?.candles) ? response.data.candles : []
                     allCandles = allCandles.concat(candles)
 
@@ -85,7 +85,7 @@ export class SchwabProvider implements IDataProvider {
                     }
                 }
             } else {
-                const response = await this.fetchPriceHistoryWithRetry(symbol, params)
+                const response = await this.fetchPriceHistoryWithRetry(symbol, params, options?.providerClient)
                 allCandles = Array.isArray(response.data?.candles) ? response.data.candles : []
             }
 
@@ -115,10 +115,10 @@ export class SchwabProvider implements IDataProvider {
         }
     }
 
-    private async fetchPriceHistoryWithRetry(symbol: string, params: SchwabHistoryParams) {
-        let client = await getRuntimeSchwabClient()
+    private async fetchPriceHistoryWithRetry(symbol: string, params: SchwabHistoryParams, providerClient?: any) {
+        let client = providerClient || await getRuntimeSchwabClient()
         if (!client) {
-            throw new Error('No Schwab runtime client configured')
+            throw new Error('No Schwab client available (checked pool and runtime fallback)')
         }
 
         try {

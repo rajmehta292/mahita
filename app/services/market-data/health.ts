@@ -269,7 +269,8 @@ export class DataHealthManager {
         symbol: string,
         timeframe: Timeframe,
         providerOverride?: string,
-        vaultName = 'schwab'
+        vaultName = 'schwab',
+        providerClient?: any
     ): Promise<{ gapsFixed: number, barsAdded: number }> {
         const report = await this.getHealth(symbol, timeframe, vaultName)
         let gapsFixed = 0
@@ -284,7 +285,8 @@ export class DataHealthManager {
 
                 const result = await marketDataStore.getHistoricalDataWithReport(symbol, timeframe, startUnix, endUnix, {
                     providerOverride,
-                    vaultName
+                    vaultName,
+                    providerClient
                 })
 
                 if (result.report.persistedBars > 0) {

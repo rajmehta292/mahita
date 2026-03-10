@@ -11,7 +11,7 @@ export interface MarketDataPoint {
 }
 
 export interface IDataProvider {
-    getHistoricalData(symbol: string, timeframe: Timeframe, startTime: number, endTime: number): Promise<MarketDataPoint[]>
+    getHistoricalData(symbol: string, timeframe: Timeframe, startTime: number, endTime: number, options?: { providerClient?: any }): Promise<MarketDataPoint[]>
 }
 
 export interface TimeRange {

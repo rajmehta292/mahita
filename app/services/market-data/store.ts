@@ -25,6 +25,7 @@ interface ProviderEntry {
 interface FetchOptions {
     forceRefresh?: boolean
     providerOverride?: string
+    providerClient?: any
 }
 
 export class MarketDataStore {
@@ -106,7 +107,8 @@ export class MarketDataStore {
                 range,
                 options.providerOverride,
                 !!options.forceRefresh,
-                targetVault
+                targetVault,
+                options.providerClient
             )
 
             report.chunkReports.push(chunkReport)
@@ -189,7 +191,8 @@ export class MarketDataStore {
         range: TimeRange,
         providerOverride?: string,
         forceRefresh = false,
-        vaultName = 'schwab'
+        vaultName = 'schwab',
+        providerClient?: any
     ): Promise<ChunkIngestionReport> {
         const warnings: string[] = []
         const providers = this.getProviders(providerOverride)
@@ -213,7 +216,14 @@ export class MarketDataStore {
 
         for (const entry of providers) {
             try {
-                const fetchedData = await this.callProvider(entry, symbol, timeframe, range.startTime, range.endTime)
+                const fetchedData = await this.callProvider(
+                    entry,
+                    symbol,
+                    timeframe,
+                    range.startTime,
+                    range.endTime,
+                    providerClient
+                )
                 const persistedBars = await this.persistBars(
                     symbol,
                     timeframe,
@@ -272,7 +282,8 @@ export class MarketDataStore {
         symbol: string,
         timeframe: Timeframe,
         startTime: number,
-        endTime: number
+        endTime: number,
+        providerClient?: any
     ): Promise<MarketDataPoint[]> {
         const startedAt = Date.now()
 
@@ -292,7 +303,7 @@ export class MarketDataStore {
 
         try {
             const fetchedData = dedupeMarketDataPoints(
-                (await entry.provider.getHistoricalData(symbol, timeframe, startTime, endTime)).filter((point) => this.isValidBar(point))
+                (await entry.provider.getHistoricalData(symbol, timeframe, startTime, endTime, { providerClient })).filter((point) => this.isValidBar(point))
             )
 
             await providerTelemetryBus.log({
