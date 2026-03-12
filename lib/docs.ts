@@ -45,6 +45,10 @@ const CURRENT_DOC_PATTERNS: Array<{
   defaults: Partial<DocFrontmatter>
 }> = [
   {
+    pattern: /^internal\/evidence\/archive\//,
+    defaults: { visibility: "signed-in", status: "Historical", category: "archive", audience: "developers" },
+  },
+  {
     pattern: /^public\//,
     defaults: { visibility: "public", status: "Current", audience: "public" },
   },

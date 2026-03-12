@@ -34,7 +34,7 @@ echo
 echo "Demo bootstrap complete."
 echo "Run 'npm run dev' to start Mahita in presentation-safe demo mode."
 echo "Use dev-bypass sign-in with one of:"
-echo "  - raj.dmehta292@gmail.com"
+echo "  - owner.demo@mahita.ai"
 echo "  - demo.user@mahita.ai"
 echo "  - reviewer@mahita.ai"
 echo

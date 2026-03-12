@@ -40,6 +40,6 @@
     "node_modules",
     "artifacts",
     "tmp",
-    "tradingview_extracted"
+    "docs/internal/evidence/archive/tradingview-research"
   ]
 }

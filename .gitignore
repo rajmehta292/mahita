@@ -24,6 +24,7 @@
 # misc
 .DS_Store
 *.pem
+next_output.log
 
 # debug
 npm-debug.log*
@@ -44,4 +45,10 @@ next-env.d.ts
 
 /src/generated/prisma
 /demo.db
+/dev.db
+/prisma/*.db
+/data/vaults/*.db
+/logs/*.jsonl
+/test-results/
+/tmp/
 /artifacts/senior-project/

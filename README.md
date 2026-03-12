@@ -1,6 +1,14 @@
-# Mahita Terminal 🚀
+# Mahita Terminal
 
-The canonical project story, senior-project docs, and live wiki now live in the site-visible Documentation section at `/docs`. For repo readers, the main current-state sources are [docs/current_state_baseline.md](/Users/rmehta01/Sites/mahita/docs/current_state_baseline.md) and [docs/guidebook/auth/README.md](/Users/rmehta01/Sites/mahita/docs/guidebook/auth/README.md).
+Mahita is a trading-terminal senior project that combines:
+
+- Mahita workspace identity and user profiles
+- Schwab developer-key setup and brokerage OAuth connection
+- portfolio, account, and control-plane surfaces
+- a prototype backtesting/editor workflow
+- a documentation/wiki system that now serves as the project’s presentation portal
+
+The live docs entry point inside the app is `/docs`. For repo readers, this README is the fastest map to the rest of the project.
 
 A professional-grade algorithmic trading platform inspired by TradingView, built with Next.js, React, and TypeScript.
 
@@ -51,6 +59,46 @@ A professional-grade algorithmic trading platform inspired by TradingView, built
 - **Order Management** - Create, modify, and cancel orders
 - **Risk Controls** - Stop-loss, take-profit, position sizing
 
+## 🧭 Project Navigation
+
+If you need to understand the project quickly, start here:
+
+- Project current state: [docs/current_state_baseline.md](/Users/rmehta01/Sites/mahita/docs/current_state_baseline.md)
+- Website-visible documentation portal: [docs/public/project-overview/how-to-use-this-documentation.md](/Users/rmehta01/Sites/mahita/docs/public/project-overview/how-to-use-this-documentation.md)
+- Senior project report draft: [docs/public/senior-project/report-draft.md](/Users/rmehta01/Sites/mahita/docs/public/senior-project/report-draft.md)
+- Presentation outline: [docs/public/senior-project/presentation-outline.md](/Users/rmehta01/Sites/mahita/docs/public/senior-project/presentation-outline.md)
+- Fast reviewer guide: [docs/public/project-overview/presentation-for-reviewers.md](/Users/rmehta01/Sites/mahita/docs/public/project-overview/presentation-for-reviewers.md)
+- Architecture/codebase map: [docs/internal/guidebook/architecture-map.md](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/architecture-map.md)
+- Auth guidebook: [docs/guidebook/auth/README.md](/Users/rmehta01/Sites/mahita/docs/guidebook/auth/README.md)
+- Local/demo bootstrap: [docs/internal/runbooks/local-bootstrap.md](/Users/rmehta01/Sites/mahita/docs/internal/runbooks/local-bootstrap.md)
+- Presentation-day recovery: [docs/internal/runbooks/presentation-day-recovery.md](/Users/rmehta01/Sites/mahita/docs/internal/runbooks/presentation-day-recovery.md)
+- Post-presentation engineering roadmap: [docs/public/project-overview/post-presentation-recovery-roadmap.md](/Users/rmehta01/Sites/mahita/docs/public/project-overview/post-presentation-recovery-roadmap.md)
+
+## 📁 Repository Layout
+
+Use this map to find the important code and documentation quickly:
+
+- `app/`
+  - Next.js pages, API routes, and UI components
+- `lib/`
+  - shared domain logic for auth, brokerage connections, provider credentials, docs, runtime health, and preferences
+- `docs/public/`
+  - faculty-facing and presentation-facing docs
+- `docs/internal/`
+  - internal guidebooks, evidence, and runbooks
+- `docs/internal/evidence/archive/`
+  - historical notes and external reference captures that informed the project, but are not active runtime code
+- `scripts/`
+  - bootstrap, packaging, seeding, and utility scripts
+- `scripts/diagnostics/`
+  - one-off diagnostics moved out of the repo root so they are easier to find and easier to ignore during normal development
+- `tests/` and `e2e/`
+  - deterministic tests and browser/system tests
+- `prisma/`
+  - schema and local DB files
+- `data/`
+  - local data artifacts such as vault-backed SQLite stores
+
 ## 📁 Project Structure
 
 ```
@@ -86,10 +134,85 @@ mahita/
 │   └── watchlist/                  # Watchlist page
 ├── data/                           
 │   └── vaults/                     # Sandbox area for isolated SQLite db files
-├── docs/                           # Documentation
+├── docs/                           # Documentation, report, wiki, guidebooks, evidence
 ├── prisma/                         # Database schema
 └── public/                         # Static assets
 ```
+
+## 🗂️ Repo Hygiene
+
+To keep the project understandable and portable:
+
+- local runtime artifacts are ignored
+  - local SQLite databases
+  - provider traffic logs
+  - transient test output
+  - local scratch files in `tmp/`
+- historical notes and reference captures live under [docs/internal/evidence/archive](/Users/rmehta01/Sites/mahita/docs/internal/evidence/archive/README.md)
+- ad hoc diagnostics scripts live under `scripts/diagnostics/`
+
+If you add a new research note, one-off diagnostic, or external reference capture, put it in one of those folders instead of the repo root.
+
+## 🔁 Clone, Rebuild, And `gitignore`
+
+If someone clones this repo, the ignored files are exactly the things they should recreate locally rather than pull from git.
+
+### What `gitignore` excludes
+
+- `node_modules/`, `.next/`, `out/`, `build/`
+  - generated dependencies and build output
+- `.env*` except `.env.demo.example`
+  - machine-specific secrets and local environment config
+- `dev.db`, `demo.db`, `prisma/*.db`, `data/vaults/*.db`
+  - local SQLite databases created during development, demo bootstrap, or data caching
+- `logs/*.jsonl`, `test-results/`, `coverage/`, `tmp/`, `next_output.log`
+  - local diagnostics, test artifacts, and scratch output
+- `public/monaco/`
+  - Monaco editor assets generated by the sync script
+- `artifacts/senior-project/`
+  - reproducible presentation outputs that can be rebuilt locally
+
+The goal is simple: a clone should contain the source code, docs, scripts, and seeds needed to rebuild the app, but not stale machine state from someone else’s laptop.
+
+### What works automatically from a fresh clone
+
+For a presentation-safe local demo:
+
+```bash
+npm run bootstrap:demo
+npm run dev
+```
+
+`bootstrap:demo` handles:
+
+- installing dependencies
+- copying `.env.demo.example` to `.env.local`
+- generating Prisma client
+- creating the local demo database
+- seeding demo users, demo workspace data, and docs-ready content
+- syncing Monaco assets needed by the editor
+
+After that, open `http://localhost:6244/docs` or `http://localhost:6244/dashboard` and sign in with one of:
+
+- `owner.demo@mahita.ai`
+- `demo.user@mahita.ai`
+- `reviewer@mahita.ai`
+
+### What still requires manual setup
+
+The demo bootstrap does **not** configure live credentials or public infrastructure.
+
+You still need to set these up manually if you want a live-capable environment:
+
+- Google OAuth credentials for `https://mahita.ai`
+- Schwab Developer Portal Client ID and Client Secret
+- a real public origin or tunnel for production-style auth/callback testing
+- any live market-data/provider configuration
+
+So the short answer is:
+
+- **Demo/presentation mode:** the script handles nearly everything
+- **Live/public mode:** the script gets you the codebase, but you still configure secrets and public auth infrastructure yourself
 
 ## 🚀 Getting Started
 
@@ -106,12 +229,24 @@ git clone https://github.com/yourusername/mahita.git
 cd mahita
 ```
 
-2. **Install dependencies**
+2. **Presentation-safe fast path**
+```bash
+npm run bootstrap:demo
+npm run dev
+```
+
+This is the recommended path for reviewers, demos, and quick onboarding.
+
+3. **Manual development setup**
+
+If you need a custom local/dev setup instead of the presentation-safe bootstrap:
+
+**Install dependencies**
 ```bash
 npm install
 ```
 
-3. **Set up environment variables**
+**Set up environment variables**
 ```bash
 cp .env.example .env.local
 ```
@@ -134,23 +269,23 @@ SCHWAB_CLIENT_SECRET="your_schwab_client_secret"
 SCHWAB_CALLBACK_URL="https://mahita.ai/schwab/callback"
 ```
 
-4. **Initialize the database**
+**Initialize the database**
 ```bash
 npx prisma generate
 npx prisma db push
 ```
 
-5. **Seed market data (optional)**
+**Seed market data (optional)**
 ```bash
 npx tsx scripts/seed-dow30.ts
 ```
 
-6. **Run the development server**
+**Run the development server**
 ```bash
 npm run dev
 ```
 
-7. **Open your browser**
+**Open your browser**
 Navigate to [http://localhost:6244](http://localhost:6244) for local development. Real user sign-in runs on [https://mahita.ai](https://mahita.ai).
 
 Local development uses the dev-bypass flow by default. Do not add `localhost` to your production Google OAuth client unless you are intentionally maintaining a separate local-only OAuth setup.

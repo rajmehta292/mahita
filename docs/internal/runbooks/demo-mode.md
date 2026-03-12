@@ -22,7 +22,7 @@ Demo mode is meant to make Mahita safe to show on any machine without requiring 
 
 ## Demo sign-in emails
 
-- `raj.dmehta292@gmail.com`
+- `owner.demo@mahita.ai`
 - `demo.user@mahita.ai`
 - `reviewer@mahita.ai`
 

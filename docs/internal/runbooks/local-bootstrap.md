@@ -24,6 +24,15 @@ npm run dev
 - Prisma generated and database initialized
 - demo users seeded
 - mock brokerage data enabled
+- presentation-safe docs/wiki content available at `/docs`
+
+## Demo identities
+
+- `owner.demo@mahita.ai`
+- `demo.user@mahita.ai`
+- `reviewer@mahita.ai`
+
+Passwords are not enforced in dev-bypass mode.
 
 ## Intended use
 

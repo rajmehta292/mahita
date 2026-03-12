@@ -1,6 +1,5 @@
-
-import { YahooProvider } from './app/services/market-data/providers/yahoo';
-import { marketDataStore } from './app/services/market-data/store';
+import { YahooProvider } from '../../app/services/market-data/providers/yahoo';
+import { marketDataStore } from '../../app/services/market-data/store';
 
 async function test() {
     try {
