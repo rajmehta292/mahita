@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { InferenceService } from "@/lib/ai/inference"
+import { authOptions } from "@/lib/auth"
 
 export async function POST(req: NextRequest) {
     try {
-        const session = await getServerSession()
+        const session = await getServerSession(authOptions)
         if (!session?.user) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
         }
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Missing messages array" }, { status: 400 })
         }
 
-        const userId = (session.user as any).id || 'default_user'
+        const userId = session.user.id
 
         // Use the centralized InferenceService
         const stream = await InferenceService.chat(userId, {
@@ -34,10 +35,10 @@ export async function POST(req: NextRequest) {
                 'Connection': 'keep-alive',
             }
         })
-    } catch (e: any) {
-        console.error("AI Proxy Error:", e)
+    } catch (error) {
+        console.error("AI Proxy Error:", error)
         return NextResponse.json({
-            error: e.message || "AI Engine connection failed."
+            error: error instanceof Error ? error.message : "AI Engine connection failed."
         }, { status: 503 })
     }
 }

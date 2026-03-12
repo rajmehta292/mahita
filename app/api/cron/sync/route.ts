@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { DataHealthManager } from "@/app/services/market-data/health"
-import { getSchwabClient } from "@/app/services/schwab/client"
 import { Timeframe } from "@/app/services/market-data/types"
+import {
+    allowInsecureUserBrokeragePlatformFallback,
+    getPlatformCredentialIsolationError,
+} from "@/lib/security/platform-security"
+import { getRuntimeSchwabProviderMembers } from "@/lib/provider-credentials"
 
 export async function GET(req: NextRequest) {
     // Basic Cron Security (assuming Vercel or custom header)
@@ -18,7 +22,7 @@ export async function GET(req: NextRequest) {
         await DataHealthManager.refreshInventory()
 
         // 2. Find symbols that need syncing (Health < 95%)
-        const needsSync = await (prisma as any).dataInventory.findMany({
+        const needsSync = await prisma.dataInventory.findMany({
             where: {
                 healthScore: {
                     lt: 95
@@ -31,28 +35,18 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ success: true, message: "All tracked data is fully synced (Health >= 95%)." })
         }
 
-        // 3. Find a user with valid Schwab configs to act as the global data provider
-        // In a production multi-tenant app, you'd decouple system data fetching from user accounts.
-        // For this MVP, we use the first available valid config.
-        const providerConfig = await (prisma as any).schwabConfig.findFirst({
-            where: {
-                accessToken: { not: null },
-                refreshToken: { not: null }
-            }
-        })
-
-        if (!providerConfig && process.env.USE_MOCK_DATA !== 'true') {
-            return NextResponse.json({ error: "No system Schwab connection available to fetch data." }, { status: 400 })
+        if (!allowInsecureUserBrokeragePlatformFallback() && process.env.USE_MOCK_DATA !== 'true') {
+            return NextResponse.json({ error: getPlatformCredentialIsolationError() }, { status: 503 })
         }
 
-        // 4. Initialize Client
-        // We provide the provider's config. If USE_MOCK_DATA=true, the factory handles returning the mock.
-        const client = getSchwabClient(providerConfig ? {
-            clientId: providerConfig.clientId,
-            callbackUrl: `${process.env.NEXTAUTH_URL || 'https://mahita.ai'}/schwab/callback`,
-            accessToken: providerConfig.accessToken,
-            refreshToken: providerConfig.refreshToken || undefined
-        } : { clientId: 'mock', callbackUrl: 'mock' })
+        const providerMembers = await getRuntimeSchwabProviderMembers()
+        if (
+            providerMembers.length === 0 &&
+            !allowInsecureUserBrokeragePlatformFallback() &&
+            process.env.USE_MOCK_DATA !== 'true'
+        ) {
+            return NextResponse.json({ error: getPlatformCredentialIsolationError() }, { status: 503 })
+        }
 
         let totalGapsFixed = 0
         let totalBarsAdded = 0
@@ -73,8 +67,10 @@ export async function GET(req: NextRequest) {
             syncedItems
         })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error("[CRON] Sync Error:", error)
-        return NextResponse.json({ error: error.message || "Internal Server Error" }, { status: 500 })
+        return NextResponse.json({
+            error: error instanceof Error ? error.message : "Internal Server Error"
+        }, { status: 500 })
     }
 }

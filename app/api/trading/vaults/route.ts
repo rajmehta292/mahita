@@ -1,26 +1,17 @@
-import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from '@/lib/auth'
-import { PrismaClient } from '@prisma/client'
+import { NextResponse } from "next/server"
+import prisma from "@/lib/prisma"
+import { requireRouteAccess } from "@/lib/security/platform-security"
 
-const prisma = new PrismaClient()
-
-export async function GET(req: NextRequest) {
-    /*
-    const session = await getServerSession(authOptions)
-
-    if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+export async function GET() {
+    const access = await requireRouteAccess({ policy: "superuser" })
+    if (!access.ok) {
+        return access.response
     }
-    */
 
     try {
-        console.log("[API] Prisma keys:", Object.keys(prisma))
-        console.log("[API] Fetching vaults...")
         const vaults = await prisma.vault.findMany({
             orderBy: { name: 'asc' }
         })
-        console.log(`[API] Found ${vaults.length} vaults`)
         return NextResponse.json(vaults)
     } catch (error) {
         console.error("Vaults Fetch Error:", error)
@@ -30,8 +21,7 @@ export async function GET(req: NextRequest) {
         }
         return NextResponse.json({
             error: "Internal Server Error",
-            details: error instanceof Error ? error.message : String(error),
-            availableModels: Object.keys(prisma)
+            details: error instanceof Error ? error.message : String(error)
         }, { status: 500 })
     }
 }

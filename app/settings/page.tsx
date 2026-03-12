@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { MainLayout } from '../components/Layout/MainLayout'
+import { parseResponseError } from '@/lib/app-errors'
 import {
     Settings as SettingsIcon,
     Key,
@@ -14,35 +15,49 @@ import {
     ExternalLink,
     Activity
 } from 'lucide-react'
+import { SchwabSetupFAQ } from '@/app/components/Auth/SchwabSetupFAQ'
 
 export default function SettingsPage() {
     const [clientId, setClientId] = useState('')
     const [clientSecret, setClientSecret] = useState('')
     const [showClientSecret, setShowClientSecret] = useState(false)
     const [hasConfig, setHasConfig] = useState(false)
-    const [loading, setLoading] = useState(true)
+    const [callbackUrl, setCallbackUrl] = useState<string | null>(null)
     const [saving, setSaving] = useState(false)
     const [testing, setTesting] = useState(false)
+    const [runtimeHint, setRuntimeHint] = useState<string | null>(null)
     const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info', text: string } | null>(null)
 
-    useEffect(() => {
-        fetchConfig()
-    }, [])
+    const maybeSetRuntimeHint = (error: unknown) => {
+        const errorWithHint = error as { hint?: unknown }
+        if (typeof errorWithHint.hint === 'string' && errorWithHint.hint.trim()) {
+            setRuntimeHint(errorWithHint.hint)
+        }
+    }
 
-    const fetchConfig = async () => {
+    const fetchConfig = useCallback(async () => {
         try {
             const response = await fetch('/api/user/schwab-config')
+            if (!response.ok) {
+                throw await parseResponseError(response, 'Mahita could not load your Schwab credentials.')
+            }
             const data = await response.json()
+            setCallbackUrl(data.callbackUrl || null)
 
             if (data.success && data.config) {
                 setHasConfig(data.config.hasClientId && data.config.hasClientSecret)
             }
         } catch (error) {
-            console.error('Failed to fetch config:', error)
-        } finally {
-            setLoading(false)
+            console.warn('Failed to fetch config:', error)
+            const normalized = error instanceof Error ? error : new Error('Failed to fetch config')
+            setMessage({ type: 'error', text: normalized.message })
+            maybeSetRuntimeHint(error)
         }
-    }
+    }, [])
+
+    useEffect(() => {
+        void fetchConfig()
+    }, [fetchConfig])
 
     const handleSave = async () => {
         if (!clientId.trim() || !clientSecret.trim()) {
@@ -52,18 +67,21 @@ export default function SettingsPage() {
 
         setSaving(true)
         setMessage(null)
+        setRuntimeHint(null)
 
         try {
-            console.log('Saving Schwab credentials...')
             const response = await fetch('/api/user/schwab-config', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ clientId, clientSecret })
             })
 
-            console.log('Response status:', response.status)
+            if (!response.ok) {
+                throw await parseResponseError(response, 'Mahita could not save your Schwab credentials.')
+            }
+
             const data = await response.json()
-            console.log('Response data:', data)
+            setCallbackUrl(data.callbackUrl || callbackUrl)
 
             if (data.success) {
                 setMessage({ type: 'success', text: 'Schwab credentials saved successfully!' })
@@ -74,9 +92,14 @@ export default function SettingsPage() {
             } else {
                 setMessage({ type: 'error', text: data.error || 'Failed to save credentials' })
             }
-        } catch (error: any) {
-            console.error('Save error:', error)
-            setMessage({ type: 'error', text: `Failed to save credentials: ${error.message}` })
+        } catch (error) {
+            console.warn('Save error:', error)
+            if (error instanceof Error) {
+                setMessage({ type: 'error', text: error.message })
+                maybeSetRuntimeHint(error)
+                return
+            }
+            setMessage({ type: 'error', text: 'Failed to save credentials.' })
         } finally {
             setSaving(false)
         }
@@ -89,11 +112,16 @@ export default function SettingsPage() {
 
         setSaving(true)
         setMessage(null)
+        setRuntimeHint(null)
 
         try {
             const response = await fetch('/api/user/schwab-config', {
                 method: 'DELETE'
             })
+
+            if (!response.ok) {
+                throw await parseResponseError(response, 'Mahita could not delete your Schwab credentials.')
+            }
 
             const data = await response.json()
 
@@ -105,7 +133,12 @@ export default function SettingsPage() {
                 setMessage({ type: 'error', text: data.error || 'Failed to delete credentials' })
             }
         } catch (error) {
-            setMessage({ type: 'error', text: 'Failed to delete credentials' })
+            if (error instanceof Error) {
+                setMessage({ type: 'error', text: error.message })
+                maybeSetRuntimeHint(error)
+            } else {
+                setMessage({ type: 'error', text: 'Failed to delete credentials' })
+            }
         } finally {
             setSaving(false)
         }
@@ -114,9 +147,13 @@ export default function SettingsPage() {
     const handleTestConnection = async () => {
         setTesting(true)
         setMessage({ type: 'info', text: 'Testing connection to Schwab...' })
+        setRuntimeHint(null)
 
         try {
             const response = await fetch('/api/schwab/accounts')
+            if (!response.ok) {
+                throw await parseResponseError(response, 'Mahita could not test the Schwab connection.')
+            }
             const data = await response.json()
 
             if (data.success) {
@@ -125,8 +162,13 @@ export default function SettingsPage() {
                 const errorDetail = data.details ? `: ${JSON.stringify(data.details)}` : ''
                 setMessage({ type: 'error', text: `Connection failed: ${data.error || 'Unknown error'}${errorDetail}. Please check your keys and re-authenticate.` })
             }
-        } catch (error: any) {
-            setMessage({ type: 'error', text: `Connection failed: ${error.message}` })
+        } catch (error) {
+            if (error instanceof Error) {
+                setMessage({ type: 'error', text: error.message })
+                maybeSetRuntimeHint(error)
+            } else {
+                setMessage({ type: 'error', text: 'Connection failed.' })
+            }
         } finally {
             setTesting(false)
             setTimeout(() => {
@@ -185,8 +227,12 @@ export default function SettingsPage() {
                                                 <li>Visit the <a href="https://beta-developer.schwab.com/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline inline-flex items-center gap-1">Schwab Developer Portal <ExternalLink className="w-3 h-3" /></a></li>
                                                 <li>Create an application and request API access</li>
                                                 <li>Once approved, copy your Client ID and Client Secret</li>
-                                                <li>Paste them below and click Save</li>
+                                                <li>Use <span className="font-mono text-blue-300">{callbackUrl || 'https://mahita.ai/schwab/callback'}</span> as the redirect URI in the Schwab Developer Portal</li>
+                                                <li>Paste the keys below and click Save</li>
                                             </ol>
+                                            <p className="mt-3 text-xs leading-5 text-blue-100/70">
+                                                Google sign-in is only for your Mahita workspace. Schwab Developer keys identify your app, and your real Schwab brokerage login happens later in the Connect Schwab OAuth step.
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
@@ -251,8 +297,14 @@ export default function SettingsPage() {
                                             )}
                                             <p className={`text-sm ${message.type === 'success' ? 'text-green-500' : message.type === 'info' ? 'text-blue-500' : 'text-red-500'
                                                 }`}>
-                                                {message.text}
+                                    {message.text}
                                             </p>
+                                        </div>
+                                    )}
+
+                                    {runtimeHint && (
+                                        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                                            {runtimeHint}
                                         </div>
                                     )}
 
@@ -305,6 +357,10 @@ export default function SettingsPage() {
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <div className="mt-6">
+                            <SchwabSetupFAQ callbackUrl={callbackUrl} compact />
                         </div>
                     </div>
                 </div>

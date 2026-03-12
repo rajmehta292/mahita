@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import {
     ChevronDown,
     ChevronUp,
@@ -9,11 +9,16 @@ import {
     Settings,
     Check,
     Download,
-    Columns,
-    GripVertical
 } from 'lucide-react'
 
-interface Position {
+export interface PositionLot {
+    id?: string
+    openedAt?: string
+    quantity: number
+    averagePrice: number
+}
+
+export interface Position {
     symbol: string
     quantity: number
     averagePrice: number
@@ -22,48 +27,69 @@ interface Position {
     unrealizedPL: number
     unrealizedPLPercent: number
     description?: string // Full name
+    lots?: PositionLot[]
 }
 
 interface PositionTableProps {
     positions: Position[]
     onExport: () => void
     onAction: (symbol: string, side: 'BUY' | 'SELL', amount?: number | 'ALL') => void
+    initialColumns?: ColumnConfig[]
+    onConfigChange?: (config: ColumnConfig[]) => void
 }
 
 type ColumnId = 'ticker' | 'qty_entry' | 'market_profile' | 'performance' | 'actions'
 
-interface ColumnConfig {
+export interface ColumnConfig {
     id: ColumnId
     label: string
     visible: boolean
     order: number
 }
 
-export function PositionTable({ positions, onExport, onAction }: PositionTableProps) {
+const DEFAULT_COLUMNS: ColumnConfig[] = [
+    { id: 'ticker', label: 'Ticker', visible: true, order: 0 },
+    { id: 'qty_entry', label: 'Qty / Avg Price', visible: true, order: 1 },
+    { id: 'market_profile', label: 'Last Price / MV', visible: true, order: 2 },
+    { id: 'performance', label: '% Change / Net', visible: true, order: 3 },
+    { id: 'actions', label: 'Actions', visible: true, order: 4 },
+]
+
+export function PositionTable({
+    positions,
+    onExport,
+    onAction,
+    initialColumns,
+    onConfigChange
+}: PositionTableProps) {
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set())
     const [sortConfig, setSortConfig] = useState<{ key: keyof Position, direction: 'asc' | 'desc' } | null>(null)
-    const [columnConfig, setColumnConfig] = useState<ColumnConfig[]>([
-        { id: 'ticker', label: 'Asset Cluster', visible: true, order: 0 },
-        { id: 'qty_entry', label: 'Qty / Entry', visible: true, order: 1 },
-        { id: 'market_profile', label: 'Market Profile', visible: true, order: 2 },
-        { id: 'performance', label: 'Performance Δ', visible: true, order: 3 },
-        { id: 'actions', label: 'Operations', visible: true, order: 4 },
-    ])
-    const [showSettings, setShowSettings] = useState(false)
-
-    // Load/Save Config
-    useEffect(() => {
-        const saved = localStorage.getItem('mahita_portfolio_columns')
-        if (saved) {
-            try {
-                setColumnConfig(JSON.parse(saved))
-            } catch (e) { }
+    const [columnConfig, setColumnConfig] = useState<ColumnConfig[]>(() => {
+        if (initialColumns && initialColumns.length > 0) {
+            return initialColumns
         }
-    }, [])
+
+        if (typeof window === 'undefined') {
+            return DEFAULT_COLUMNS
+        }
+
+        const saved = window.localStorage.getItem('mahita_portfolio_columns')
+        if (!saved) {
+            return DEFAULT_COLUMNS
+        }
+
+        try {
+            return JSON.parse(saved) as ColumnConfig[]
+        } catch {
+            return DEFAULT_COLUMNS
+        }
+    })
+    const [showSettings, setShowSettings] = useState(false)
 
     const saveConfig = (newConfig: ColumnConfig[]) => {
         setColumnConfig(newConfig)
         localStorage.setItem('mahita_portfolio_columns', JSON.stringify(newConfig))
+        onConfigChange?.(newConfig)
     }
 
     const toggleRow = (symbol: string) => {
@@ -100,7 +126,7 @@ export function PositionTable({ positions, onExport, onAction }: PositionTablePr
             <div className="px-8 py-5 border-b border-[#2A2E39] flex items-center justify-between bg-white/[0.02]">
                 <div className="flex items-center gap-4">
                     <h3 className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-white">
-                        Asset Intelligence
+                        Asset Distribution
                         <span className="text-[10px] bg-blue-500/10 text-blue-500 px-2.5 py-1 rounded-lg border border-blue-500/20">{positions.length} Active</span>
                     </h3>
                 </div>
@@ -219,7 +245,7 @@ export function PositionTable({ positions, onExport, onAction }: PositionTablePr
                             </tr>
                         ) : (
                             sortedPositions.map((pos) => (
-                                <use-fragment key={pos.symbol}>
+                                <Fragment key={pos.symbol}>
                                     <tr
                                         className={`hover:bg-white/[0.03] transition-all group cursor-pointer ${expandedRows.has(pos.symbol) ? 'bg-white/[0.04]' : ''}`}
                                         onClick={() => toggleRow(pos.symbol)}
@@ -247,10 +273,10 @@ export function PositionTable({ positions, onExport, onAction }: PositionTablePr
 
                                                 {col.id === 'qty_entry' && (
                                                     <div className="text-right">
-                                                        <div className="font-bold text-sm text-gray-300">{pos.quantity.toLocaleString()} Shares</div>
-                                                        <div className="text-[10px] text-gray-500 font-bold mt-1 tracking-tighter uppercase tabular-nums">
-                                                            AVG: <span className="text-gray-400">${pos.averagePrice.toFixed(2)}</span>
-                                                        </div>
+                                                            <div className="font-bold text-sm text-gray-300">{pos.quantity.toLocaleString()} Shares</div>
+                                                            <div className="text-[10px] text-gray-500 font-bold mt-1 tracking-tighter uppercase tabular-nums">
+                                                                AVG: <span className="text-gray-400">${pos.averagePrice.toFixed(2)}</span>
+                                                            </div>
                                                     </div>
                                                 )}
 
@@ -266,12 +292,12 @@ export function PositionTable({ positions, onExport, onAction }: PositionTablePr
                                                 {col.id === 'performance' && (
                                                     <div className="text-right">
                                                         <div className={`flex flex-col items-end ${pos.unrealizedPL >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                                            <span className="font-black text-sm tracking-tighter tabular-nums">
-                                                                {pos.unrealizedPL >= 0 ? '+' : ''}${Math.abs(pos.unrealizedPL).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                                            </span>
                                                             <div className="flex items-center gap-1 text-[10px] font-black uppercase mt-1 bg-black/20 px-1.5 py-0.5 rounded border border-white/5 tabular-nums">
                                                                 {pos.unrealizedPLPercent >= 0 ? '+' : ''}{pos.unrealizedPLPercent.toFixed(2)}%
                                                             </div>
+                                                            <span className="font-black text-sm tracking-tighter tabular-nums mt-2">
+                                                                {pos.unrealizedPL >= 0 ? '+' : ''}${Math.abs(pos.unrealizedPL).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                            </span>
                                                         </div>
                                                     </div>
                                                 )}
@@ -285,10 +311,26 @@ export function PositionTable({ positions, onExport, onAction }: PositionTablePr
                                                             Buy
                                                         </button>
                                                         <button
-                                                            onClick={() => onAction(pos.symbol, 'SELL')}
+                                                            onClick={() => onAction(pos.symbol, 'SELL', 'ALL')}
                                                             className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500 text-rose-500 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-rose-500/20"
                                                         >
-                                                            Sell
+                                                            Sell All
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                const response = window.prompt(`Sell how many shares of ${pos.symbol}?`, String(pos.quantity))
+                                                                if (!response) {
+                                                                    return
+                                                                }
+
+                                                                const quantity = Number(response)
+                                                                if (Number.isFinite(quantity) && quantity > 0) {
+                                                                    onAction(pos.symbol, 'SELL', quantity)
+                                                                }
+                                                            }}
+                                                            className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500 text-amber-400 hover:text-white rounded-lg text-[10px] font-black uppercase tracking-widest transition-all border border-amber-500/20"
+                                                        >
+                                                            Sell Custom
                                                         </button>
                                                     </div>
                                                 )}
@@ -301,39 +343,102 @@ export function PositionTable({ positions, onExport, onAction }: PositionTablePr
                                         <tr className="bg-[#131722]/50 animate-in slide-in-from-top-2 duration-300">
                                             <td colSpan={visibleColumns.length} className="px-8 py-6">
                                                 <div className="border-l-2 border-blue-500/50 pl-6 space-y-4">
-                                                    <div className="flex items-center gap-8">
+                                                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                                                         <div>
-                                                            <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Lot Detail</div>
-                                                            <div className="text-xs font-bold text-gray-300">Default Allocation (Standard)</div>
+                                                            <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Active Position Detail</div>
+                                                            <div className="overflow-hidden rounded-2xl border border-[#2A2E39]">
+                                                                <table className="min-w-[420px] text-left text-xs">
+                                                                    <thead className="bg-[#0F1218] text-[10px] uppercase tracking-widest text-gray-500">
+                                                                        <tr>
+                                                                            <th className="px-4 py-3">Position</th>
+                                                                            <th className="px-4 py-3 text-right">Qty</th>
+                                                                            <th className="px-4 py-3 text-right">Avg Price</th>
+                                                                            <th className="px-4 py-3 text-right">Last Price</th>
+                                                                            <th className="px-4 py-3 text-right">Market Value</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        {(pos.lots && pos.lots.length > 0 ? pos.lots : [
+                                                                            {
+                                                                                id: `${pos.symbol}-aggregate`,
+                                                                                quantity: pos.quantity,
+                                                                                averagePrice: pos.averagePrice,
+                                                                            }
+                                                                        ]).map((lot, index) => (
+                                                                            <tr key={lot.id ?? `${pos.symbol}-${index}`} className="border-t border-[#2A2E39]">
+                                                                                <td className="px-4 py-3 text-gray-300">
+                                                                                    {lot.openedAt ? new Date(lot.openedAt).toLocaleString() : 'Current Holding'}
+                                                                                </td>
+                                                                                <td className="px-4 py-3 text-right font-mono text-white">{lot.quantity.toLocaleString()}</td>
+                                                                                <td className="px-4 py-3 text-right font-mono text-white">${lot.averagePrice.toFixed(2)}</td>
+                                                                                <td className="px-4 py-3 text-right font-mono text-white">${pos.currentPrice.toFixed(2)}</td>
+                                                                                <td className="px-4 py-3 text-right font-mono text-white">${(lot.quantity * pos.currentPrice).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
                                                         </div>
-                                                        <div>
-                                                            <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Exposure</div>
-                                                            <div className="text-xs font-bold text-emerald-500">Tier 1 Core</div>
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Last Sync</div>
-                                                            <div className="text-xs font-bold text-gray-300 font-mono">2026-03-10 14:15:02</div>
+
+                                                        <div className="min-w-[220px] rounded-2xl border border-[#2A2E39] bg-[#11141B] p-4">
+                                                            <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-3">Position Snapshot</div>
+                                                            <div className="space-y-2 text-xs">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-gray-500">Avg Price</span>
+                                                                    <span className="font-mono text-white">${pos.averagePrice.toFixed(2)}</span>
+                                                                </div>
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-gray-500">Last Price</span>
+                                                                    <span className="font-mono text-white">${pos.currentPrice.toFixed(2)}</span>
+                                                                </div>
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-gray-500">Market Value</span>
+                                                                    <span className="font-mono text-white">${pos.marketValue.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                                                </div>
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-gray-500">Net Since Purchase</span>
+                                                                    <span className={`font-mono ${pos.unrealizedPL >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                                        {pos.unrealizedPL >= 0 ? '+' : '-'}${Math.abs(pos.unrealizedPL).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <div className="flex gap-2">
+                                                    <div className="flex flex-wrap gap-2">
                                                         <button
                                                             onClick={() => onAction(pos.symbol, 'SELL', 'ALL')}
                                                             className="px-4 py-2 bg-[#2A2E39] hover:bg-rose-500/20 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border border-[#3B4050]"
                                                         >
-                                                            Liquidate All
+                                                            Sell All
                                                         </button>
                                                         <button
-                                                            onClick={() => onAction(pos.symbol, 'BUY', 100)}
+                                                            onClick={() => onAction(pos.symbol, 'BUY')}
                                                             className="px-4 py-2 bg-[#2A2E39] hover:bg-blue-500/20 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border border-[#3B4050]"
                                                         >
-                                                            Scale +$100
+                                                            Buy More
+                                                        </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                const response = window.prompt(`Sell how many shares of ${pos.symbol}?`, String(pos.quantity))
+                                                                if (!response) {
+                                                                    return
+                                                                }
+
+                                                                const quantity = Number(response)
+                                                                if (Number.isFinite(quantity) && quantity > 0) {
+                                                                    onAction(pos.symbol, 'SELL', quantity)
+                                                                }
+                                                            }}
+                                                            className="px-4 py-2 bg-[#2A2E39] hover:bg-amber-500/20 text-white rounded-xl text-[10px] font-bold uppercase tracking-widest transition-all border border-[#3B4050]"
+                                                        >
+                                                            Sell Custom
                                                         </button>
                                                     </div>
                                                 </div>
                                             </td>
                                         </tr>
                                     )}
-                                </use-fragment>
+                                </Fragment>
                             ))
                         )}
                     </tbody>

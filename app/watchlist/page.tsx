@@ -1,27 +1,45 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession, signIn } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import { MainLayout } from '../components/Layout/MainLayout'
-import { Star, Plus, Trash2, TrendingUp, TrendingDown } from 'lucide-react'
+import { Plus, Trash2, TrendingUp, TrendingDown } from 'lucide-react'
+import { useUserPreferences } from '../hooks/use-user-preferences'
+import { parseStoredStringArray, serializeStringArray } from '@/lib/preferences-serialization'
+import { AuthEntryCta } from '../components/Auth/AuthEntryCta'
+
+interface WatchlistQuote {
+    symbol: string
+    name?: string
+    price?: number
+    change?: number
+    changePercent?: number
+}
 
 export default function WatchlistPage() {
     const { data: session, status } = useSession()
     const [symbols, setSymbols] = useState<string[]>(['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'BTC-USD', 'NVDA'])
-    const [quotes, setQuotes] = useState<any[]>([])
+    const [quotes, setQuotes] = useState<WatchlistQuote[]>([])
     const [newSymbol, setNewSymbol] = useState('')
     const [isAdding, setIsAdding] = useState(false)
     const [isLoading, setIsLoading] = useState(true)
+    const { preferences, updatePreferences } = useUserPreferences()
 
     // Load saved symbols
     useEffect(() => {
+        const preferenceSymbols = parseStoredStringArray(preferences?.watchlistSymbols)
+        if (preferenceSymbols.length > 0) {
+            setSymbols(preferenceSymbols)
+            return
+        }
+
         const saved = localStorage.getItem('mahita_watchlist')
         if (saved) {
             try {
                 setSymbols(JSON.parse(saved))
-            } catch (e) { }
+            } catch { }
         }
-    }, [])
+    }, [preferences?.watchlistSymbols])
 
     // Poll live quotes
     useEffect(() => {
@@ -36,10 +54,10 @@ export default function WatchlistPage() {
                 const res = await fetch(`/api/trading/quotes?symbols=${symbols.join(',')}`)
                 const data = await res.json()
                 if (data.success) {
-                    setQuotes(data.quotes)
+                    setQuotes(data.quotes as WatchlistQuote[])
                 }
             } catch (error) {
-                console.error("Failed to fetch watchlist quotes", error)
+                console.warn("Failed to fetch watchlist quotes", error)
             } finally {
                 setIsLoading(false)
             }
@@ -56,6 +74,11 @@ export default function WatchlistPage() {
             const up = [...symbols, newSymbol.trim().toUpperCase()]
             setSymbols(up)
             localStorage.setItem('mahita_watchlist', JSON.stringify(up))
+            updatePreferences({
+                watchlistSymbols: serializeStringArray(up),
+            }).catch((error) => {
+                console.warn('Failed to persist watchlist symbols:', error)
+            })
         }
         setNewSymbol('')
         setIsAdding(false)
@@ -65,6 +88,11 @@ export default function WatchlistPage() {
         const up = symbols.filter(s => s !== sym)
         setSymbols(up)
         localStorage.setItem('mahita_watchlist', JSON.stringify(up))
+        updatePreferences({
+            watchlistSymbols: serializeStringArray(up),
+        }).catch((error) => {
+            console.warn('Failed to persist watchlist symbols:', error)
+        })
     }
 
     if (status === 'loading') {
@@ -81,12 +109,7 @@ export default function WatchlistPage() {
         return (
             <MainLayout showBottomPanel={false}>
                 <div className="flex items-center justify-center h-full">
-                    <button
-                        onClick={() => signIn('google')}
-                        className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-                    >
-                        Sign in with Google
-                    </button>
+                    <AuthEntryCta className="bg-blue-500 hover:bg-blue-600 text-white" />
                 </div>
             </MainLayout>
         )
@@ -146,13 +169,13 @@ export default function WatchlistPage() {
                                     <div className="flex items-end justify-between">
                                         <div>
                                             <div className="text-white text-2xl font-bold">${(item.price || 0).toFixed(2)}</div>
-                                            <div className={`flex items-center gap-1 text-sm ${item.change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                                {item.change >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                                                <span>{item.change >= 0 ? '+' : ''}{(item.change || 0).toFixed(2)} ({(item.changePercent || 0).toFixed(2)}%)</span>
+                                            <div className={`flex items-center gap-1 text-sm ${(item.change ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                                {(item.change ?? 0) >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                                                <span>{(item.change ?? 0) >= 0 ? '+' : ''}{(item.change || 0).toFixed(2)} ({(item.changePercent || 0).toFixed(2)}%)</span>
                                             </div>
                                         </div>
-                                        <a href={`/data-doctor?symbol=${item.symbol}`} className="px-3 py-1.5 bg-[#2A2E39] hover:bg-blue-500 text-white text-xs rounded transition-colors whitespace-nowrap">
-                                            Commands
+                                        <a href={`/chart?symbol=${item.symbol}&timeframe=1d`} className="px-3 py-1.5 bg-[#2A2E39] hover:bg-blue-500 text-white text-xs rounded transition-colors whitespace-nowrap">
+                                            Open Chart
                                         </a>
                                     </div>
                                 </div>

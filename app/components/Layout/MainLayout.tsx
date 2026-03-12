@@ -4,6 +4,7 @@ import { ReactNode, useState } from 'react'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
 import { BottomPanel } from './BottomPanel'
+import { SessionActivityTracker } from '@/app/components/Auth/SessionActivityTracker'
 
 interface MainLayoutProps {
     children: ReactNode
@@ -15,6 +16,7 @@ export function MainLayout({ children, showBottomPanel = true }: MainLayoutProps
 
     return (
         <div className="flex flex-col h-screen w-screen overflow-hidden bg-[#131722]">
+            <SessionActivityTracker />
             <TopBar onMenuClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} />
             <div className="flex flex-1 overflow-hidden relative">
                 <Sidebar

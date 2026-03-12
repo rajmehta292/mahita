@@ -1,12 +1,14 @@
 # 02 - Authentication and Security Blueprint
 
+Status: Historical blueprint. Superseded in practice by [docs/current_state_baseline.md](/Users/rmehta01/Sites/mahita/docs/current_state_baseline.md), [docs/execution/mahita_recovery_program.md](/Users/rmehta01/Sites/mahita/docs/execution/mahita_recovery_program.md), and [docs/security/enterprise_security_program.md](/Users/rmehta01/Sites/mahita/docs/security/enterprise_security_program.md).
+
 ## Executive Summary
 This document details the critical security implementations for safeguarding brokerage access and the application backend since it operates via a public DNS address.
 
 ## 1. Authentication Configuration
 *   **Provider**: NextAuth.js employing strictly Google OAuth.
 *   **White-label Execution**: The `signIn` NextAuth callback must strictly validate the `profile.email` against a single environment variable `ALLOWED_EMAIL` representing the sole system owner. All other authenticated Google profiles must be unequivocally rejected (return `false`).
-*   **Middleware Protection**: An edge `middleware.ts` must enforce session tokens for all paths matching `/dashboard/*` or `/api/trading/*`.
+*   **Route Protection**: An edge `proxy.ts` should enforce authenticated access to protected product and API surfaces.
 
 ## 2. Broker Keys & Secrets
 *   **Cardinal Rule**: Platform API Keys (Schwab, Alpaca) must **NEVER** be persisted in the standard database schema (SQLite/Postgres).

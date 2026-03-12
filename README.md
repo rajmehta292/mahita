@@ -1,5 +1,7 @@
 # Mahita Terminal 🚀
 
+The canonical project story, senior-project docs, and live wiki now live in the site-visible Documentation section at `/docs`. For repo readers, the main current-state sources are [docs/current_state_baseline.md](/Users/rmehta01/Sites/mahita/docs/current_state_baseline.md) and [docs/guidebook/auth/README.md](/Users/rmehta01/Sites/mahita/docs/guidebook/auth/README.md).
+
 A professional-grade algorithmic trading platform inspired by TradingView, built with Next.js, React, and TypeScript.
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
@@ -117,16 +119,19 @@ cp .env.example .env.local
 Edit `.env.local` with your credentials:
 ```env
 DATABASE_URL="file:./dev.db"
+NEXTAUTH_SECRET="your_nextauth_secret"
+MAHITA_PUBLIC_APP_ORIGIN="https://mahita.ai"
+ENABLE_DEV_AUTH_BYPASS="true"
+
+# Production Google auth on mahita.ai only
 GOOGLE_CLIENT_ID="your_google_client_id"
 GOOGLE_CLIENT_SECRET="your_google_client_secret"
-NEXTAUTH_SECRET="your_nextauth_secret"
-NEXTAUTH_URL="http://mahita.ai"
-ALLOWED_EMAIL="your@email.com"
+NEXTAUTH_URL="https://mahita.ai"
 
 # Optional: For live trading with Schwab
 SCHWAB_CLIENT_ID="your_schwab_client_id"
 SCHWAB_CLIENT_SECRET="your_schwab_client_secret"
-SCHWAB_CALLBACK_URL="http://mahita.ai/schwab/callback"
+SCHWAB_CALLBACK_URL="https://mahita.ai/schwab/callback"
 ```
 
 4. **Initialize the database**
@@ -146,14 +151,17 @@ npm run dev
 ```
 
 7. **Open your browser**
-Navigate to [http://mahita.ai](http://mahita.ai)
+Navigate to [http://localhost:6244](http://localhost:6244) for local development. Real user sign-in runs on [https://mahita.ai](https://mahita.ai).
+
+Local development uses the dev-bypass flow by default. Do not add `localhost` to your production Google OAuth client unless you are intentionally maintaining a separate local-only OAuth setup.
 
 ## 📖 Usage
 
 ### Authentication
-1. Click "Sign in with Google"
-2. Authorize the application
-3. Access the trading terminal
+1. Use Google sign-in on `https://mahita.ai` to access your Mahita workspace
+2. Local development uses the dev-bypass flow by default
+3. After signing into Mahita, save your Schwab developer app keys in Settings
+4. Use the Schwab OAuth connect flow later to authorize your real brokerage account
 
 ### Charting
 1. Navigate to **Chart** from the sidebar

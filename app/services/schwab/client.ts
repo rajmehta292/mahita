@@ -39,10 +39,26 @@ export interface Position {
 
 export interface AccountBalance {
   cashBalance: number
+  cashAndCashInvestments: number
   equity: number
+  liquidationValue: number
   buyingPower: number
   dayTradingBuyingPower: number
   maintenanceRequirement: number
+  longMarketValue: number
+  shortMarketValue: number
+  moneyMarketFund: number
+  netChange: number
+}
+
+function toNumericValue(...values: unknown[]) {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) {
+      return value
+    }
+  }
+
+  return 0
 }
 
 export class SchwabClient {
@@ -93,9 +109,10 @@ export class SchwabClient {
     return { data: await response.json() }
   }
 
-  getAuthorizationUrl(): string {
+  getAuthorizationUrl(options?: { state?: string }): string {
     const scopes = encodeURIComponent('readonly trading')
-    return `https://api.schwabapi.com/v1/oauth/authorize?response_type=code&client_id=${this.config.clientId}&redirect_uri=${encodeURIComponent(this.config.callbackUrl)}&scope=${scopes}`
+    const state = options?.state ? `&state=${encodeURIComponent(options.state)}` : ''
+    return `https://api.schwabapi.com/v1/oauth/authorize?response_type=code&client_id=${this.config.clientId}&redirect_uri=${encodeURIComponent(this.config.callbackUrl)}&scope=${scopes}${state}`
   }
 
   /**
@@ -228,13 +245,52 @@ export class SchwabClient {
   async getBalance(accountId: string): Promise<AccountBalance> {
     const response = await this.request(`${this.traderUrl}/accounts/${accountId}`)
     const balances = response.data?.securitiesAccount?.currentBalances || {}
+    const initialBalances = response.data?.securitiesAccount?.initialBalances || {}
+    const projectedBalances = response.data?.securitiesAccount?.projectedBalances || {}
+    const cashBalance = toNumericValue(
+      balances.cashBalance,
+      balances.availableFunds,
+      balances.cashAvailableForTrading
+    )
+    const moneyMarketFund = toNumericValue(
+      balances.moneyMarketFund,
+      balances.cashAvailableForWithdrawal
+    )
+    const longMarketValue = toNumericValue(
+      balances.longMarketValue,
+      balances.marketValue
+    )
+    const shortMarketValue = toNumericValue(balances.shortMarketValue)
+    const equity = toNumericValue(
+      balances.equity,
+      balances.accountValue,
+      balances.netLiquidationValue
+    )
+    const liquidationValue = toNumericValue(
+      balances.liquidationValue,
+      balances.netLiquidationValue,
+      equity + cashBalance + moneyMarketFund + longMarketValue - shortMarketValue,
+      equity
+    )
+    const netChange = toNumericValue(
+      balances.netChange,
+      projectedBalances.netChange,
+      projectedBalances.todayNetChange,
+      liquidationValue - toNumericValue(initialBalances.liquidationValue, initialBalances.accountValue)
+    )
 
     return {
-      cashBalance: balances.cashBalance || 0,
-      equity: balances.equity || 0,
-      buyingPower: balances.buyingPower || 0,
-      dayTradingBuyingPower: balances.dayTradingBuyingPower || 0,
-      maintenanceRequirement: balances.maintenanceRequirement || 0,
+      cashBalance,
+      cashAndCashInvestments: cashBalance + moneyMarketFund,
+      equity,
+      liquidationValue,
+      buyingPower: toNumericValue(balances.buyingPower),
+      dayTradingBuyingPower: toNumericValue(balances.dayTradingBuyingPower),
+      maintenanceRequirement: toNumericValue(balances.maintenanceRequirement),
+      longMarketValue,
+      shortMarketValue,
+      moneyMarketFund,
+      netChange,
     }
   }
 
@@ -372,8 +428,9 @@ export class MockSchwabClient extends SchwabClient {
     super(config)
   }
 
-  getAuthorizationUrl(): string {
-    return `${this['config'].callbackUrl}?code=mock_auth_code_12345`
+  getAuthorizationUrl(options?: { state?: string }): string {
+    const state = options?.state ? `&state=${encodeURIComponent(options.state)}` : ''
+    return `${this['config'].callbackUrl}?code=mock_auth_code_12345${state}`
   }
 
   async authenticate(authorizationCode: string): Promise<SchwabAuthResponse> {
@@ -395,9 +452,14 @@ export class MockSchwabClient extends SchwabClient {
           currentBalances: {
             cashBalance: 25000.00,
             equity: 105000.00,
+            liquidationValue: 105000.00,
+            netChange: 1245.00,
             buyingPower: 210000.00,
             dayTradingBuyingPower: 420000.00,
-            maintenanceRequirement: 15000.00
+            maintenanceRequirement: 15000.00,
+            longMarketValue: 80000.00,
+            shortMarketValue: 0,
+            moneyMarketFund: 5000.00,
           }
         }
       }
@@ -414,6 +476,8 @@ export class MockSchwabClient extends SchwabClient {
             currentBalances: {
               cashBalance: 25000.00,
               equity: 105000.00,
+              liquidationValue: 105000.00,
+              netChange: 1245.00,
               buyingPower: 210000.00
             }
           }
@@ -450,10 +514,16 @@ export class MockSchwabClient extends SchwabClient {
     const balances = res.data.securitiesAccount.currentBalances
     return {
       cashBalance: balances.cashBalance,
+      cashAndCashInvestments: balances.cashBalance + (balances.moneyMarketFund || 0),
       equity: balances.equity,
+      liquidationValue: balances.liquidationValue || balances.equity,
       buyingPower: balances.buyingPower,
       dayTradingBuyingPower: balances.dayTradingBuyingPower,
-      maintenanceRequirement: balances.maintenanceRequirement
+      maintenanceRequirement: balances.maintenanceRequirement,
+      longMarketValue: balances.longMarketValue || 0,
+      shortMarketValue: balances.shortMarketValue || 0,
+      moneyMarketFund: balances.moneyMarketFund || 0,
+      netChange: balances.netChange || 1245,
     }
   }
 

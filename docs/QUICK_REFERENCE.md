@@ -1,5 +1,7 @@
 # Mahita Terminal - Quick Reference Guide
 
+Status: Historical quick reference. For the current auth/origin/brokerage model, use [docs/guidebook/auth/README.md](/Users/rmehta01/Sites/mahita/docs/guidebook/auth/README.md).
+
 ## 🚀 Quick Start
 
 ### First Time Setup
@@ -22,7 +24,7 @@ npm run dev
 ```
 
 ### Access URLs
-- **Local**: http://mahita.ai
+- **Local**: http://localhost:6244
 - **Production**: https://mahita.ai
 
 ## 📱 Pages Overview
@@ -47,7 +49,7 @@ DATABASE_URL="file:./dev.db"
 GOOGLE_CLIENT_ID="your_google_client_id"
 GOOGLE_CLIENT_SECRET="your_google_client_secret"
 NEXTAUTH_SECRET="your_nextauth_secret"
-NEXTAUTH_URL="http://mahita.ai"
+NEXTAUTH_URL="https://mahita.ai"
 ALLOWED_EMAIL="your@email.com"
 ```
 
@@ -55,7 +57,7 @@ ALLOWED_EMAIL="your@email.com"
 ```env
 SCHWAB_CLIENT_ID="your_schwab_client_id"
 SCHWAB_CLIENT_SECRET="your_schwab_client_secret"
-SCHWAB_CALLBACK_URL="http://mahita.ai/schwab/callback"
+SCHWAB_CALLBACK_URL="https://mahita.ai/schwab/callback"
 ```
 
 ## 🎨 Key Features

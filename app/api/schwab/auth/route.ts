@@ -1,22 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { getSchwabClient, initializeSchwabClient } from '@/app/services/schwab/client'
-import prisma from '@/lib/prisma'
+import { getAppServerSession, getCurrentUser } from '@/lib/server-session'
+import {
+  getInteractiveSchwabOAuthConfig,
+} from '@/lib/schwab-config'
+import {
+  issueBrokerageAuthorizationState,
+  persistBrokerageConnectionTokens,
+  requireUserSchwabBrokerageConnection,
+  validateBrokerageAuthorizationState,
+} from '@/lib/brokerage-connections'
+import { toErrorResponse } from '@/lib/route-errors'
+import { getRequestOriginFromHeaders } from '@/lib/auth-environment'
 
 export async function GET(request: NextRequest) {
   try {
-    let session: any = await getServerSession(authOptions)
-
-    // DEV BYPASS
-    if (!session && process.env.NODE_ENV === 'development') {
-      session = { user: { email: 'dev@mahita.ai' } }
-      await prisma.user.upsert({
-        where: { email: 'dev@mahita.ai' },
-        create: { email: 'dev@mahita.ai', name: 'Dev User' },
-        update: {}
-      })
-    }
+    const session = await getAppServerSession()
 
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -25,83 +24,94 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams
     const action = searchParams.get('action')
 
-    // Get user's Schwab config
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { schwabConfig: true }
-    })
+    const user = await getCurrentUser(session)
 
-    if (!user || !user.schwabConfig) {
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const resolved = await requireUserSchwabBrokerageConnection(user.id).catch(() => null)
+
+    if (!resolved) {
       return NextResponse.json(
         { error: 'Schwab credentials not configured. Please add your API keys in Settings.' },
         { status: 400 }
       )
     }
+    const { connection, config } = resolved
+    const { clientId, clientSecret } = config
 
-    const { clientId, clientSecret } = user.schwabConfig
-
-    // Robust Callback URL detection - prefer NEXTAUTH_URL for consistent redirect URIs
-    const nextAuthUrl = process.env.NEXTAUTH_URL
-    const callbackUrl = nextAuthUrl
-      ? `${nextAuthUrl.replace(/\/$/, '')}/schwab/callback`
-      : `${request.headers.get('x-forwarded-proto') || 'https'}://${request.headers.get('host') || 'mahita.ai'}/schwab/callback`
+    const requestOrigin = getRequestOriginFromHeaders(request.headers)
+    const interactiveOAuth = getInteractiveSchwabOAuthConfig(requestOrigin)
+    const callbackUrl = interactiveOAuth.callbackUrl
 
     console.log(`[Schwab Auth] Using dynamic authorize callback: ${callbackUrl}`)
 
     // Initialize client with user's credentials
     const client = initializeSchwabClient({
       clientId,
-      clientSecret,
+      clientSecret: clientSecret || undefined,
       callbackUrl,
     })
 
     if (action === 'authorize') {
+      if (!interactiveOAuth.supported) {
+        return NextResponse.json(
+          {
+            error: interactiveOAuth.reason,
+            callbackUrl: interactiveOAuth.callbackUrl,
+            interactiveOAuthSupported: false,
+          },
+          { status: 400 }
+        )
+      }
+
       // Return authorization URL
-      const authUrl = client.getAuthorizationUrl()
-      return NextResponse.json({ authUrl })
+      const state = await issueBrokerageAuthorizationState(connection.id)
+      const authUrl = client.getAuthorizationUrl({ state })
+      return NextResponse.json({
+        authUrl,
+        state,
+        connectionId: connection.id,
+        callbackUrl,
+        interactiveOAuthSupported: true,
+      })
     }
 
     if (action === 'status' || !action) {
-      const isConnected = !!user.schwabConfig.accessToken && !!user.schwabConfig.refreshToken
-      const isExpired = user.schwabConfig.accessTokenExpiry && (user.schwabConfig.accessTokenExpiry.getTime() - Date.now() < 0)
+      const isConnected = Boolean(config.accessToken) && Boolean(config.refreshToken)
+      const isExpired = config.accessTokenExpiry && (config.accessTokenExpiry.getTime() - Date.now() < 0)
 
       return NextResponse.json({
         isConnected,
         isExpired,
-        tokenExpiry: user.schwabConfig.accessTokenExpiry
+        tokenExpiry: config.accessTokenExpiry,
+        connectionId: connection.id,
+        connectionStatus: connection.status,
+        callbackUrl,
+        interactiveOAuthSupported: interactiveOAuth.supported,
+        interactiveOAuthReason: interactiveOAuth.reason,
+        isPendingAuthorization: Boolean(connection.pendingAuthState),
+        pendingAuthStartedAt: connection.pendingAuthStartedAt,
       })
     }
 
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
-  } catch (error: any) {
-    console.error('Schwab auth error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to process auth request' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    return toErrorResponse(error, 'Mahita could not start the Schwab authorization flow.')
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    let session: any = await getServerSession(authOptions)
-
-    // DEV BYPASS
-    if (!session && process.env.NODE_ENV === 'development') {
-      session = { user: { email: 'dev@mahita.ai' } }
-      await prisma.user.upsert({
-        where: { email: 'dev@mahita.ai' },
-        create: { email: 'dev@mahita.ai', name: 'Dev User' },
-        update: {}
-      })
-    }
+    const session = await getAppServerSession()
 
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await request.json()
-    const { code } = body
+    const { code, state } = body
 
     if (!code) {
       return NextResponse.json(
@@ -110,30 +120,39 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get user's Schwab config
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { schwabConfig: true }
-    })
+    const user = await getCurrentUser(session)
 
-    if (!user || !user.schwabConfig) {
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const resolved = await requireUserSchwabBrokerageConnection(user.id).catch(() => null)
+
+    if (!resolved) {
       return NextResponse.json(
         { error: 'Schwab credentials not configured' },
         { status: 400 }
       )
     }
+    const { connection, config } = resolved
+    const { clientId, clientSecret } = config
 
-    const { clientId, clientSecret } = user.schwabConfig
+    await validateBrokerageAuthorizationState({
+      brokerageConnectionId: connection.id,
+      state,
+    })
 
-    // Robust Callback URL detection - prefer NEXTAUTH_URL for consistent redirect URIs
-    const nextAuthUrl = process.env.NEXTAUTH_URL
-    const callbackUrl = nextAuthUrl
-      ? `${nextAuthUrl.replace(/\/$/, '')}/schwab/callback`
-      : `${request.headers.get('x-forwarded-proto') || 'https'}://${request.headers.get('host') || 'mahita.ai'}/schwab/callback`
+    const requestOrigin = getRequestOriginFromHeaders(request.headers)
+    const interactiveOAuth = getInteractiveSchwabOAuthConfig(requestOrigin)
+    const callbackUrl = interactiveOAuth.callbackUrl
 
     console.log(`[Schwab Auth] Using dynamic exchange callback: ${callbackUrl}`)
 
-    const client = getSchwabClient({ clientId, clientSecret, callbackUrl })
+    const client = getSchwabClient({
+      clientId,
+      clientSecret: clientSecret || undefined,
+      callbackUrl,
+    })
     const authResponse = await client.authenticate(code)
 
     // Calculate expiry times
@@ -141,16 +160,12 @@ export async function POST(request: NextRequest) {
     const accessTokenExpiry = new Date(now.getTime() + (authResponse.expires_in || 1800) * 1000)
     const refreshTokenExpiry = new Date(now.getTime() + (authResponse.refresh_token_expires_in || 604800) * 1000)
 
-    // Store tokens in database
-    await prisma.schwabConfig.update({
-      where: { userId: user.id },
-      data: {
-        accessToken: authResponse.access_token,
-        refreshToken: authResponse.refresh_token,
-        accessTokenExpiry,
-        refreshTokenExpiry,
-        updatedAt: new Date(),
-      }
+    await persistBrokerageConnectionTokens({
+      brokerageConnectionId: connection.id,
+      accessToken: authResponse.access_token,
+      refreshToken: authResponse.refresh_token,
+      accessTokenExpiry,
+      refreshTokenExpiry,
     })
 
     // Debug: Decode the token payload to verify scopes (it's a JWT)
@@ -163,19 +178,16 @@ export async function POST(request: NextRequest) {
           console.log('[Schwab Auth] Access Token Decoded Scopes:', payloadInfo.scp || payloadInfo.scope || 'No scope field')
         }
       }
-    } catch (decodeErr) {
-      console.log('[Schwab Auth] Could not decode access token payload:', decodeErr)
+    } catch (decodeError) {
+      console.log('[Schwab Auth] Could not decode access token payload:', decodeError)
     }
 
     return NextResponse.json({
       success: true,
       message: 'Authentication successful. Tokens saved.',
+      connectionId: connection.id,
     })
-  } catch (error: any) {
-    console.error('Schwab authentication error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to authenticate' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    return toErrorResponse(error, 'Failed to complete Schwab authorization.')
   }
 }

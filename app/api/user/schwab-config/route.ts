@@ -1,29 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import prisma from '@/lib/prisma'
+import { getAppServerSession, getCurrentUser } from '@/lib/server-session'
+import {
+  deleteUserSchwabCredentials,
+  ensureUserSchwabBrokerageConnection,
+  saveUserSchwabCredentials,
+} from '@/lib/brokerage-connections'
+import { toErrorResponse } from '@/lib/route-errors'
+import { getSchwabCallbackUrl, resolveSchwabConfig } from '@/lib/schwab-config'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    let session: any = await getServerSession(authOptions)
-
-    // DEV BYPASS
-    if (!session && process.env.NODE_ENV === 'development') {
-      session = { user: { email: 'dev@mahita.ai' } }
-      await prisma.user.upsert({
-        where: { email: 'dev@mahita.ai' },
-        create: { email: 'dev@mahita.ai', name: 'Dev User' },
-        update: {}
-      })
-    }
+    const session = await getAppServerSession()
 
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const callbackUrl = getSchwabCallbackUrl()
+
     if (process.env.USE_MOCK_DATA === 'true') {
       return NextResponse.json({
         success: true,
+        callbackUrl,
         config: {
           hasClientId: true,
           hasClientSecret: true,
@@ -35,56 +33,59 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { schwabConfig: true }
-    })
+    const user = await getCurrentUser(session)
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Return config without sensitive tokens
-    if (user.schwabConfig) {
+    const connection = await ensureUserSchwabBrokerageConnection(user.id)
+
+    if (connection?.linkedSchwabConfig) {
+      const config = resolveSchwabConfig(connection.linkedSchwabConfig)
       return NextResponse.json({
         success: true,
+        callbackUrl,
         config: {
-          hasClientId: !!user.schwabConfig.clientId,
-          hasClientSecret: !!user.schwabConfig.clientSecret,
-          hasAccessToken: !!user.schwabConfig.accessToken,
-          hasRefreshToken: !!user.schwabConfig.refreshToken,
-          accessTokenExpiry: user.schwabConfig.accessTokenExpiry,
-          refreshTokenExpiry: user.schwabConfig.refreshTokenExpiry,
-        }
+          hasClientId: !!config.clientId,
+          hasClientSecret: !!config.clientSecret,
+          hasAccessToken: !!config.accessToken,
+          hasRefreshToken: !!config.refreshToken,
+          accessTokenExpiry: config.accessTokenExpiry,
+          refreshTokenExpiry: config.refreshTokenExpiry,
+        },
+        connection: {
+          id: connection.id,
+          status: connection.status,
+          lastSyncedAt: connection.lastSyncedAt,
+          lastError: connection.lastError,
+          accountCount: connection.accounts.length,
+        },
       })
     }
 
     return NextResponse.json({
       success: true,
-      config: null
+      callbackUrl,
+      config: null,
+      connection: connection
+        ? {
+            id: connection.id,
+            status: connection.status,
+            lastSyncedAt: connection.lastSyncedAt,
+            lastError: connection.lastError,
+            accountCount: connection.accounts.length,
+          }
+        : null,
     })
-  } catch (error: any) {
-    console.error('Get Schwab config error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to get config' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    return toErrorResponse(error, 'Mahita could not load your Schwab credentials.')
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    let session: any = await getServerSession(authOptions)
-
-    // DEV BYPASS
-    if (!session && process.env.NODE_ENV === 'development') {
-      session = { user: { email: 'dev@mahita.ai' } }
-      await prisma.user.upsert({
-        where: { email: 'dev@mahita.ai' },
-        create: { email: 'dev@mahita.ai', name: 'Dev User' },
-        update: {}
-      })
-    }
+    const session = await getAppServerSession()
 
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -94,15 +95,7 @@ export async function POST(request: NextRequest) {
     const clientId = body.clientId?.trim()
     const clientSecret = body.clientSecret?.trim()
 
-    // Robust Callback URL detection
-    const protocol = request.headers.get('x-forwarded-proto') || 'https'
-    const host = request.headers.get('host') || 'mahita.ai'
-    const callbackUrl = `${protocol}://${host}/schwab/callback`
-
-    console.log(`[Schwab Auth] Using dynamic callback URL: ${callbackUrl}`)
-
-    // Note: getSchwabClient is not defined in this file, assuming it's imported or defined elsewhere
-    // const client = getSchwabClient({ clientId, clientSecret, callbackUrl })
+    const callbackUrl = getSchwabCallbackUrl()
 
     if (!clientId || !clientSecret) {
       return NextResponse.json(
@@ -111,93 +104,67 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
+    const user = await getCurrentUser(session)
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Check if config exists
-    const existingConfig = await prisma.schwabConfig.findUnique({
-      where: { userId: user.id }
+    const connection = await saveUserSchwabCredentials({
+      userId: user.id,
+      clientId,
+      clientSecret,
     })
-
-    let schwabConfig
-    if (existingConfig) {
-      // Update existing
-      schwabConfig = await prisma.schwabConfig.update({
-        where: { userId: user.id },
-        data: {
-          clientId,
-          clientSecret,
-          updatedAt: new Date(),
-        }
-      })
-    } else {
-      // Create new
-      schwabConfig = await prisma.schwabConfig.create({
-        data: {
-          userId: user.id,
-          clientId,
-          clientSecret,
-        }
-      })
-    }
 
     return NextResponse.json({
       success: true,
-      message: 'Schwab credentials saved successfully'
+      message: 'Schwab credentials saved successfully',
+      callbackUrl,
+      connection: connection
+        ? {
+            id: connection.id,
+            status: connection.status,
+            lastSyncedAt: connection.lastSyncedAt,
+            lastError: connection.lastError,
+            accountCount: connection.accounts.length,
+          }
+        : null,
     })
-  } catch (error: any) {
-    console.error('Save Schwab config error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to save config' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    return toErrorResponse(error, 'Mahita could not save your Schwab credentials.')
   }
 }
 
-export async function DELETE(request: NextRequest) {
+export async function DELETE() {
   try {
-    let session: any = await getServerSession(authOptions)
-
-    // DEV BYPASS
-    if (!session && process.env.NODE_ENV === 'development') {
-      session = { user: { email: 'dev@mahita.ai' } }
-      await prisma.user.upsert({
-        where: { email: 'dev@mahita.ai' },
-        create: { email: 'dev@mahita.ai', name: 'Dev User' },
-        update: {}
-      })
-    }
+    const session = await getAppServerSession()
 
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    })
+    const user = await getCurrentUser(session)
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    await prisma.schwabConfig.deleteMany({
-      where: { userId: user.id }
-    })
+    const connection = await deleteUserSchwabCredentials(user.id)
 
     return NextResponse.json({
       success: true,
-      message: 'Schwab credentials deleted successfully'
+      message: 'Schwab credentials deleted successfully',
+      connection: connection
+        ? {
+            id: connection.id,
+            status: connection.status,
+            lastSyncedAt: connection.lastSyncedAt,
+            lastError: connection.lastError,
+            accountCount: connection.accounts.length,
+          }
+        : null,
     })
-  } catch (error: any) {
-    console.error('Delete Schwab config error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to delete config' },
-      { status: 500 }
-    )
+  } catch (error: unknown) {
+    return toErrorResponse(error, 'Mahita could not delete your Schwab credentials.')
   }
 }

@@ -4,6 +4,8 @@ import { providerTelemetryBus } from './provider-telemetry'
 import { getGlobalUniverse } from './universe-loader'
 import { ChunkIngestionReport, Timeframe } from './types'
 import { timeframeToSeconds } from './utils'
+import { getPlatformCredentialIsolationError } from '@/lib/security/platform-security'
+import type { SchwabClient } from '@/app/services/schwab/client'
 
 const ONE_YEAR = 31536000
 
@@ -75,11 +77,12 @@ class IngestionService {
         const clientPool = await getSchwabClientPool()
 
         if (clientPool.length === 0 && process.env.USE_MOCK_DATA !== 'true') {
+            const errorMessage = getPlatformCredentialIsolationError()
             await providerTelemetryBus.log({
                 kind: 'error',
-                message: `SYS-CRITICAL: No valid Schwab keys in pool. Halting Sweep.`,
+                message: `SYS-CRITICAL: ${errorMessage}`,
             })
-            throw new Error(`IngestionService Halted: No valid keys found in pool.`)
+            throw new Error(`IngestionService Halted: ${errorMessage}`)
         }
 
         this.running = true
@@ -318,7 +321,7 @@ class IngestionService {
         provider: string | undefined,
         pauseMs: number,
         logger: IngestionLogger,
-        providerClient?: any
+        providerClient?: SchwabClient
     ): Promise<{ fetchedBars: number, persistedBars: number }> {
         let currentStart = startTime
         let fetchedBars = 0

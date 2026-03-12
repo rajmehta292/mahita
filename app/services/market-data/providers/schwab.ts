@@ -1,6 +1,8 @@
 import { getRuntimeSchwabClient, getRuntimeSchwabClientWithOptions } from '@/app/services/schwab/runtime'
+import type { SchwabClient } from '@/app/services/schwab/client'
 import { IDataProvider, MarketDataPoint, Timeframe } from '../types'
 import { providerTelemetryBus } from '../provider-telemetry'
+import { getPlatformCredentialIsolationError } from '@/lib/security/platform-security'
 
 interface SchwabHistoryParams {
     periodType?: 'day' | 'month' | 'year' | 'ytd'
@@ -9,6 +11,21 @@ interface SchwabHistoryParams {
     frequency?: number
     startDate?: number
     endDate?: number
+}
+
+interface SchwabCandle {
+    datetime: number
+    open: number
+    high: number
+    low: number
+    close: number
+    volume?: number
+}
+
+interface SchwabPriceHistoryResponse {
+    data?: {
+        candles?: SchwabCandle[]
+    } | null
 }
 
 export class SchwabProvider implements IDataProvider {
@@ -52,7 +69,7 @@ export class SchwabProvider implements IDataProvider {
         return !symbol.includes('=') && !symbol.includes('-USD')
     }
 
-    async getHistoricalData(symbol: string, timeframe: Timeframe, startTime: number, endTime: number, options?: { providerClient?: any }): Promise<MarketDataPoint[]> {
+    async getHistoricalData(symbol: string, timeframe: Timeframe, startTime: number, endTime: number, options?: { providerClient?: SchwabClient }): Promise<MarketDataPoint[]> {
         if (!this.supportsSymbol(symbol)) {
             return []
         }
@@ -63,7 +80,7 @@ export class SchwabProvider implements IDataProvider {
         }
 
         try {
-            let allCandles: any[] = []
+            let allCandles: SchwabCandle[] = []
 
             // Chunking logic for minute data (Schwab caps this strictly to 10 days per request)
             if (params.frequencyType === 'minute' && params.startDate && params.endDate) {
@@ -90,7 +107,7 @@ export class SchwabProvider implements IDataProvider {
             }
 
             return allCandles
-                .map((candle: any) => ({
+                .map((candle) => ({
                     time: Math.floor(Number(candle.datetime) / 1000),
                     open: Number(candle.open),
                     high: Number(candle.high),
@@ -115,14 +132,14 @@ export class SchwabProvider implements IDataProvider {
         }
     }
 
-    private async fetchPriceHistoryWithRetry(symbol: string, params: SchwabHistoryParams, providerClient?: any) {
+    private async fetchPriceHistoryWithRetry(symbol: string, params: SchwabHistoryParams, providerClient?: SchwabClient): Promise<SchwabPriceHistoryResponse> {
         let client = providerClient || await getRuntimeSchwabClient()
         if (!client) {
-            throw new Error('No Schwab client available (checked pool and runtime fallback)')
+            throw new Error(getPlatformCredentialIsolationError())
         }
 
         try {
-            return await client.getPriceHistory(symbol, params)
+            return await client.getPriceHistory(symbol, params) as SchwabPriceHistoryResponse
         } catch (error) {
             const message = error instanceof Error ? error.message : ''
 
@@ -140,7 +157,7 @@ export class SchwabProvider implements IDataProvider {
                 throw error
             }
 
-            return await client.getPriceHistory(symbol, params)
+            return await client.getPriceHistory(symbol, params) as SchwabPriceHistoryResponse
         }
     }
 }

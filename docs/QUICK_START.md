@@ -1,5 +1,7 @@
 # Quick Start Guide
 
+Status: Historical quick start. Operationally useful, but auth and callback guidance is superseded by [docs/guidebook/auth/README.md](/Users/rmehta01/Sites/mahita/docs/guidebook/auth/README.md) and [docs/current_state_baseline.md](/Users/rmehta01/Sites/mahita/docs/current_state_baseline.md).
+
 Get up and running with Mahita Terminal in 5 minutes!
 
 ## Prerequisites
@@ -28,7 +30,7 @@ DATABASE_URL="file:./dev.db"
 GOOGLE_CLIENT_ID="your_google_client_id_here"
 GOOGLE_CLIENT_SECRET="your_google_client_secret_here"
 NEXTAUTH_SECRET="generate_a_random_secret_here"
-NEXTAUTH_URL="http://mahita.ai"
+NEXTAUTH_URL="https://mahita.ai"
 ALLOWED_EMAIL="your@email.com"
 ```
 
@@ -38,7 +40,7 @@ ALLOWED_EMAIL="your@email.com"
 2. Create a new project or select existing
 3. Enable Google+ API
 4. Go to "Credentials" → "Create Credentials" → "OAuth 2.0 Client ID"
-5. Set authorized redirect URI: `http://mahita.ai/api/auth/callback/google`
+5. Set authorized redirect URI: `https://mahita.ai/api/auth/callback/google`
 6. Copy Client ID and Client Secret to `.env.local`
 
 ### Generating NextAuth Secret
@@ -70,7 +72,7 @@ npx tsx scripts/seed-dow30.ts
 npm run dev
 ```
 
-Open [http://mahita.ai](http://mahita.ai) in your browser.
+Open [http://localhost:6244](http://localhost:6244) for local development. Real-user Google sign-in runs on [https://mahita.ai](https://mahita.ai).
 
 ## First Steps
 

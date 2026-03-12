@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { type ReactNode, useState, useEffect, useCallback } from 'react'
 import { MainLayout } from '../components/Layout/MainLayout'
 import {
     TrendingUp,
@@ -9,27 +9,59 @@ import {
     Activity,
     BarChart3,
     Newspaper,
-    Brain,
     Star,
     Clock,
-    AlertCircle,
-    ArrowUpRight,
-    ArrowDownRight,
     Zap,
-    RefreshCw,
-    Target,
-    ArrowRight
+    ChevronDown
 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { SchwabGating } from '../components/SchwabGating'
 import { AlphaInsightsWidget } from '../components/AI/AlphaInsightsWidget'
+import { useUserPreferences } from '../hooks/use-user-preferences'
+import { parseStoredStringArray } from '@/lib/preferences-serialization'
+import { resolveHydratedAccountId } from '@/lib/account-selection'
 
-interface MarketMover {
+interface QuoteSnapshot {
     symbol: string
     price: number
     change: number
     changePercent: number
+    name?: string
+}
+
+interface SchwabAccount {
+    securitiesAccount: {
+        accountId: string
+        hashValue?: string
+        type: string
+    }
+}
+
+interface DashboardAccountSummary {
+    accountId: string
+    accountKey: string
+    type: string
+    displayName: string
+    cashAndCashInvestments: number
+    accountValue: number
+    dayChange: number
+    dayChangePercent: number
+    positionsCount: number
+    holdingsMarketValue: number
+    totalCostBasis: number
+    totalUnrealizedGainLoss: number
+}
+
+interface DashboardTotals {
+    cashAndCashInvestments: number
+    accountValue: number
+    dayChange: number
+    dayChangePercent: number
+    holdingsMarketValue: number
+    totalCostBasis: number
+    totalUnrealizedGainLoss: number
+    positionsCount: number
 }
 
 interface NewsItem {
@@ -40,106 +72,151 @@ interface NewsItem {
     link?: string
 }
 
+interface MetricCardProps {
+    label: string
+    value: string
+    icon: ReactNode
+    sub: string
+    trendColor?: string
+}
+
 export default function DashboardPage() {
     const router = useRouter()
+    const { preferences, updatePreferences } = useUserPreferences()
 
     // State for Account Management
     const [connected, setConnected] = useState(false)
-    const [accounts, setAccounts] = useState<any[]>([])
+    const [accounts, setAccounts] = useState<SchwabAccount[]>([])
     const [selectedAccount, setSelectedAccount] = useState<string>('')
 
     // State for Metrics
-    const [accountValue, setAccountValue] = useState<number | null>(null)
-    const [dayPnL, setDayPnL] = useState<number | null>(null)
     const [systemRunning, setSystemRunning] = useState<boolean>(false)
-    const [loading, setLoading] = useState(false)
+    const [accountSummaries, setAccountSummaries] = useState<DashboardAccountSummary[]>([])
+    const [summaryTotals, setSummaryTotals] = useState<DashboardTotals | null>(null)
+    const [summaryUpdatedAt, setSummaryUpdatedAt] = useState<string | null>(null)
 
     // State for Widgets
-    const [marketMovers, setMarketMovers] = useState<MarketMover[]>([])
+    const [marketMovers, setMarketMovers] = useState<QuoteSnapshot[]>([])
     const [news, setNews] = useState<NewsItem[]>([])
     const [symbols, setSymbols] = useState<string[]>(['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA'])
-    const [watchlistQuotes, setWatchlistQuotes] = useState<any[]>([])
-    const [aiInsights, setAiInsights] = useState<any[]>([
-        { text: 'Monitoring market liquidity and asset flow...', confidence: 64 },
-    ])
+    const [watchlistQuotes, setWatchlistQuotes] = useState<QuoteSnapshot[]>([])
+
+    const selectedAccountSummary = accountSummaries.find(
+        (account) => account.accountKey === selectedAccount || account.accountId === selectedAccount
+    ) || null
 
     const fetchDashboardData = useCallback(async () => {
         if (!connected) return
-        setLoading(true)
         try {
-            // 1. Fetch Accounts if needed
-            if (accounts.length === 0) {
-                const accRes = await fetch('/api/schwab/accounts')
-                const accData = await accRes.json()
-                if (accData.success && accData.accounts?.length > 0) {
-                    setAccounts(accData.accounts)
-                    const saved = localStorage.getItem('mahita_default_account')
-                    if (saved && accData.accounts.some((a: any) => (a.securitiesAccount.hashValue || a.securitiesAccount.accountId) === saved)) {
-                        setSelectedAccount(saved)
-                    } else {
-                        const first = accData.accounts[0].securitiesAccount
-                        setSelectedAccount(first.hashValue || first.accountId)
-                    }
-                }
+            // 1. Fetch account summaries
+            const accountSummaryResponse = await fetch('/api/schwab/account-summaries')
+            const accountSummaryData = await accountSummaryResponse.json()
+            if (accountSummaryData.success && accountSummaryData.accounts?.length > 0) {
+                const summaries = accountSummaryData.accounts as DashboardAccountSummary[]
+                setAccountSummaries(summaries)
+                setSummaryTotals(accountSummaryData.totals ?? null)
+                setSummaryUpdatedAt(accountSummaryData.updatedAt ?? null)
+                setAccounts(
+                    summaries.map((summary) => ({
+                        securitiesAccount: {
+                            accountId: summary.accountId,
+                            hashValue: summary.accountKey,
+                            type: summary.type,
+                        },
+                    }))
+                )
+            } else if (accountSummaryData.success) {
+                setAccountSummaries([])
+                setSummaryTotals(accountSummaryData.totals ?? null)
+                setSummaryUpdatedAt(accountSummaryData.updatedAt ?? null)
+                setAccounts([])
             }
 
-            // 2. Fetch Account Specific Stats
-            if (selectedAccount) {
-                const posRes = await fetch(`/api/schwab/positions?accountId=${selectedAccount}`)
-                const posData = await posRes.json()
-                if (posData.success && posData.balance) {
-                    setAccountValue(posData.balance.liquidationValue || 0)
-                    setDayPnL(posData.balance.netChange || 0)
-                }
-            }
-
-            // 3. News
+            // 2. News
             const newsRes = await fetch('/api/trading/news')
             const newsData = await newsRes.json()
             if (newsData.success) setNews(newsData.news || [])
 
-            // 4. System Status
-            const sysRes = await fetch('/api/trading/continuous-ingest')
+            // 3. System Status
+            const sysRes = await fetch('/api/platform/runtime-status')
             const sysData = await sysRes.json()
-            setSystemRunning(!!sysData.isRunning)
+            setSystemRunning(!!sysData.runtime?.dataPipeline?.running)
 
-            // 5. Market Movers
+            // 4. Market Movers
             const moversRes = await fetch('/api/trading/quotes?symbols=SPY,QQQ,AAPL,MSFT,NVDA,TSLA,AMZN,META')
             const moversData = await moversRes.json()
             if (moversData.success && moversData.quotes) {
-                const sorted = moversData.quotes.sort((a: any, b: any) => Math.abs(b.changePercent) - Math.abs(a.changePercent)).slice(0, 6)
+                const sorted = (moversData.quotes as QuoteSnapshot[])
+                    .sort((left, right) => Math.abs(right.changePercent) - Math.abs(left.changePercent))
+                    .slice(0, 6)
                 setMarketMovers(sorted)
-
-                // Dynamic Insight Sample
-                if (sorted[0]?.changePercent > 1.5) {
-                    setAiInsights([
-                        { text: `${sorted[0].symbol} breakout detected with significant volume growth.`, confidence: 88 },
-                        { text: 'Overall market momentum looks highly supportive.', confidence: 75 }
-                    ])
-                }
             }
         } catch (e) {
-            console.error("Dashboard error", e)
-        } finally {
-            setLoading(false)
+            console.warn("Dashboard error", e)
         }
-    }, [connected, selectedAccount, accounts.length])
+    }, [connected])
 
     useEffect(() => {
-        if (connected) fetchDashboardData()
+        if (connected) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            void fetchDashboardData()
+        }
         const timer = setInterval(() => { if (connected) fetchDashboardData() }, 60000)
         return () => clearInterval(timer)
     }, [connected, fetchDashboardData])
 
     useEffect(() => {
-        if (selectedAccount) localStorage.setItem('mahita_default_account', selectedAccount)
-    }, [selectedAccount])
+        if (accounts.length === 0) {
+            return
+        }
+
+        const localPreference = localStorage.getItem('mahita_default_account')
+        const preferredAccountId = preferences?.selectedAccountId || localPreference
+        const nextAccountId = resolveHydratedAccountId(
+            accounts,
+            selectedAccount,
+            preferredAccountId
+        )
+
+        if (nextAccountId && nextAccountId !== selectedAccount) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setSelectedAccount(nextAccountId)
+        }
+    }, [accounts, preferences?.selectedAccountId, selectedAccount])
+
+    useEffect(() => {
+        if (!selectedAccount) {
+            return
+        }
+
+        localStorage.setItem('mahita_default_account', selectedAccount)
+        if (preferences?.selectedAccountId === selectedAccount) {
+            return
+        }
+
+        updatePreferences({ selectedAccountId: selectedAccount }).catch((preferenceError) => {
+            console.warn('Failed to persist account preference:', preferenceError)
+        })
+    }, [preferences?.selectedAccountId, selectedAccount, updatePreferences])
 
     // Watchlist Management
     useEffect(() => {
+        const preferenceSymbols = parseStoredStringArray(preferences?.watchlistSymbols)
+        if (preferenceSymbols.length > 0) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            setSymbols(preferenceSymbols)
+            return
+        }
+
         const saved = localStorage.getItem('mahita_watchlist')
-        if (saved) try { setSymbols(JSON.parse(saved)) } catch (e) { }
-    }, [])
+        if (saved) {
+            try {
+                setSymbols(JSON.parse(saved))
+            } catch {
+                // fall back to defaults
+            }
+        }
+    }, [preferences?.watchlistSymbols])
 
     useEffect(() => {
         if (symbols.length === 0) return
@@ -175,7 +252,7 @@ export default function DashboardPage() {
                                     onChange={(e) => setSelectedAccount(e.target.value)}
                                     className="bg-[#131722] text-white text-xs font-bold px-4 py-2.5 rounded-xl border border-[#2A2E39] focus:outline-none focus:border-blue-500 appearance-none pr-10 hover:border-blue-500/50 transition-all cursor-pointer shadow-inner"
                                 >
-                                    {accounts.map((acc: any) => (
+                                    {accounts.map((acc) => (
                                         <option key={acc.securitiesAccount.accountId} value={acc.securitiesAccount.hashValue || acc.securitiesAccount.accountId}>
                                             ...{acc.securitiesAccount.accountId.slice(-4)} ({acc.securitiesAccount.type})
                                         </option>
@@ -197,31 +274,133 @@ export default function DashboardPage() {
                             {/* Matrix Grid */}
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                 <MetricCard
-                                    label="Portfolio Liquidity"
-                                    value={accountValue !== null ? `$${accountValue.toLocaleString()}` : '---'}
+                                    label="Selected Account Value"
+                                    value={selectedAccountSummary ? `$${selectedAccountSummary.accountValue.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : '---'}
                                     icon={<DollarSign className="w-4 h-4" />}
-                                    sub="Schwab Real-time"
+                                    sub={selectedAccountSummary ? selectedAccountSummary.displayName : 'Select account'}
                                 />
                                 <MetricCard
-                                    label="Day P&L Momentum"
-                                    value={dayPnL !== null ? (dayPnL >= 0 ? `+$${dayPnL.toLocaleString()}` : `-$${Math.abs(dayPnL).toLocaleString()}`) : '---'}
+                                    label="Cash & Cash Investments"
+                                    value={selectedAccountSummary ? `$${selectedAccountSummary.cashAndCashInvestments.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : '---'}
                                     icon={<Activity className="w-4 h-4" />}
-                                    sub="Intraday Delta"
-                                    trendColor={dayPnL !== null ? (dayPnL >= 0 ? 'text-emerald-500' : 'text-rose-500') : ''}
+                                    sub="Selected Account Liquidity"
                                 />
                                 <MetricCard
-                                    label="System Latency"
+                                    label="Day Change"
+                                    value={selectedAccountSummary ? (selectedAccountSummary.dayChange >= 0 ? `+$${selectedAccountSummary.dayChange.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : `-$${Math.abs(selectedAccountSummary.dayChange).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}`) : '---'}
+                                    icon={<TrendingUp className="w-4 h-4" />}
+                                    sub={selectedAccountSummary ? `${selectedAccountSummary.dayChangePercent >= 0 ? '+' : ''}${selectedAccountSummary.dayChangePercent.toFixed(2)}% intraday` : 'Selected account'}
+                                    trendColor={selectedAccountSummary ? (selectedAccountSummary.dayChange >= 0 ? 'text-emerald-500' : 'text-rose-500') : ''}
+                                />
+                                <MetricCard
+                                    label="System Status"
                                     value={systemRunning ? 'Active' : 'Idle'}
                                     icon={<Zap className="w-4 h-4" />}
-                                    sub="Data Ingestion"
+                                    sub={selectedAccountSummary ? `${selectedAccountSummary.positionsCount} positions tracked` : 'Data Ingestion'}
                                     trendColor={systemRunning ? 'text-emerald-500' : 'text-gray-500'}
                                 />
-                                <MetricCard
-                                    label="Monitor Assets"
-                                    value={symbols.length.toString()}
-                                    icon={<Star className="w-4 h-4" />}
-                                    sub="Active Watchlist"
-                                />
+                            </div>
+
+                            <div className="bg-[#1E222D] border border-[#2A2E39] rounded-3xl shadow-2xl overflow-hidden">
+                                <div className="px-8 py-5 border-b border-[#2A2E39] bg-white/[0.02] flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-sm font-black uppercase tracking-widest text-white">Summary</h3>
+                                        <p className="mt-1 text-xs text-gray-500">
+                                            {summaryUpdatedAt
+                                                ? `Updated: ${new Date(summaryUpdatedAt).toLocaleString([], {
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                    second: '2-digit',
+                                                    month: '2-digit',
+                                                    day: '2-digit',
+                                                    year: 'numeric',
+                                                })}`
+                                                : 'Waiting for account summary sync'}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">All Accounts</div>
+                                        <div className="text-2xl font-black tracking-tighter text-white">
+                                            {summaryTotals ? `$${summaryTotals.accountValue.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : '---'}
+                                        </div>
+                                        <div className={`text-xs font-bold ${summaryTotals ? (summaryTotals.dayChange >= 0 ? 'text-emerald-500' : 'text-rose-500') : 'text-gray-500'}`}>
+                                            {summaryTotals
+                                                ? `${summaryTotals.dayChange >= 0 ? '+' : '-'}$${Math.abs(summaryTotals.dayChange).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })} (${summaryTotals.dayChangePercent >= 0 ? '+' : ''}${summaryTotals.dayChangePercent.toFixed(2)}%)`
+                                                : 'No totals available'}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 px-8 py-6 border-b border-[#2A2E39]">
+                                    <SummaryStat
+                                        label="Selected Value"
+                                        value={selectedAccountSummary ? `$${selectedAccountSummary.accountValue.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : '---'}
+                                    />
+                                    <SummaryStat
+                                        label="Selected Cash"
+                                        value={selectedAccountSummary ? `$${selectedAccountSummary.cashAndCashInvestments.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : '---'}
+                                    />
+                                    <SummaryStat
+                                        label="Holdings Market Value"
+                                        value={selectedAccountSummary ? `$${selectedAccountSummary.holdingsMarketValue.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : '---'}
+                                    />
+                                    <SummaryStat
+                                        label="Unrealized Gain / Loss"
+                                        value={selectedAccountSummary ? `${selectedAccountSummary.totalUnrealizedGainLoss >= 0 ? '+' : '-'}$${Math.abs(selectedAccountSummary.totalUnrealizedGainLoss).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}` : '---'}
+                                        tone={selectedAccountSummary ? (selectedAccountSummary.totalUnrealizedGainLoss >= 0 ? 'positive' : 'negative') : 'neutral'}
+                                    />
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full text-sm">
+                                        <thead className="bg-[#131722] text-gray-500 uppercase text-[10px] tracking-[0.2em]">
+                                            <tr>
+                                                <th className="px-8 py-4 text-left">Account</th>
+                                                <th className="px-6 py-4 text-right">Cash & Cash Investments</th>
+                                                <th className="px-6 py-4 text-right">Account Value</th>
+                                                <th className="px-6 py-4 text-right">Day Change $</th>
+                                                <th className="px-6 py-4 text-right">Day Change %</th>
+                                                <th className="px-6 py-4 text-right">Positions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {accountSummaries.map((summary) => {
+                                                const isSelected =
+                                                    summary.accountKey === selectedAccount ||
+                                                    summary.accountId === selectedAccount
+
+                                                return (
+                                                    <tr
+                                                        key={summary.accountKey}
+                                                        className={`border-t border-[#2A2E39] transition-colors cursor-pointer ${isSelected ? 'bg-blue-500/10' : 'hover:bg-white/[0.02]'
+                                                            }`}
+                                                        onClick={() => setSelectedAccount(summary.accountKey)}
+                                                    >
+                                                        <td className="px-8 py-4">
+                                                            <div className="text-white font-semibold">{summary.displayName}</div>
+                                                            <div className="text-xs text-gray-500">
+                                                                Account ending in {summary.accountId.slice(-4)} • {summary.type}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right font-mono text-white">
+                                                            ${summary.cashAndCashInvestments.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right font-mono text-white">
+                                                            ${summary.accountValue.toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
+                                                        </td>
+                                                        <td className={`px-6 py-4 text-right font-mono ${summary.dayChange >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                            {summary.dayChange >= 0 ? '+' : '-'}${Math.abs(summary.dayChange).toLocaleString(undefined, { maximumFractionDigits: 2, minimumFractionDigits: 2 })}
+                                                        </td>
+                                                        <td className={`px-6 py-4 text-right font-mono ${summary.dayChangePercent >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                            {summary.dayChangePercent >= 0 ? '+' : ''}{summary.dayChangePercent.toFixed(2)}%
+                                                        </td>
+                                                        <td className="px-6 py-4 text-right text-white">{summary.positionsCount}</td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -301,7 +480,7 @@ export default function DashboardPage() {
     )
 }
 
-function MetricCard({ label, value, icon, sub, trendColor = 'text-white' }: any) {
+function MetricCard({ label, value, icon, sub, trendColor = 'text-white' }: MetricCardProps) {
     return (
         <div className="bg-[#1E222D] border border-[#2A2E39] rounded-2xl p-6 hover:border-blue-500/30 transition-all shadow-xl group cursor-pointer">
             <div className="flex justify-between items-center mb-4">
@@ -316,7 +495,31 @@ function MetricCard({ label, value, icon, sub, trendColor = 'text-white' }: any)
     )
 }
 
-function MoverCard({ mover }: { mover: MarketMover }) {
+function SummaryStat({
+    label,
+    value,
+    tone = 'neutral',
+}: {
+    label: string
+    value: string
+    tone?: 'positive' | 'negative' | 'neutral'
+}) {
+    const toneClass =
+        tone === 'positive'
+            ? 'text-emerald-500'
+            : tone === 'negative'
+                ? 'text-rose-500'
+                : 'text-white'
+
+    return (
+        <div className="rounded-2xl border border-[#2A2E39] bg-[#131722] px-5 py-4">
+            <div className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-500">{label}</div>
+            <div className={`mt-2 text-xl font-black tracking-tight ${toneClass}`}>{value}</div>
+        </div>
+    )
+}
+
+function MoverCard({ mover }: { mover: QuoteSnapshot }) {
     const isUp = mover.change >= 0
     return (
         <div className="flex items-center justify-between p-4 bg-[#131722] rounded-2xl border border-[#2A2E39] hover:border-blue-500/20 transition-all group cursor-pointer">
@@ -360,24 +563,5 @@ function NewsRow({ item }: { item: NewsItem }) {
                 {item.sentiment}
             </div>
         </a>
-    )
-}
-
-function ChevronDown(props: any) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <path d="m6 9 6 6 6-6" />
-        </svg>
     )
 }

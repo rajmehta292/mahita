@@ -3,10 +3,26 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "sync:monaco": "node scripts/sync-monaco.mjs",
+    "predev": "npm run sync:monaco && prisma generate",
     "dev": "next dev -p 6244",
+    "dev:reset": "npm run sync:monaco && prisma generate && prisma db push && next dev -p 6244",
+    "bootstrap:demo": "bash ./scripts/bootstrap-demo.sh",
+    "bundle:demo": "bash ./scripts/package-demo-bundle.sh",
+    "export:evidence": "bash ./scripts/export-project-evidence.sh",
+    "audit:auth-collisions": "node scripts/audit-auth-collisions.mjs",
+    "prebuild": "npm run sync:monaco && prisma generate",
     "build": "next build",
     "start": "next start -p 6244",
-    "lint": "eslint"
+    "lint": "eslint",
+    "lint:scoped": "eslint lib/account-selection.ts lib/admin-control-plane.ts lib/auth.ts lib/auth-environment.ts lib/auth-policy.ts lib/auth-redirect.ts lib/brokerage-connections.ts lib/docs.ts lib/preferences-serialization.ts lib/platform/customer-read-models.ts lib/provider-credentials.ts lib/roles.ts lib/secrets.ts lib/schwab-config.ts lib/security/http-headers.ts lib/security/platform-security.ts lib/server-session.ts lib/trading/order-draft.ts lib/trending-indicators.ts lib/user-preferences.ts app/admin/page.tsx app/api/admin app/api/ai/models/route.ts app/api/ai/chat/route.ts app/api/ai/alpha-insights/route.ts app/api/cron/sync/route.ts app/api/health/auth/route.ts app/api/platform/runtime-status/route.ts app/api/platform/chart-catalog/route.ts app/api/schwab/accounts/route.ts app/api/schwab/auth/route.ts app/api/schwab/orders/route.ts app/api/schwab/positions/route.ts app/api/trading/provider-health/route.ts app/api/trading/provider-stream/route.ts app/api/trading/provider-traffic/route.ts app/api/trading/continuous-ingest/route.ts app/api/trading/data-health/route.ts app/api/trading/data-health/refresh/route.ts app/api/trading/data-health/sync-gaps/route.ts app/api/trading/data-inspect/route.ts app/api/trading/data-reset/route.ts app/api/trading/inventory/route.ts app/api/trading/vaults/route.ts app/api/trending-indicators/scan/route.ts app/api/user/preferences/route.ts app/api/user/session-activity/route.ts app/api/user/schwab-config/route.ts app/api/user/schwab-tokens/route.ts app/auth/signin/page.tsx app/auth/error/page.tsx app/auth/post-signin/page.tsx app/page.tsx app/chart/page.tsx app/docs app/components/Admin app/components/Auth/LandingSignInMenu.tsx app/components/Auth/SessionActivityTracker.tsx app/components/Auth/SignInCard.tsx app/components/Docs app/components/Landing/LandingExperience.tsx app/components/Layout/MainLayout.tsx app/components/Layout/Sidebar.tsx app/components/Layout/TopBar.tsx app/components/Portfolio/PositionTable.tsx app/components/SchwabData/SchwabDataCenter.tsx app/components/TrendingIndicators/TrendingIndicatorsDashboard.tsx app/dashboard/page.tsx app/history/page.tsx app/portfolio/page.tsx app/active-trader/page.tsx app/schwab-data/page.tsx app/trending-indicators/page.tsx app/watchlist/page.tsx app/desktop-expansion/page.tsx app/data-doctor/page.tsx app/data-doctor/logs/page.tsx app/hooks/use-auth-health.ts app/services/market-data/ingestion.ts app/services/market-data/providers/schwab.ts app/services/schwab/runtime.ts scripts/resolve_tickers.ts tests e2e playwright.config.ts proxy.ts vitest.config.ts types/next-auth.d.ts vitest.d.ts",
+    "test": "vitest run",
+    "test:dom": "vitest run",
+    "test:e2e": "playwright test",
+    "test:smoke": "npm run test:dom",
+    "qa:unit": "vitest run tests",
+    "qa:e2e": "playwright test",
+    "qa:all": "npm run qa:unit && npm run qa:e2e"
   },
   "dependencies": {
     "@libsql/client": "^0.17.0",
@@ -20,17 +36,22 @@
     "lightweight-charts": "^5.1.0",
     "next": "16.1.6",
     "next-auth": "^4.24.13",
+    "openai": "^6.27.0",
     "parquetjs-lite": "^0.8.7",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
     "react-syntax-highlighter": "^16.1.1",
     "remark-gfm": "^4.0.1",
+    "tsx": "^4.20.6",
     "technicalindicators": "^3.1.0",
     "yahoo-finance2": "^3.13.2"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/d3-dsv": "^3.0.7",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -38,10 +59,13 @@
     "clsx": "^2.1.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "jsdom": "^28.1.0",
     "lucide-react": "^0.577.0",
+    "msw": "^2.12.10",
     "prisma": "^6.19.2",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.0.18"
   }
 }

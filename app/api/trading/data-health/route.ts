@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from '@/lib/auth'
 import { DataHealthManager } from "@/app/services/market-data/health"
+import { requireRouteAccess } from "@/lib/security/platform-security"
 
 export async function GET(req: NextRequest) {
-    const session = await getServerSession(authOptions)
-
-    if (!session) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    const access = await requireRouteAccess({ policy: "superuser" })
+    if (!access.ok) {
+        return access.response
     }
 
     try {

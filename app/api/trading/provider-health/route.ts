@@ -1,11 +1,17 @@
 import { NextResponse } from 'next/server'
 import { checkSchwabTokenHealth } from '@/app/services/schwab/runtime'
 import { providerTelemetryBus } from '@/app/services/market-data/provider-telemetry'
+import { requireRouteAccess } from '@/lib/security/platform-security'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
     try {
+        const access = await requireRouteAccess({ policy: "superuser" })
+        if (!access.ok) {
+            return access.response
+        }
+
         const tokenHealth = await checkSchwabTokenHealth()
 
         // Compute active Throttle Queue size from the telemetry bus

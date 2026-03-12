@@ -1,5 +1,7 @@
 # 06 - Master AI Implementation Guide
 
+Status: Historical execution guide. Portions of this file are superseded by the active recovery and security documents, especially around auth and route protection.
+
 ## Executive Summary
 **ATTENTION NEXT AI AGENT**: This acts as the meta-instruction wrapper for executing the codebase correctly in isolated autonomous sessions. Start from Doc 01 and proceed aggressively but iteratively through Doc 05.
 
@@ -7,7 +9,7 @@
 
 ### Phase 1: Security & Bootstrap
 1. Scaffold Next.js + Tailwind. Define `.env.local` ignoring database schema integrations for secrets.
-2. Initialize NextAuth with Google Provider strictly applying the whitelist conditional check against `ALLOWED_EMAIL` inside the `callbacks: signIn` payload. Enforce routing locks via `middleware.ts`.
+2. Initialize NextAuth with Google Provider and enforce routing locks via `proxy.ts`, with roles and access checks performed server-side.
 
 ### Phase 2: Structural Data Providers
 1. Define Prisma Data models (Strategy, MarketData, Auth scopes).

@@ -1,24 +1,25 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { MainLayout } from '../components/Layout/MainLayout'
 import { SchwabGating } from '../components/SchwabGating'
 import {
     PieChart,
-    Download,
     ChevronDown,
     AlertCircle,
     TrendingUp,
-    TrendingDown,
     Activity,
-    DollarSign,
     RefreshCw,
-    Wallet,
     Target,
-    ArrowRight
+    ArrowRight,
+    ExternalLink,
+    X
 } from 'lucide-react'
-import { PositionTable } from '../components/Portfolio/PositionTable'
+import { ColumnConfig, PositionTable } from '../components/Portfolio/PositionTable'
+import { useUserPreferences } from '../hooks/use-user-preferences'
+import { createOrderDraft, OrderDraft, serializeOrderDraft } from '@/lib/trading/order-draft'
+import { resolveHydratedAccountId } from '@/lib/account-selection'
 
 interface Position {
     symbol: string
@@ -53,7 +54,7 @@ interface SchwabAccount {
 }
 
 export default function PortfolioPage() {
-    const [loading, setLoading] = useState(false)
+    const router = useRouter()
     const [connected, setConnected] = useState(false)
     const [accounts, setAccounts] = useState<SchwabAccount[]>([])
     const [selectedAccount, setSelectedAccount] = useState<string>('')
@@ -61,6 +62,20 @@ export default function PortfolioPage() {
     const [balance, setBalance] = useState<AccountBalance | null>(null)
     const [error, setError] = useState<string | null>(null)
     const [isRefreshing, setIsRefreshing] = useState(false)
+    const [pendingOrderDraft, setPendingOrderDraft] = useState<OrderDraft | null>(null)
+    const { preferences, updatePreferences } = useUserPreferences()
+
+    const preferredColumns = useMemo(() => {
+        if (!preferences?.portfolioColumns) {
+            return undefined
+        }
+
+        try {
+            return JSON.parse(preferences.portfolioColumns) as ColumnConfig[]
+        } catch {
+            return undefined
+        }
+    }, [preferences?.portfolioColumns])
 
     const fetchAccounts = async () => {
         try {
@@ -68,26 +83,17 @@ export default function PortfolioPage() {
             const data = await response.json()
             if (data.success && data.accounts.length > 0) {
                 setAccounts(data.accounts)
-                // Persistence logic for default account
-                const saved = localStorage.getItem('mahita_default_account')
-                if (saved) {
-                    setSelectedAccount(saved)
-                } else {
-                    const firstAcc = data.accounts[0].securitiesAccount
-                    setSelectedAccount(firstAcc.hashValue || firstAcc.accountId)
-                }
             }
-        } catch (e) {
+        } catch {
             setError('Failed to load accounts')
         }
     }
 
-    const fetchPositions = async (id?: string) => {
+    const fetchPositions = useCallback(async (id?: string) => {
         const targetId = id || selectedAccount
         if (!targetId) return
 
         setIsRefreshing(true)
-        setLoading(true)
         try {
             const response = await fetch(`/api/schwab/positions?accountId=${targetId}`)
             const data = await response.json()
@@ -96,15 +102,26 @@ export default function PortfolioPage() {
                 setBalance(data.balance)
                 setError(null)
             } else {
-                setError(data.error)
+                if (
+                    response.status === 401 ||
+                    data.error?.toLowerCase().includes('token') ||
+                    data.error?.toLowerCase().includes('auth')
+                ) {
+                    setConnected(false)
+                    setSelectedAccount('')
+                    setPositions([])
+                    setBalance(null)
+                    setError('Schwab authorization expired. Reconnect the brokerage session to resume live portfolio sync.')
+                } else {
+                    setError(data.error)
+                }
             }
-        } catch (e) {
+        } catch {
             setError('Portfolio data synchronization failed')
         } finally {
             setIsRefreshing(false)
-            setLoading(false)
         }
-    }
+    }, [selectedAccount])
 
     useEffect(() => {
         if (connected) {
@@ -113,28 +130,93 @@ export default function PortfolioPage() {
     }, [connected])
 
     useEffect(() => {
-        if (selectedAccount) {
-            fetchPositions()
-            localStorage.setItem('mahita_default_account', selectedAccount)
+        if (accounts.length === 0) {
+            return
         }
-    }, [selectedAccount])
+
+        const localPreference = localStorage.getItem('mahita_default_account')
+        const preferredAccountId = preferences?.selectedAccountId || localPreference
+        const nextAccountId = resolveHydratedAccountId(
+            accounts,
+            selectedAccount,
+            preferredAccountId
+        )
+
+        if (nextAccountId && nextAccountId !== selectedAccount) {
+            setSelectedAccount(nextAccountId)
+        }
+    }, [accounts, preferences?.selectedAccountId, selectedAccount])
+
+    useEffect(() => {
+        if (!selectedAccount) {
+            return
+        }
+
+        fetchPositions()
+        localStorage.setItem('mahita_default_account', selectedAccount)
+
+        if (preferences?.selectedAccountId === selectedAccount) {
+            return
+        }
+
+        updatePreferences({ selectedAccountId: selectedAccount }).catch((preferenceError) => {
+            console.warn('Failed to persist account preference:', preferenceError)
+        })
+    }, [preferences?.selectedAccountId, selectedAccount, updatePreferences, fetchPositions])
+
+    const activeColumnConfig = preferredColumns && preferredColumns.length > 0
+        ? preferredColumns
+        : [
+            { id: 'ticker', label: 'Ticker', visible: true, order: 0 },
+            { id: 'qty_entry', label: 'Qty / Avg Price', visible: true, order: 1 },
+            { id: 'market_profile', label: 'Last Price / MV', visible: true, order: 2 },
+            { id: 'performance', label: '% Change / Net', visible: true, order: 3 },
+            { id: 'actions', label: 'Actions', visible: true, order: 4 },
+        ] satisfies ColumnConfig[]
 
     const handleAction = async (symbol: string, side: 'BUY' | 'SELL', amount?: number | 'ALL') => {
-        console.log(`Action: ${side} ${symbol} ${amount}`)
-        alert(`${side} ${symbol} order triggered (Simulated)`)
+        const position = positions.find((candidate) => candidate.symbol === symbol)
+
+        setPendingOrderDraft(createOrderDraft({
+            accountId: selectedAccount,
+            symbol,
+            side,
+            quantityMode: amount === 'ALL' ? 'ALL' : 'CUSTOM',
+            quantity: typeof amount === 'number'
+                ? amount
+                : side === 'BUY'
+                    ? undefined
+                    : position?.quantity,
+            limitPrice: position?.currentPrice,
+        }))
     }
 
     const handleExport = () => {
-        const headers = ['Symbol', 'Quantity', 'Avg Price', 'Price', 'Market Value', 'P&L', 'P&L%']
-        const rows = positions.map(p => [
-            p.symbol,
-            p.quantity,
-            p.averagePrice,
-            p.currentPrice,
-            p.marketValue,
-            p.unrealizedPL,
-            p.unrealizedPLPercent
-        ].join(','))
+        const visibleColumns = [...activeColumnConfig]
+            .filter((column) => column.visible)
+            .sort((left, right) => left.order - right.order)
+
+        const rows = positions.map((position) => visibleColumns.map((column) => {
+            if (column.id === 'ticker') {
+                return `${position.symbol} (${position.description || 'Common Stock'})`
+            }
+
+            if (column.id === 'qty_entry') {
+                return `${position.quantity} @ ${position.averagePrice.toFixed(2)}`
+            }
+
+            if (column.id === 'market_profile') {
+                return `${position.currentPrice.toFixed(2)} / ${position.marketValue.toFixed(2)}`
+            }
+
+            if (column.id === 'performance') {
+                return `${position.unrealizedPLPercent.toFixed(2)}% / ${position.unrealizedPL.toFixed(2)}`
+            }
+
+            return 'Portfolio actions are available in-app'
+        }).join(','))
+
+        const headers = visibleColumns.map((column) => column.label)
         const csv = [headers.join(','), ...rows].join('\n')
         const blob = new Blob([csv], { type: 'text/csv' })
         const url = URL.createObjectURL(blob)
@@ -142,6 +224,7 @@ export default function PortfolioPage() {
         a.href = url
         a.download = `portfolio_${selectedAccount}.csv`
         a.click()
+        URL.revokeObjectURL(url)
     }
 
     return (
@@ -172,7 +255,7 @@ export default function PortfolioPage() {
                                     onChange={(e) => setSelectedAccount(e.target.value)}
                                     className="bg-[#131722] text-white text-xs font-bold px-4 py-2.5 rounded-xl border border-[#2A2E39] focus:outline-none focus:border-blue-500 appearance-none pr-10 hover:border-blue-500/50 transition-all cursor-pointer shadow-inner"
                                 >
-                                    {accounts.map((acc: any) => (
+                                    {accounts.map((acc) => (
                                         <option key={acc.securitiesAccount.accountId} value={acc.securitiesAccount.hashValue || acc.securitiesAccount.accountId}>
                                             ...{acc.securitiesAccount.accountId.slice(-4)} ({acc.securitiesAccount.type})
                                         </option>
@@ -219,7 +302,7 @@ export default function PortfolioPage() {
                                         <div className="text-rose-500/80 text-xs font-mono">{error}</div>
                                     </div>
                                     <button
-                                        onClick={() => window.location.reload()}
+                                        onClick={() => setConnected(false)}
                                         className="mt-2 px-8 py-2.5 bg-rose-500 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-rose-500/20 hover:brightness-110 active:scale-95 transition-all"
                                     >
                                         Reconnect Schwab Data
@@ -229,10 +312,19 @@ export default function PortfolioPage() {
 
                             {!error && (
                                 <PositionTable
+                                    key={preferences?.portfolioColumns ?? 'default-columns'}
                                     positions={positions}
                                     onExport={handleExport}
                                     onAction={handleAction}
-                                />
+                                    initialColumns={preferredColumns}
+                                    onConfigChange={(config) => {
+                                        updatePreferences({
+                                            portfolioColumns: JSON.stringify(config)
+                                        }).catch((preferenceError) => {
+                                            console.warn('Failed to persist portfolio column preferences:', preferenceError)
+                                        })
+                                    }}
+                                    />
                             )}
 
                             {/* Summary Cards */}
@@ -274,6 +366,92 @@ export default function PortfolioPage() {
                     </div>
                 </div>
             </SchwabGating>
+
+            {pendingOrderDraft && (
+                <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/70 backdrop-blur-md p-4 animate-in fade-in duration-200">
+                    <div className="w-full max-w-xl rounded-3xl border border-[#2A2E39] bg-[#171B24] shadow-[0_30px_120px_rgba(0,0,0,0.65)]">
+                        <div className="flex items-start justify-between gap-4 border-b border-[#2A2E39] px-6 py-5">
+                            <div>
+                                <div className="text-[10px] font-black uppercase tracking-[0.25em] text-blue-500">Trade Preview</div>
+                                <h2 className="mt-2 text-xl font-black tracking-tight text-white">
+                                    {pendingOrderDraft.side} {pendingOrderDraft.symbol}
+                                </h2>
+                                <p className="mt-2 text-sm text-gray-400">
+                                    Review the ticket and continue in Active Trader for validation and submission.
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setPendingOrderDraft(null)}
+                                className="rounded-xl border border-[#2A2E39] p-2 text-gray-500 transition-colors hover:text-white"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+
+                        <div className="grid gap-4 px-6 py-5 md:grid-cols-2">
+                            <div className="rounded-2xl border border-[#2A2E39] bg-[#11141B] p-4">
+                                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-500">Order Setup</div>
+                                <div className="mt-4 space-y-3 text-sm">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-500">Account</span>
+                                        <span className="font-mono text-white">{selectedAccount || 'Pending selection'}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-500">Side</span>
+                                        <span className={`font-black ${pendingOrderDraft.side === 'BUY' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                            {pendingOrderDraft.side}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-500">Quantity</span>
+                                        <span className="font-mono text-white">
+                                            {pendingOrderDraft.quantityMode === 'ALL'
+                                                ? 'All available shares'
+                                                : pendingOrderDraft.quantity ?? 'Set in ticket'}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-500">Order Type</span>
+                                        <span className="font-mono text-white">{pendingOrderDraft.orderType}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4">
+                                <div className="text-[10px] font-black uppercase tracking-[0.22em] text-blue-400">Execution Flow</div>
+                                <ul className="mt-4 space-y-3 text-sm text-gray-300">
+                                    <li>1. Active Trader loads this ticket with your selected account and symbol.</li>
+                                    <li>2. You can edit quantity, order type, duration, and session rules.</li>
+                                    <li>3. Mahita will preview the final Schwab payload before submit.</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col gap-3 border-t border-[#2A2E39] px-6 py-5 sm:flex-row sm:items-center sm:justify-end">
+                            <button
+                                onClick={() => setPendingOrderDraft(null)}
+                                className="rounded-2xl border border-[#2A2E39] px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-gray-400 transition-colors hover:text-white"
+                            >
+                                Stay Here
+                            </button>
+                            <button
+                                onClick={() => {
+                                    const query = serializeOrderDraft({
+                                        ...pendingOrderDraft,
+                                        accountId: selectedAccount,
+                                    })
+                                    setPendingOrderDraft(null)
+                                    router.push(`/active-trader?${query}`)
+                                }}
+                                className="flex items-center justify-center gap-2 rounded-2xl bg-blue-500 px-5 py-3 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-lg shadow-blue-500/20 transition-all hover:bg-blue-600"
+                            >
+                                Edit In Active Trader
+                                <ExternalLink className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </MainLayout>
     )
 }

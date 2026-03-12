@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
 import { providerTelemetryBus } from '@/app/services/market-data/provider-telemetry'
 import { marketDataStore } from '@/app/services/market-data/store'
+import { requireRouteAccess } from '@/lib/security/platform-security'
 
 export async function GET() {
-    const session = await getServerSession(authOptions)
-
-    if (!session) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const access = await requireRouteAccess({ policy: "superuser" })
+    if (!access.ok) {
+        return access.response
     }
 
     return NextResponse.json({

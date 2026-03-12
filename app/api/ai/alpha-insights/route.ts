@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { AlphaInsightsService } from '@/lib/ai/rag/alpha-insights-service'
 
 const insightsService = new AlphaInsightsService()
 
 export async function GET(req: NextRequest) {
     try {
-        const session = await getServerSession()
+        const session = await getServerSession(authOptions)
         if (!session?.user) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
@@ -20,7 +21,8 @@ export async function GET(req: NextRequest) {
 
         // 1. Fetch Positions (Internal API call to keep it DRY or call service directly)
         // For simplicity and speed, we'll fetch from our existing positions endpoint
-        const posRes = await fetch(`${process.env.NEXTAUTH_URL}/api/schwab/positions?accountId=${accountId}`, {
+        const origin = req.nextUrl.origin
+        const posRes = await fetch(`${origin}/api/schwab/positions?accountId=${accountId}`, {
             headers: req.headers // Pass through auth headers/cookies
         })
         const posData = await posRes.json()
@@ -30,7 +32,7 @@ export async function GET(req: NextRequest) {
         }
 
         // 2. Generate Insights
-        const userId = (session.user as any).id || 'default_user'
+        const userId = session.user.id
         const assessment = await insightsService.generateAssessment(
             userId,
             posData.positions,
@@ -42,8 +44,11 @@ export async function GET(req: NextRequest) {
             ...assessment
         })
 
-    } catch (e: any) {
-        console.error('Alpha Insights API Error:', e)
-        return NextResponse.json({ error: e.message }, { status: 500 })
+    } catch (error) {
+        console.error('Alpha Insights API Error:', error)
+        return NextResponse.json(
+            { error: error instanceof Error ? error.message : 'Failed to generate Alpha Insights' },
+            { status: 500 }
+        )
     }
 }

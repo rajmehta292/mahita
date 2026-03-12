@@ -1,20 +1,24 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth/next"
-import { authOptions } from '@/lib/auth'
+import { Prisma } from "@prisma/client"
 import prisma from "@/lib/prisma"
+import { getAppServerSession, isSuperuserSession } from "@/lib/server-session"
 
 export async function GET(req: NextRequest) {
-    const session = await getServerSession(authOptions)
+    const session = await getAppServerSession()
 
-    if (!session) {
+    if (!session?.user?.email) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    if (!isSuperuserSession(session)) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 })
     }
 
     try {
         const { searchParams } = new URL(req.url)
         const vaultName = searchParams.get('vault')
 
-        const where: any = {}
+        const where: Prisma.DataInventoryWhereInput = {}
         if (vaultName) {
             const vault = await prisma.vault.findUnique({ where: { name: vaultName } })
             if (vault) {

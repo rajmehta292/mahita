@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { useSession, signIn } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import { MainLayout } from '../components/Layout/MainLayout'
 import { Search, Filter, TrendingUp, TrendingDown } from 'lucide-react'
+import { AuthEntryCta } from '../components/Auth/AuthEntryCta'
 
 interface ScreenerRow {
     symbol: string
@@ -75,12 +76,7 @@ export default function ScreenerPage() {
         return (
             <MainLayout showBottomPanel={false}>
                 <div className="flex items-center justify-center h-full">
-                    <button
-                        onClick={() => signIn('google')}
-                        className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-                    >
-                        Sign in with Google
-                    </button>
+                    <AuthEntryCta className="bg-blue-500 hover:bg-blue-600 text-white" />
                 </div>
             </MainLayout>
         )
@@ -145,8 +141,8 @@ export default function ScreenerPage() {
                                                     <a href={`/chart?symbol=${row.symbol}&timeframe=1d`} className="text-white font-medium hover:text-blue-400">
                                                         {row.symbol}
                                                     </a>
-                                                    <a href={`/data-doctor?symbol=${row.symbol}`} className="text-xs text-gray-400 hover:text-blue-400">
-                                                        Open Data Command
+                                                    <a href={`/chart?symbol=${row.symbol}&timeframe=1d`} className="text-xs text-gray-400 hover:text-blue-400">
+                                                        Open Chart
                                                     </a>
                                                 </div>
                                             </td>

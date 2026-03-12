@@ -1,12 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { getSchwabClient } from '@/app/services/schwab/client'
-import prisma from '@/lib/prisma'
+import { getAppServerSession, getCurrentUser } from '@/lib/server-session'
+import {
+  getSchwabCallbackUrl,
+} from '@/lib/schwab-config'
+import {
+  persistBrokerageConnectionTokens,
+  requireUserSchwabBrokerageConnection,
+  resolveBrokerageAccountSelection,
+} from '@/lib/brokerage-connections'
+
+interface AccountLookupRecord {
+  securitiesAccount?: {
+    hashValue?: string
+  }
+  hashValue?: string
+}
+
+interface AccountLookupResponse {
+  data?: AccountLookupRecord[]
+}
+
+interface SchwabApiErrorShape {
+  message?: string
+  response?: {
+    status?: number
+    data?: unknown
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAppServerSession()
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -20,7 +45,7 @@ export async function GET(request: NextRequest) {
 
       if (!accountId) {
         const accs = await client.getAccounts()
-        accountId = (accs as any).data?.[0]?.securitiesAccount?.hashValue || 'mock-hash'
+        accountId = (accs as AccountLookupResponse).data?.[0]?.securitiesAccount?.hashValue || 'mock-hash'
       }
 
       const positions = await client.getPositions(accountId!)
@@ -28,20 +53,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, positions, balance })
     }
 
-    // Get user's Schwab config with tokens
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { schwabConfig: true }
-    })
+    const user = await getCurrentUser(session)
 
-    if (!user || !user.schwabConfig) {
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const resolved = await requireUserSchwabBrokerageConnection(user.id).catch(() => null)
+
+    if (!resolved) {
       return NextResponse.json(
         { error: 'Schwab credentials not configured' },
         { status: 400 }
       )
     }
-
-    const config = user.schwabConfig
+    const { connection, config } = resolved
 
     if (!config.clientId || !config.clientSecret) {
       return NextResponse.json({ error: 'Schwab Client ID or Secret missing' }, { status: 400 })
@@ -54,10 +80,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const callbackUrl = `${process.env.NEXTAUTH_URL || 'https://mahita.ai'}/schwab/callback`
+    const callbackUrl = getSchwabCallbackUrl()
     const client = getSchwabClient({
       clientId: config.clientId,
-      clientSecret: config.clientSecret,
+      clientSecret: config.clientSecret || undefined,
       callbackUrl
     })
 
@@ -74,17 +100,14 @@ export async function GET(request: NextRequest) {
       try {
         const newTokens = await client.refreshAccessToken(config.refreshToken)
 
-        // Save new tokens to DB
-        const updatedConfig = await prisma.schwabConfig.update({
-          where: { id: config.id },
-          data: {
-            accessToken: newTokens.access_token,
-            refreshToken: newTokens.refresh_token || config.refreshToken,
-            accessTokenExpiry: new Date(Date.now() + newTokens.expires_in * 1000),
-            refreshTokenExpiry: newTokens.refresh_token_expires_in
-              ? new Date(Date.now() + newTokens.refresh_token_expires_in * 1000)
-              : config.refreshTokenExpiry
-          }
+        await persistBrokerageConnectionTokens({
+          brokerageConnectionId: connection.id,
+          accessToken: newTokens.access_token,
+          refreshToken: newTokens.refresh_token || config.refreshToken,
+          accessTokenExpiry: new Date(Date.now() + newTokens.expires_in * 1000),
+          refreshTokenExpiry: newTokens.refresh_token_expires_in
+            ? new Date(Date.now() + newTokens.refresh_token_expires_in * 1000)
+            : config.refreshTokenExpiry,
         })
 
         client.setAccessToken(newTokens.access_token, newTokens.refresh_token || config.refreshToken)
@@ -99,10 +122,14 @@ export async function GET(request: NextRequest) {
     console.log(`[Schwab Positions] Ensuring account ID exists...`)
 
     if (!accountId) {
+      accountId = resolveBrokerageAccountSelection(connection, accountId)
+    }
+
+    if (!accountId) {
       const accountsRes = await client.getAccounts()
-      const accountsList = (accountsRes as any).data || accountsRes
+      const accountsList = (accountsRes as AccountLookupResponse).data || []
       if (Array.isArray(accountsList) && accountsList.length > 0) {
-        accountId = accountsList[0].securitiesAccount?.hashValue || accountsList[0].hashValue
+        accountId = accountsList[0].securitiesAccount?.hashValue || accountsList[0].hashValue || null
       }
 
       if (!accountId) {
@@ -122,23 +149,26 @@ export async function GET(request: NextRequest) {
         success: true,
         positions,
         balance,
+        connectionId: connection.id,
       })
-    } catch (apiError: any) {
-      const errorData = apiError.response?.data
-      console.error(`[Schwab Positions] API Error for account ${accountId}:`, errorData || apiError.message)
+    } catch (apiError: unknown) {
+      const normalizedError = apiError as SchwabApiErrorShape
+      const errorData = normalizedError.response?.data
+      console.error(`[Schwab Positions] API Error for account ${accountId}:`, errorData || normalizedError.message)
 
-      if (apiError.response?.status === 400) {
+      if (normalizedError.response?.status === 400) {
         return NextResponse.json({
           error: 'Bad Request: Please ensure you are using a valid account ID (hashValue) and have proper permissions.',
           details: errorData
         }, { status: 400 })
       }
-      throw apiError
+      throw normalizedError
     }
-  } catch (error: any) {
-    console.error('Schwab positions route error:', error)
+  } catch (error: unknown) {
+    const normalizedError = error as SchwabApiErrorShape
+    console.error('Schwab positions route error:', normalizedError)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch positions' },
+      { error: normalizedError.message || 'Failed to fetch positions' },
       { status: 500 }
     )
   }

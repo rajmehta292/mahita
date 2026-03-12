@@ -1,5 +1,14 @@
 # Mahita Terminal - Complete TradingView-Like Platform
 
+Status: Superseded. Do not use this document as the current platform status source of truth.
+
+Current source-of-truth documents:
+- [Current State Baseline](/Users/rmehta01/Sites/mahita/docs/current_state_baseline.md)
+- [Mahita Recovery Program](/Users/rmehta01/Sites/mahita/docs/execution/mahita_recovery_program.md)
+- [Verification Matrix](/Users/rmehta01/Sites/mahita/docs/qa/verification_matrix.md)
+
+This document reflects an older aspirational state and currently overstates implementation and release readiness.
+
 ## Overview
 
 Mahita Terminal is now a fully-featured, professional-grade algorithmic trading platform inspired by TradingView's architecture and user experience. The platform provides comprehensive tools for market analysis, strategy development, backtesting, and portfolio management.
@@ -370,7 +379,7 @@ DATABASE_URL=file:./dev.db
 GOOGLE_CLIENT_ID=your_client_id
 GOOGLE_CLIENT_SECRET=your_client_secret
 NEXTAUTH_SECRET=your_secret
-NEXTAUTH_URL=http://mahita.ai
+NEXTAUTH_URL=https://mahita.ai
 ALLOWED_EMAIL=your@email.com
 ```
 

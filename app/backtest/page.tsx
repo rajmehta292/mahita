@@ -1,19 +1,15 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { MainLayout } from '../components/Layout/MainLayout'
 import dynamic from 'next/dynamic'
+import { normalizeUnknownError, parseResponseError } from '@/lib/app-errors'
 import {
     Play,
     Save,
     Plus,
-    Trash2,
     Edit,
-    Settings,
     BarChart3,
-    AlertCircle,
-    CheckCircle,
-    Maximize2,
     ChevronRight,
     ChevronLeft,
     ChevronUp,
@@ -27,8 +23,11 @@ import {
 } from 'lucide-react'
 import StrategyTester from '../components/StrategyTester'
 import { clsx } from 'clsx'
+import { MahitaCodeEditor } from '../components/Backtest/MahitaCodeEditor'
+import { ClientPaneErrorBoundary } from '../components/Error/ClientPaneErrorBoundary'
+import type { BacktestResult } from '../services/trading-engine/types'
+import type { MarketDataPoint } from '../services/market-data/types'
 
-const Editor = dynamic(() => import('@monaco-editor/react'), { ssr: false })
 const Chart = dynamic(() => import('../components/Chart'), { ssr: false })
 
 interface Strategy {
@@ -42,21 +41,24 @@ interface Strategy {
     updatedAt: string
 }
 
-const DEFAULT_SCRIPT = `// Pine Script Strategy
-// @version=1
+const DEFAULT_SCRIPT = `//@version=5
+strategy("EMA Crossover Prototype", overlay=true)
 
-// This strategy uses EMA crossover for entry/exit signals
-const ema_fast = ta.ema(9)
-const ema_slow = ta.ema(21)
-const rsi = ta.rsi(14)
+fastEma = ta.ema(close, 9)
+slowEma = ta.ema(close, 21)
+rsiValue = ta.rsi(close, 14)
 
-if (ema_fast > ema_slow && rsi < 70) {
-    strategy.entry("Long", "long")
-}
+longEntry = ta.crossover(fastEma, slowEma) and rsiValue < 70
+longExit = ta.crossunder(fastEma, slowEma) or rsiValue > 70
 
-if (ema_fast < ema_slow || rsi > 70) {
+if longEntry
+    strategy.entry("Long", strategy.long)
+
+if longExit
     strategy.close("Long")
-}
+
+plot(fastEma, "Fast EMA", color=color.green)
+plot(slowEma, "Slow EMA", color=color.red)
 `
 
 export default function BacktestPage() {
@@ -69,33 +71,43 @@ export default function BacktestPage() {
 
     // UI States
     const [loading, setLoading] = useState(false)
-    const [verifying, setVerifying] = useState(false)
-    const [results, setResults] = useState<any>(null)
-    const [data, setData] = useState<any[]>([])
+    const [results, setResults] = useState<BacktestResult | null>(null)
+    const [data, setData] = useState<MarketDataPoint[]>([])
+    const [marketDataError, setMarketDataError] = useState<string | null>(null)
+    const [backtestError, setBacktestError] = useState<string | null>(null)
     const [showSaveDialog, setShowSaveDialog] = useState(false)
     const [isEditorOpen, setIsEditorOpen] = useState(true)
     const [isResultsOpen, setIsResultsOpen] = useState(false)
     const [activeTab, setActiveTab] = useState<'editor' | 'ai' | 'history'>('editor')
 
+    const fetchMarketData = useCallback(async () => {
+        try {
+            setMarketDataError(null)
+            const response = await fetch(`/api/trading/market-data?symbol=${selectedSymbol}&timeframe=${selectedTimeframe}`)
+            if (!response.ok) {
+                throw await parseResponseError(response, 'Mahita could not load market data for the backtest workspace.')
+            }
+            const json = await response.json()
+            if (json && json.data) setData(json.data)
+        } catch (error) {
+            const normalized = normalizeUnknownError(error, 'Mahita could not load market data.', {
+                code: 'UPSTREAM_FETCH_FAILED',
+                hint: 'Retry once the market-data route is healthy. The editor remains available while market data is unavailable.',
+            })
+            console.warn('Failed to fetch market data:', normalized)
+            setMarketDataError(normalized.message)
+        }
+    }, [selectedSymbol, selectedTimeframe])
+
     useEffect(() => {
         loadStrategies()
         fetchMarketData()
-    }, [selectedSymbol, selectedTimeframe])
+    }, [fetchMarketData])
 
     const loadStrategies = async () => {
         const saved = localStorage.getItem('strategies')
         if (saved) {
             setStrategies(JSON.parse(saved))
-        }
-    }
-
-    const fetchMarketData = async () => {
-        try {
-            const response = await fetch(`/api/trading/market-data?symbol=${selectedSymbol}&timeframe=${selectedTimeframe}`)
-            const json = await response.json()
-            if (json && json.data) setData(json.data)
-        } catch (error) {
-            console.error('Failed to fetch market data:', error)
         }
     }
 
@@ -124,6 +136,7 @@ export default function BacktestPage() {
     const runBacktest = async () => {
         setLoading(true)
         setIsResultsOpen(true)
+        setBacktestError(null)
         try {
             if (data.length === 0) return
 
@@ -152,12 +165,21 @@ export default function BacktestPage() {
                 })
             })
 
+            if (!response.ok) {
+                throw await parseResponseError(response, 'Mahita could not complete this prototype backtest run.')
+            }
+
             const json = await response.json()
             if (json) {
                 setResults(json)
             }
         } catch (error) {
-            console.error('Backtest error:', error)
+            const normalized = normalizeUnknownError(error, 'Mahita could not complete this prototype backtest run.', {
+                code: 'UNKNOWN_ERROR',
+                hint: 'This workspace still runs the prototype engine. Save your script, confirm market data is loaded, then retry.',
+            })
+            console.warn('Backtest error:', normalized)
+            setBacktestError(normalized.message)
         } finally {
             setLoading(false)
         }
@@ -172,6 +194,9 @@ export default function BacktestPage() {
                         <div className="flex items-center gap-2">
                             <BarChart3 className="w-5 h-5 text-blue-500" />
                             <span className="font-bold text-sm tracking-tight">MAHITA ENGINE v6</span>
+                            <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">
+                                Prototype Engine
+                            </span>
                         </div>
                         <div className="h-4 w-[1px] bg-[#2A2E39]"></div>
                         <div className="flex items-center gap-3">
@@ -236,7 +261,14 @@ export default function BacktestPage() {
                             </div>
 
                             <div className="w-full h-full">
-                                {data.length === 0 ? (
+                                {marketDataError ? (
+                                    <div className="h-full flex items-center justify-center px-6 text-center">
+                                        <div className="max-w-md rounded-3xl border border-rose-500/20 bg-rose-500/10 px-6 py-5">
+                                            <p className="text-sm font-medium text-white">Market data unavailable</p>
+                                            <p className="mt-2 text-sm text-rose-100/80">{marketDataError}</p>
+                                        </div>
+                                    </div>
+                                ) : data.length === 0 ? (
                                     <div className="h-full flex items-center justify-center text-gray-500 font-mono text-[10px] uppercase tracking-[0.3em]">
                                         <div className="flex flex-col items-center gap-4">
                                             <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
@@ -244,12 +276,14 @@ export default function BacktestPage() {
                                         </div>
                                     </div>
                                 ) : (
-                                    <Chart
-                                        data={data}
-                                        trades={results?.trades || []}
-                                        chartType="Standard"
-                                        indicators={['Volume']}
-                                    />
+                                    <ClientPaneErrorBoundary title="Chart unavailable">
+                                        <Chart
+                                            data={data}
+                                            trades={results?.trades || []}
+                                            chartType="Standard"
+                                            indicators={['Volume']}
+                                        />
+                                    </ClientPaneErrorBoundary>
                                 )}
                             </div>
                         </div>
@@ -282,6 +316,11 @@ export default function BacktestPage() {
                                 </div>
                             </div>
                             <div className="h-[310px] overflow-auto px-6 pb-6">
+                                {backtestError && (
+                                    <div className="mb-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+                                        {backtestError}
+                                    </div>
+                                )}
                                 <StrategyTester results={results} />
                             </div>
                         </div>
@@ -368,21 +407,12 @@ export default function BacktestPage() {
 
                                             {/* Monaco Editor */}
                                             <div className="flex-1 min-h-0 bg-[#0d0e12]">
-                                                <Editor
-                                                    height="100%"
-                                                    defaultLanguage="javascript"
-                                                    theme="vs-dark"
-                                                    value={script}
-                                                    onChange={(value) => setScript(value || '')}
-                                                    options={{
-                                                        minimap: { enabled: false },
-                                                        fontSize: 13,
-                                                        lineNumbers: 'on',
-                                                        scrollBeyondLastLine: false,
-                                                        automaticLayout: true,
-                                                        padding: { top: 15 }
-                                                    }}
-                                                />
+                                                <ClientPaneErrorBoundary title="Editor unavailable">
+                                                    <MahitaCodeEditor
+                                                        value={script}
+                                                        onChange={setScript}
+                                                    />
+                                                </ClientPaneErrorBoundary>
                                             </div>
                                         </>
                                     )}

@@ -1,22 +1,34 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { NextResponse } from 'next/server'
 import { getSchwabClient } from '@/app/services/schwab/client'
-import prisma from '@/lib/prisma'
+import { getAppServerSession, getCurrentUser } from '@/lib/server-session'
+import {
+  getSchwabCallbackUrl,
+} from '@/lib/schwab-config'
+import {
+  persistBrokerageConnectionTokens,
+  requireUserSchwabBrokerageConnection,
+  syncBrokerageAccountsFromSchwab,
+} from '@/lib/brokerage-connections'
 
-export async function GET(request: NextRequest) {
+interface AccountNumberMapping {
+  accountNumber?: string
+  hashValue?: string
+}
+
+interface SchwabSecuritiesAccount {
+  accountId?: string
+  accountNumber?: string
+  hashValue?: string
+  type?: string
+}
+
+interface SchwabAccountRecord {
+  securitiesAccount?: SchwabSecuritiesAccount
+}
+
+export async function GET() {
   try {
-    let session: any = await getServerSession(authOptions)
-
-    // DEV BYPASS
-    if (!session && process.env.NODE_ENV === 'development') {
-      session = { user: { email: 'dev@mahita.ai' } }
-      await prisma.user.upsert({
-        where: { email: 'dev@mahita.ai' },
-        create: { email: 'dev@mahita.ai', name: 'Dev User' },
-        update: {}
-      })
-    }
+    const session = await getAppServerSession()
 
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -29,20 +41,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, accounts: response.data })
     }
 
-    // Get user's Schwab config with tokens
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { schwabConfig: true }
-    })
+    const user = await getCurrentUser(session)
 
-    if (!user || !user.schwabConfig) {
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const resolved = await requireUserSchwabBrokerageConnection(user.id).catch(() => null)
+
+    if (!resolved) {
       return NextResponse.json(
         { error: 'Schwab credentials not configured' },
         { status: 400 }
       )
     }
 
-    const config = user.schwabConfig
+    const { connection, config } = resolved
 
     if (!config.clientId || !config.clientSecret) {
       return NextResponse.json({ error: 'Schwab Client ID or Secret missing' }, { status: 400 })
@@ -55,10 +69,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const callbackUrl = `${process.env.NEXTAUTH_URL || 'https://mahita.ai'}/schwab/callback`
+    const callbackUrl = getSchwabCallbackUrl()
     const client = getSchwabClient({
       clientId: config.clientId,
-      clientSecret: config.clientSecret,
+      clientSecret: config.clientSecret || undefined,
       callbackUrl
     })
 
@@ -75,17 +89,14 @@ export async function GET(request: NextRequest) {
       try {
         const newTokens = await client.refreshAccessToken(config.refreshToken)
 
-        // Save new tokens to DB
-        await prisma.schwabConfig.update({
-          where: { id: config.id },
-          data: {
-            accessToken: newTokens.access_token,
-            refreshToken: newTokens.refresh_token || config.refreshToken,
-            accessTokenExpiry: new Date(Date.now() + newTokens.expires_in * 1000),
-            refreshTokenExpiry: newTokens.refresh_token_expires_in
-              ? new Date(Date.now() + newTokens.refresh_token_expires_in * 1000)
-              : config.refreshTokenExpiry
-          }
+        await persistBrokerageConnectionTokens({
+          brokerageConnectionId: connection.id,
+          accessToken: newTokens.access_token,
+          refreshToken: newTokens.refresh_token || config.refreshToken,
+          accessTokenExpiry: new Date(Date.now() + newTokens.expires_in * 1000),
+          refreshTokenExpiry: newTokens.refresh_token_expires_in
+            ? new Date(Date.now() + newTokens.refresh_token_expires_in * 1000)
+            : config.refreshTokenExpiry,
         })
 
         client.setAccessToken(newTokens.access_token, newTokens.refresh_token || config.refreshToken)
@@ -101,40 +112,46 @@ export async function GET(request: NextRequest) {
       client.getAccountNumbers()
     ])
 
-    const accountNumbers = numbersResponse.data || []
-    const hashMap = new Map(accountNumbers.map((n: any) => [n.accountNumber, n.hashValue]))
+    const accountNumbers = (numbersResponse.data || []) as AccountNumberMapping[]
+    const hashMap = new Map(accountNumbers.map((accountNumber) => [accountNumber.accountNumber, accountNumber.hashValue]))
 
-    const mergedAccounts = (response.data || []).map((acc: any) => {
-      const sAcc = acc.securitiesAccount || {}
+    const mergedAccounts = ((response.data || []) as SchwabAccountRecord[]).map((account) => {
+      const sAcc = account.securitiesAccount || {}
       if (sAcc.accountNumber && hashMap.has(sAcc.accountNumber)) {
         sAcc.hashValue = hashMap.get(sAcc.accountNumber)
         // Ensure accountId is present for UI compatibility
         sAcc.accountId = sAcc.accountNumber
       }
-      return acc
+      return account
     })
 
     if (mergedAccounts && Array.isArray(mergedAccounts)) {
       console.log(`[Schwab Accounts] Found ${mergedAccounts.length} accounts`)
-      mergedAccounts.forEach((acc: any, i: number) => {
-        const sAcc = acc.securitiesAccount
-        console.log(`  Account ${i}: ID=${sAcc?.accountId}, Hash=${sAcc?.hashValue ? 'Present' : 'MISSING'}`)
+      mergedAccounts.forEach((account, index) => {
+        const sAcc = account.securitiesAccount
+        console.log(`  Account ${index}: ID=${sAcc?.accountId}, Hash=${sAcc?.hashValue ? 'Present' : 'MISSING'}`)
       })
+
+      await syncBrokerageAccountsFromSchwab(connection.id, mergedAccounts)
     }
 
     return NextResponse.json({
       success: true,
       accounts: mergedAccounts,
+      connectionId: connection.id,
     })
-  } catch (error: any) {
-    const errorData = error.response?.data
-    console.error('Schwab accounts route error:', errorData || error.message)
+  } catch (error: unknown) {
+    const errorResponse = error instanceof Error && 'response' in error
+      ? (error as Error & { response?: { status?: number, data?: unknown } }).response
+      : undefined
+    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch accounts'
+    console.error('Schwab accounts route error:', errorResponse?.data || errorMessage)
     return NextResponse.json(
       {
-        error: error.message || 'Failed to fetch accounts',
-        details: errorData
+        error: errorMessage,
+        details: errorResponse?.data
       },
-      { status: error.response?.status || 500 }
+      { status: errorResponse?.status || 500 }
     )
   }
 }

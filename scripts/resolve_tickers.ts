@@ -3,6 +3,16 @@ import path from 'node:path';
 
 const CSV_PATH = path.join(process.cwd(), 'data', 'top_1000_assets_by_market_cap.csv');
 
+type YahooSearchQuote = {
+    symbol: string
+    exchange?: string
+    isYahooFinance?: boolean
+}
+
+type YahooSearchResponse = {
+    quotes?: YahooSearchQuote[]
+}
+
 async function resolveTicker(name: string, originalTicker: string): Promise<string> {
     // If the ticker is a standard US ticker (1-5 uppercase letters, no numbers, no dots except BRK.B)
     if (/^[A-Z]{1,5}$/.test(originalTicker) || originalTicker === 'BRK-B' || originalTicker === 'BRK-A') {
@@ -18,11 +28,11 @@ async function resolveTicker(name: string, originalTicker: string): Promise<stri
         const res = await fetch(`https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(name)}&quotesCount=5`, {
             headers: { 'User-Agent': 'Mozilla/5.0' }
         });
-        const searchResults = await res.json();
+        const searchResults = await res.json() as YahooSearchResponse;
 
         if (searchResults.quotes && searchResults.quotes.length > 0) {
             // Try to find a US listed equity (NYSE, NASDAQ, OTC)
-            const usQuotes = searchResults.quotes.filter(q =>
+            const usQuotes = searchResults.quotes.filter((q: YahooSearchQuote) =>
                 q.isYahooFinance === true &&
                 (q.exchange === 'NYQ' || q.exchange === 'NMS' || q.exchange === 'NYSE' || q.exchange === 'NASDAQ' || q.exchange === 'PNK' || q.exchange === 'OTC')
             );
@@ -48,7 +58,7 @@ async function run() {
     const lines = content.split('\n');
     const header = lines[0];
 
-    let resolvedLines: string[] = [header];
+    const resolvedLines: string[] = [header];
 
     for (let i = 1; i < lines.length; i++) {
         const line = lines[i].trim();
@@ -62,7 +72,7 @@ async function run() {
             const name = line.substring(0, nameIdxEnd).trim().replace(/^"|"$/g, '');
 
             const resolvedTicker = await resolveTicker(name, originalTicker);
-            let cleanedName = name.replace(/,/g, ''); // strip commas internally to protect CSV bounds
+            const cleanedName = name.replace(/,/g, ''); // strip commas internally to protect CSV bounds
             resolvedLines.push(`${cleanedName},${resolvedTicker},${marketCap}`);
 
             if (originalTicker !== resolvedTicker) {

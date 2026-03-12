@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { Search, Bell, Settings, User, TrendingUp, Menu, X } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Search, Bell, Settings, User, TrendingUp, Menu, X, LogOut, ChevronDown } from 'lucide-react'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import { resolveClientCallbackUrl } from '@/lib/auth-redirect'
 
 interface TopBarProps {
     onMenuClick: () => void
@@ -14,10 +15,24 @@ export function TopBar({ onMenuClick }: TopBarProps) {
     const router = useRouter()
     const [searchQuery, setSearchQuery] = useState('')
     const [isSearchOpen, setIsSearchOpen] = useState(false)
+    const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
+    const accountMenuRef = useRef<HTMLDivElement | null>(null)
+    const landingUrl = resolveClientCallbackUrl('/')
+
+    useEffect(() => {
+        function handleOutsideClick(event: MouseEvent) {
+            if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+                setIsAccountMenuOpen(false)
+            }
+        }
+
+        document.addEventListener('mousedown', handleOutsideClick)
+        return () => document.removeEventListener('mousedown', handleOutsideClick)
+    }, [])
 
     const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
         if (e.key === 'Enter' && searchQuery.trim()) {
-            router.push(`/data-doctor?symbol=${searchQuery.trim().toUpperCase()}`)
+            router.push(`/chart?symbol=${searchQuery.trim().toUpperCase()}&timeframe=1d`)
             setIsSearchOpen(false)
             setSearchQuery('')
         }
@@ -79,16 +94,39 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                     <Settings className="w-4 h-4 text-gray-400" />
                 </button>
                 {session && (
-                    <div className="flex items-center gap-2 pl-3 border-l border-[#2A2E39]">
-                        <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
-                            <User className="w-4 h-4 text-white" />
-                        </div>
+                    <div className="relative pl-3 border-l border-[#2A2E39]" ref={accountMenuRef}>
                         <button
-                            onClick={() => signOut()}
-                            className="text-xs text-gray-400 hover:text-white transition-colors whitespace-nowrap hidden xs:block"
+                            onClick={() => setIsAccountMenuOpen((current) => !current)}
+                            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-gray-300 transition-colors hover:bg-[#2A2E39] hover:text-white"
                         >
-                            Sign Out
+                            <div className="w-7 h-7 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                                <User className="w-4 h-4 text-white" />
+                            </div>
+                            <span className="hidden md:inline text-xs font-medium max-w-[180px] truncate">
+                                {session.user.email || 'Account'}
+                            </span>
+                            <ChevronDown className={`w-4 h-4 transition-transform ${isAccountMenuOpen ? 'rotate-180' : ''}`} />
                         </button>
+
+                        {isAccountMenuOpen && (
+                            <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-60 rounded-2xl border border-[#2A2E39] bg-[#1E222D] p-2 shadow-2xl shadow-black/40">
+                                <div className="px-3 py-2 border-b border-[#2A2E39]">
+                                    <p className="text-[10px] uppercase tracking-[0.2em] text-gray-500">Signed in</p>
+                                    <p className="mt-1 text-sm text-white truncate">{session.user.email || 'Mahita User'}</p>
+                                </div>
+
+                                <button
+                                    onClick={() => {
+                                        setIsAccountMenuOpen(false)
+                                        void signOut({ callbackUrl: landingUrl })
+                                    }}
+                                    className="mt-2 flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-[#2A2E39] hover:text-white"
+                                >
+                                    <LogOut className="w-4 h-4" />
+                                    <span>Log out</span>
+                                </button>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

@@ -7,6 +7,38 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum UserRole {
+  USER
+  ADMIN
+  SUPERUSER
+}
+
+enum ProviderCredentialSourceType {
+  DEDICATED
+  USER_SCHWAB_CONFIG
+}
+
+enum ProviderPoolPurpose {
+  MARKET_DATA
+}
+
+enum ProviderPoolMemberStatus {
+  ACTIVE
+  DISABLED
+  DEGRADED
+}
+
+enum BrokerageConnectionProvider {
+  SCHWAB
+}
+
+enum BrokerageConnectionStatus {
+  CONFIGURED
+  AUTHORIZED
+  DEGRADED
+  DISCONNECTED
+}
+
 // NextAuth Models
 model Account {
   id                String  @id @default(cuid())
@@ -36,15 +68,25 @@ model Session {
 }
 
 model User {
-  id            String        @id @default(cuid())
-  name          String?
-  email         String?       @unique
-  emailVerified DateTime?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
-  strategies    Strategy[]
-  schwabConfig  SchwabConfig?
+  id                String            @id @default(cuid())
+  name              String?
+  email             String?           @unique
+  emailVerified     DateTime?
+  image             String?
+  role              UserRole          @default(USER)
+  accounts          Account[]
+  sessions          Session[]
+  strategies        Strategy[]
+  schwabConfig      SchwabConfig?
+  brokerageConnections BrokerageConnection[]
+  preferences       UserPreference?
+  aiKeys            AIKey[]
+  aiUsage           AIUsage[]
+  investorProfile   InvestorProfile?
+  adminAuditEvents  AdminAuditEvent[] @relation("AdminActor")
+  adminAuditTargets AdminAuditEvent[] @relation("AdminTarget")
+  adminSecretRevealGrants AdminSecretRevealGrant[] @relation("AdminSecretRevealActor")
+  providerCredentialsCreated ProviderCredential[] @relation("ProviderCredentialCreator")
 }
 
 model VerificationToken {
@@ -68,7 +110,201 @@ model SchwabConfig {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  brokerageConnection BrokerageConnection?
+  providerCredentials ProviderCredential[]
+}
+
+model BrokerageConnection {
+  id                  String                     @id @default(cuid())
+  userId              String
+  provider            BrokerageConnectionProvider @default(SCHWAB)
+  label               String?
+  status              BrokerageConnectionStatus @default(CONFIGURED)
+  linkedSchwabConfigId String?                  @unique
+  isPrimary           Boolean                   @default(true)
+  pendingAuthState    String?
+  pendingAuthStartedAt DateTime?
+  lastSyncedAt        DateTime?
+  lastError           String?
+  createdAt           DateTime                  @default(now())
+  updatedAt           DateTime                  @updatedAt
+
+  user              User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedSchwabConfig SchwabConfig? @relation(fields: [linkedSchwabConfigId], references: [id], onDelete: SetNull)
+  accounts          BrokerageAccount[]
+
+  @@unique([userId, provider])
+  @@index([provider, status])
+}
+
+model BrokerageAccount {
+  id                   String   @id @default(cuid())
+  brokerageConnectionId String
+  providerAccountId    String
+  accountHash          String?
+  accountNumber        String?
+  accountType          String?
+  displayName          String?
+  isActive             Boolean  @default(true)
+  rawSnapshot          String?
+  lastSyncedAt         DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  brokerageConnection BrokerageConnection @relation(fields: [brokerageConnectionId], references: [id], onDelete: Cascade)
+
+  @@unique([brokerageConnectionId, providerAccountId])
+  @@index([brokerageConnectionId, isActive])
+  @@index([brokerageConnectionId, accountHash])
+}
+
+model ProviderCredential {
+  id                  String                       @id @default(cuid())
+  provider            String
+  label               String
+  sourceType          ProviderCredentialSourceType @default(DEDICATED)
+  createdByUserId     String?
+  linkedSchwabConfigId String?                    @unique
+  clientId            String?
+  clientSecret        String?
+  accessToken         String?
+  refreshToken        String?
+  accessTokenExpiry   DateTime?
+  refreshTokenExpiry  DateTime?
+  isEnabled           Boolean                      @default(true)
+  notes               String?
+  lastValidatedAt     DateTime?
+  lastValidationError String?
+  createdAt           DateTime                     @default(now())
+  updatedAt           DateTime                     @updatedAt
+
+  createdByUser   User?         @relation("ProviderCredentialCreator", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  linkedSchwabConfig SchwabConfig? @relation(fields: [linkedSchwabConfigId], references: [id], onDelete: SetNull)
+  poolMembers     ProviderPoolMember[]
+  revealGrants    AdminSecretRevealGrant[]
+
+  @@index([provider, isEnabled])
+}
+
+model ProviderPoolMember {
+  id                   String                   @id @default(cuid())
+  providerCredentialId String
+  purpose              ProviderPoolPurpose      @default(MARKET_DATA)
+  label                String?
+  priority             Int                      @default(100)
+  weight               Int                      @default(1)
+  status               ProviderPoolMemberStatus @default(ACTIVE)
+  isPrimary            Boolean                  @default(false)
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  providerCredential ProviderCredential @relation(fields: [providerCredentialId], references: [id], onDelete: Cascade)
+
+  @@unique([providerCredentialId, purpose])
+  @@index([purpose, status, priority])
+}
+
+model UserPreference {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  selectedAccountId      String?
+  portfolioColumns       String?
+  portfolioSortKey       String?
+  portfolioSortDirection String?
+  dashboardLayout        String?
+  watchlistSymbols       String?
+  trendingStrategyIds    String?
+  lastVisitedPath        String?
+  lastVisitedAt          DateTime?
+  lastSignInAt           DateTime?
+  previousSignInAt       DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AIKey {
+  id        String   @id @default(cuid())
+  userId    String
+  provider  String
+  label     String?
+  key       String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+}
+
+model AIUsage {
+  id         String   @id @default(cuid())
+  userId     String
+  provider   String
+  modelId    String
+  tokenCount Int      @default(0)
+  isByok     Boolean  @default(false)
+  metadata   String?
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+model InvestorProfile {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  lifeStage               String?
+  timeHorizon             String?
+  riskTolerance           String?
+  liquidityNeeds          String?
+  taxSensitivity          String?
+  objective               String?
+  alphaPromptsEnabled     Boolean  @default(true)
+  minProfitThresholdPct   Float?
+  proposalCooldownMinutes Int?
+  accountScope            String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AdminAuditEvent {
+  id           String   @id @default(cuid())
+  actorUserId  String
+  targetUserId String?
+  action       String
+  reason       String?
+  metadata     String?
+  createdAt    DateTime @default(now())
+
+  actorUser  User  @relation("AdminActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+  targetUser User? @relation("AdminTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId, createdAt])
+  @@index([targetUserId, createdAt])
+}
+
+model AdminSecretRevealGrant {
+  id                  String   @id @default(cuid())
+  actorUserId         String
+  providerCredentialId String
+  targetUserId        String?
+  reason              String
+  expiresAt           DateTime
+  revokedAt           DateTime?
+  createdAt           DateTime @default(now())
+
+  actorUser          User              @relation("AdminSecretRevealActor", fields: [actorUserId], references: [id], onDelete: Cascade)
+  providerCredential ProviderCredential @relation(fields: [providerCredentialId], references: [id], onDelete: Cascade)
+
+  @@index([actorUserId, createdAt])
+  @@index([providerCredentialId, expiresAt])
 }
 
 // Custom Trading Models

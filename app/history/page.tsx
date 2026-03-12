@@ -1,16 +1,18 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useSession, signIn } from 'next-auth/react'
+import { useCallback, useEffect, useState } from 'react'
+import { useSession } from 'next-auth/react'
 import { MainLayout } from '../components/Layout/MainLayout'
+import { SchwabGating } from '../components/SchwabGating'
+import { AuthEntryCta } from '../components/Auth/AuthEntryCta'
+import { useUserPreferences } from '../hooks/use-user-preferences'
+import { resolveHydratedAccountId } from '@/lib/account-selection'
 import {
-    Calendar,
-    Filter,
     Download,
-    ChevronRight,
     RefreshCw,
     AlertCircle,
     ChevronDown,
+    ChevronRight,
     History as HistoryIcon,
     Search
 } from 'lucide-react'
@@ -18,6 +20,7 @@ import {
 interface SchwabAccount {
     securitiesAccount: {
         accountId: string
+        hashValue?: string
         type: string
     }
 }
@@ -30,7 +33,22 @@ interface Trade {
     quantity: number
     price: number
     date: string
-    fullData: any
+    fullData: BrokerageOrder
+}
+
+interface BrokerageOrder {
+    orderId: string
+    status: string
+    quantity?: number
+    price?: number
+    stopPrice?: number
+    enteredTime?: string
+    orderLegCollection?: Array<{
+        instruction?: string
+        instrument?: {
+            symbol?: string
+        }
+    }>
 }
 
 export default function HistoryPage() {
@@ -42,48 +60,23 @@ export default function HistoryPage() {
     const [loading, setLoading] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const { preferences, updatePreferences } = useUserPreferences()
 
-    useEffect(() => {
-        if (status === 'authenticated') {
-            checkSchwabConfig()
-        }
-    }, [status])
-
-    const checkSchwabConfig = async () => {
-        try {
-            const response = await fetch('/api/user/schwab-config')
-            const data = await response.json()
-            if (data.success && data.config?.hasAccessToken) {
-                setConnected(true)
-                fetchAccounts()
-            } else {
-                setConnected(false)
-                setLoading(false)
-            }
-        } catch (error) {
-            console.error('Config check failed:', error)
-            setLoading(false)
-        }
-    }
-
-    const fetchAccounts = async () => {
+    const fetchAccounts = useCallback(async () => {
         try {
             const response = await fetch('/api/schwab/accounts')
             const data = await response.json()
             if (data.success && data.accounts.length > 0) {
                 setAccounts(data.accounts)
-                if (!selectedAccountId) {
-                    setSelectedAccountId(data.accounts[0].securitiesAccount.accountId)
-                }
             }
         } catch (error) {
-            console.error('Fetch accounts failed:', error)
+            console.warn('Fetch accounts failed:', error)
         } finally {
             setLoading(false)
         }
-    }
+    }, [])
 
-    const fetchOrders = async (id?: string) => {
+    const fetchOrders = useCallback(async (id?: string) => {
         const targetId = id || selectedAccountId
         if (!targetId) return
 
@@ -95,7 +88,7 @@ export default function HistoryPage() {
 
             if (data.success && data.orders) {
                 // Map Schwab orders to our Trade interface
-                const mappedTrades = data.orders.map((order: any) => {
+                const mappedTrades = (data.orders as BrokerageOrder[]).map((order) => {
                     const leg = order.orderLegCollection?.[0]
                     return {
                         id: order.orderId,
@@ -104,7 +97,7 @@ export default function HistoryPage() {
                         status: order.status,
                         quantity: order.quantity || 0,
                         price: order.price || order.stopPrice || 0,
-                        date: new Date(order.enteredTime).toLocaleDateString(),
+                        date: order.enteredTime ? new Date(order.enteredTime).toLocaleDateString() : 'Unknown',
                         fullData: order
                     }
                 })
@@ -112,18 +105,64 @@ export default function HistoryPage() {
             } else {
                 setError(data.error || 'No history found')
             }
-        } catch (error) {
+        } catch {
             setError('Failed to fetch trade history')
         } finally {
             setIsRefreshing(false)
         }
-    }
+    }, [selectedAccountId])
+
+    const handleStateChange = useCallback((isConnected: boolean) => {
+        setConnected(isConnected)
+        if (isConnected) {
+            fetchAccounts()
+            return
+        }
+
+        setAccounts([])
+        setSelectedAccountId('')
+        setTrades([])
+        setLoading(false)
+    }, [fetchAccounts])
+
+    useEffect(() => {
+        if (accounts.length === 0) {
+            return
+        }
+
+        const localPreference = localStorage.getItem('mahita_default_account')
+        const preferredAccountId = preferences?.selectedAccountId || localPreference
+        const nextAccountId = resolveHydratedAccountId(
+            accounts,
+            selectedAccountId,
+            preferredAccountId
+        )
+
+        if (nextAccountId && nextAccountId !== selectedAccountId) {
+            setSelectedAccountId(nextAccountId)
+        }
+    }, [accounts, preferences?.selectedAccountId, selectedAccountId])
+
+    useEffect(() => {
+        if (!selectedAccountId) {
+            return
+        }
+
+        localStorage.setItem('mahita_default_account', selectedAccountId)
+        if (preferences?.selectedAccountId === selectedAccountId) {
+            return
+        }
+
+        updatePreferences({ selectedAccountId: selectedAccountId }).catch((preferenceError) => {
+            console.warn('Failed to persist history account preference:', preferenceError)
+        })
+    }, [preferences?.selectedAccountId, selectedAccountId, updatePreferences])
 
     useEffect(() => {
         if (connected && selectedAccountId) {
-            fetchOrders()
+            fetchOrders(selectedAccountId)
         }
-    }, [connected, selectedAccountId])
+    }, [connected, selectedAccountId, fetchOrders])
 
     if (status === 'loading' || (connected && loading)) {
         return (
@@ -143,34 +182,7 @@ export default function HistoryPage() {
                         <HistoryIcon className="w-12 h-12 text-blue-500 mx-auto mb-4 opacity-50" />
                         <h2 className="text-2xl font-bold text-white mb-4">Secure History Access</h2>
                         <p className="text-gray-400 mb-8 font-medium">Please sign in to view your private trading history and execution metrics.</p>
-                        <button
-                            onClick={() => signIn('google')}
-                            className="w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl transition-all font-bold flex items-center justify-center gap-2"
-                        >
-                            Sign in with Google
-                        </button>
-                    </div>
-                </div>
-            </MainLayout>
-        )
-    }
-
-    if (!connected) {
-        return (
-            <MainLayout showBottomPanel={false}>
-                <div className="flex-1 flex items-center justify-center bg-[#131722] p-6 text-center">
-                    <div className="max-w-md bg-[#1E222D] p-8 rounded-2xl border border-[#2A2E39] shadow-2xl">
-                        <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                            <HistoryIcon className="w-8 h-8 text-blue-500" />
-                        </div>
-                        <h2 className="text-2xl font-bold text-white mb-4">Connect Brokerage</h2>
-                        <p className="text-gray-400 mb-8">Link your Schwab account to sync your live trade history and performance data.</p>
-                        <button
-                            onClick={() => signIn('google')}
-                            className="w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-xl transition-all font-bold"
-                        >
-                            Connect Schwab
-                        </button>
+                        <AuthEntryCta fullWidth className="bg-blue-500 hover:bg-blue-600 text-white rounded-xl transition-all font-bold flex items-center justify-center gap-2" />
                     </div>
                 </div>
             </MainLayout>
@@ -179,7 +191,8 @@ export default function HistoryPage() {
 
     return (
         <MainLayout showBottomPanel={false}>
-            <div className="flex flex-col h-full bg-[#131722] text-white overflow-hidden">
+            <SchwabGating onStateChange={handleStateChange}>
+                <div className="flex flex-col h-full bg-[#131722] text-white overflow-hidden">
                 {/* Header */}
                 <div className="bg-[#1E222D] border-b border-[#2A2E39] px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
                     <div className="flex items-center gap-3">
@@ -198,7 +211,7 @@ export default function HistoryPage() {
                                 className="appearance-none bg-[#131722] border border-[#2A2E39] rounded-xl px-4 py-2 pr-10 text-sm font-medium focus:outline-none focus:border-blue-500 transition-colors cursor-pointer"
                             >
                                 {accounts.map((acc) => (
-                                    <option key={acc.securitiesAccount.accountId} value={acc.securitiesAccount.accountId}>
+                                    <option key={acc.securitiesAccount.accountId} value={acc.securitiesAccount.hashValue || acc.securitiesAccount.accountId}>
                                         Account: {acc.securitiesAccount.accountId}
                                     </option>
                                 ))}
@@ -207,10 +220,10 @@ export default function HistoryPage() {
                         </div>
 
                         <div className="flex items-center gap-2 border-l border-[#2A2E39] ml-2 pl-4">
-                            <button
-                                onClick={() => fetchOrders()}
-                                disabled={isRefreshing}
-                                className="p-2 bg-[#2A2E39] hover:bg-[#363A45] rounded-lg transition-colors disabled:opacity-50"
+                                <button
+                                    onClick={() => fetchOrders()}
+                                    disabled={isRefreshing}
+                                    className="p-2 bg-[#2A2E39] hover:bg-[#363A45] rounded-lg transition-colors disabled:opacity-50"
                             >
                                 <RefreshCw className={`w-4 h-4 text-gray-400 ${isRefreshing ? 'animate-spin' : ''}`} />
                             </button>
@@ -326,7 +339,8 @@ export default function HistoryPage() {
                         )}
                     </div>
                 </div>
-            </div>
+                </div>
+            </SchwabGating>
         </MainLayout>
     )
 }

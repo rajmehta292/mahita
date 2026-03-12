@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /out/
+/public/monaco/
 
 # production
 /build
@@ -32,6 +33,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.demo.example
 
 # vercel
 .vercel
@@ -41,3 +43,5 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+/demo.db
+/artifacts/senior-project/

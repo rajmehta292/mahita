@@ -3,71 +3,68 @@
 ## ✅ Dev Server Status
 
 The development server is now running on:
-- **Local**: http://mahita.ai
-- **Network**: http://192.168.1.221:3000
+- **Local**: http://localhost:6244
+- **Network**: http://192.168.1.221:6244
 
 ## 📍 All Available Pages
 
 ### 1. **Dashboard** (Overview)
-- **URL**: http://mahita.ai/dashboard
+- **URL**: http://localhost:6244/dashboard
 - **Features**: Portfolio stats, quick actions, recent activity
 - **Access**: Click "Dashboard" in sidebar or navigate directly
 
 ### 2. **Chart** (Technical Analysis)
-- **URL**: http://mahita.ai/chart
+- **URL**: http://localhost:6244/chart
 - **Features**: Professional charting, drawing tools, indicators
 - **Access**: Click "Chart" in sidebar
 
 ### 3. **Backtest** (Strategy Testing)
-- **URL**: http://mahita.ai/backtest
+- **URL**: http://localhost:6244/backtest
 - **Features**: Pine Script editor, backtesting engine, results
 - **Access**: Click "Backtest" in sidebar
 
 ### 4. **Screener** (Stock Screening)
-- **URL**: http://mahita.ai/screener
+- **URL**: http://localhost:6244/screener
 - **Features**: Filter stocks, real-time data, sortable columns
 - **Access**: Click "Screener" in sidebar
 
 ### 5. **Orders** (Order Management)
-- **URL**: http://mahita.ai/orders
+- **URL**: http://localhost:6244/orders
 - **Features**: Active orders, order history, quick actions
 - **Access**: Click "Orders" in sidebar
 
 ### 6. **History** (Trade Log)
-- **URL**: http://mahita.ai/history
+- **URL**: http://localhost:6244/history
 - **Features**: Complete trade history, P&L tracking, export
 - **Access**: Click "History" in sidebar
 
 ### 7. **Watchlist** (Favorites)
-- **URL**: http://mahita.ai/watchlist
+- **URL**: http://localhost:6244/watchlist
 - **Features**: Personal watchlist, price cards, quick chart access
 - **Access**: Click "Watchlist" in sidebar
 
 ### 8. **Test Navigation** (Debug)
-- **URL**: http://mahita.ai/test-nav
+- **URL**: http://localhost:6244/test-nav
 - **Features**: Quick links to all pages for testing
 - **Access**: Navigate directly to URL
 
 ## 🔐 Authentication Required
 
-All pages require Google OAuth authentication:
-1. Navigate to any page
-2. Click "Sign in with Google"
-3. Authorize the application
-4. Access granted to all features
+Production uses Google OAuth on `https://mahita.ai`.
+Local development uses the Mahita dev-bypass flow by default.
 
 ## 🎯 Quick Start
 
 ### Option 1: Use the Sidebar
-1. Open http://mahita.ai
-2. Sign in with Google
+1. Open http://localhost:6244
+2. Use the dev-bypass flow locally, or sign in with Google on https://mahita.ai
 3. Use the left sidebar to navigate between pages
 
 ### Option 2: Direct URLs
 Simply paste any of the URLs above into your browser
 
 ### Option 3: Test Page
-1. Go to http://mahita.ai/test-nav
+1. Go to http://localhost:6244/test-nav
 2. Click on any page card to navigate
 
 ## 🐛 Troubleshooting
@@ -195,4 +192,4 @@ If pages aren't showing:
 
 **All pages are now live and accessible!** 🎉
 
-Navigate to http://mahita.ai/test-nav to see all available pages.
+Navigate to http://localhost:6244/test-nav to see all available pages.

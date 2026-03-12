@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
-import { useSession, signIn } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import { MainLayout } from '../components/Layout/MainLayout'
 import { Plus, X } from 'lucide-react'
+import { AuthEntryCta } from '../components/Auth/AuthEntryCta'
 
 export default function OrdersPage() {
     const { data: session, status } = useSession()
@@ -28,12 +28,7 @@ export default function OrdersPage() {
         return (
             <MainLayout showBottomPanel={false}>
                 <div className="flex items-center justify-center h-full">
-                    <button
-                        onClick={() => signIn('google')}
-                        className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-                    >
-                        Sign in with Google
-                    </button>
+                    <AuthEntryCta className="bg-blue-500 hover:bg-blue-600 text-white" />
                 </div>
             </MainLayout>
         )

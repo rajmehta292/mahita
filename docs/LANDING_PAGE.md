@@ -221,7 +221,7 @@ xl: 1280px  /* Desktops */
 
 The landing page is deployed at:
 - **Production**: https://mahita.ai
-- **Local Dev**: http://mahita.ai
+- **Local Dev**: http://localhost:6244
 
 Both Next.js dev server and Cloudflare Tunnel must be running for public access.
 

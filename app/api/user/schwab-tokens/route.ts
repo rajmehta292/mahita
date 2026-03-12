@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import prisma from '@/lib/prisma'
+import { getAppServerSession, getCurrentUser } from '@/lib/server-session'
+import {
+  persistBrokerageConnectionTokens,
+  requireUserSchwabBrokerageConnection,
+} from '@/lib/brokerage-connections'
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAppServerSession()
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -20,20 +22,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { schwabConfig: true }
-    })
+    const user = await getCurrentUser(session)
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    if (!user.schwabConfig) {
-      return NextResponse.json(
-        { error: 'Schwab credentials not configured. Please add your API keys first.' },
-        { status: 400 }
-      )
     }
 
     // Calculate expiry times
@@ -46,51 +38,64 @@ export async function POST(request: NextRequest) {
       ? new Date(now.getTime() + refreshTokenExpiresIn * 1000)
       : new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000) // Default 7 days
 
-    // Update tokens
-    await prisma.schwabConfig.update({
-      where: { userId: user.id },
-      data: {
-        accessToken,
-        refreshToken,
-        accessTokenExpiry,
-        refreshTokenExpiry,
-        updatedAt: new Date(),
-      }
+    const resolved = await requireUserSchwabBrokerageConnection(user.id).catch(() => null)
+
+    if (!resolved) {
+      return NextResponse.json(
+        { error: 'Schwab credentials not configured. Please add your API keys first.' },
+        { status: 400 }
+      )
+    }
+
+    const { connection } = resolved
+
+    await persistBrokerageConnectionTokens({
+      brokerageConnectionId: connection.id,
+      accessToken,
+      refreshToken,
+      accessTokenExpiry,
+      refreshTokenExpiry,
     })
 
     return NextResponse.json({
       success: true,
       message: 'Tokens saved successfully'
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Save tokens error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to save tokens' },
+      { error: error instanceof Error ? error.message : 'Failed to save tokens' },
       { status: 500 }
     )
   }
 }
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getAppServerSession()
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { schwabConfig: true }
-    })
+    const user = await getCurrentUser(session)
 
-    if (!user || !user.schwabConfig) {
+    if (!user) {
       return NextResponse.json({
         success: false,
-        error: 'No Schwab configuration found'
+        error: 'User not found',
       }, { status: 404 })
     }
 
-    const config = user.schwabConfig
+    const resolved = await requireUserSchwabBrokerageConnection(user.id).catch(() => null)
+
+    if (!resolved) {
+      return NextResponse.json({
+        success: false,
+        error: 'No Schwab brokerage connection found',
+      }, { status: 404 })
+    }
+
+    const { connection, config } = resolved
 
     // Check if tokens are expired
     const now = new Date()
@@ -99,21 +104,23 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      tokens: {
-        accessToken: config.accessToken,
-        refreshToken: config.refreshToken,
+      status: {
+        hasClientId: Boolean(config.clientId),
+        hasClientSecret: Boolean(config.clientSecret),
+        hasAccessToken: Boolean(config.accessToken),
+        hasRefreshToken: Boolean(config.refreshToken),
         accessTokenValid,
         refreshTokenValid,
-      },
-      credentials: {
-        clientId: config.clientId,
-        clientSecret: config.clientSecret,
+        accessTokenExpiry: config.accessTokenExpiry,
+        refreshTokenExpiry: config.refreshTokenExpiry,
+        connectionId: connection.id,
+        connectionStatus: connection.status,
       }
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Get tokens error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to get tokens' },
+      { error: error instanceof Error ? error.message : 'Failed to get tokens' },
       { status: 500 }
     )
   }

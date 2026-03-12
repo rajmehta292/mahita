@@ -1,13 +1,11 @@
 import { NextRequest } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
 import { providerTelemetryBus } from '@/app/services/market-data/provider-telemetry'
+import { requireRouteAccess } from '@/lib/security/platform-security'
 
 export async function GET(request: NextRequest) {
-    const session = await getServerSession(authOptions)
-
-    if (!session) {
-        return new Response('Unauthorized', { status: 401 })
+    const access = await requireRouteAccess({ policy: "superuser" })
+    if (!access.ok) {
+        return access.response
     }
 
     const encoder = new TextEncoder()

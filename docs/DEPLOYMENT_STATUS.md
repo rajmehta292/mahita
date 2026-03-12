@@ -4,9 +4,9 @@
 
 ### 1. Next.js Development Server
 - **Status**: ✅ Running
-- **Port**: 3000
-- **Local URL**: http://mahita.ai
-- **Network URL**: http://192.168.1.221:3000
+- **Port**: 6244
+- **Local URL**: http://localhost:6244
+- **Network URL**: http://192.168.1.221:6244
 
 ### 2. Cloudflare Tunnel
 - **Status**: ✅ Running
@@ -22,8 +22,8 @@
 - **Status**: ✅ Live and accessible worldwide
 
 ### Local Access (Development)
-- **Localhost**: http://mahita.ai
-- **Network**: http://192.168.1.221:3000
+- **Localhost**: http://localhost:6244
+- **Network**: http://192.168.1.221:6244
 - **Status**: ✅ Available on local network
 
 ## 📍 Available Pages
@@ -46,7 +46,7 @@ All pages are accessible via both URLs:
 
 ## 🔐 Authentication
 
-- **Method**: Google OAuth
+- **Method**: Google OAuth on `https://mahita.ai`, dev bypass on localhost
 - **Provider**: NextAuth
 - **Status**: ✅ Configured
 - **Whitelist**: Email-based access control
@@ -133,7 +133,7 @@ cloudflared tunnel --config cloudflared/config.yml run
 
 **Local**:
 ```bash
-curl http://mahita.ai
+curl http://localhost:6244
 ```
 
 **Public**:

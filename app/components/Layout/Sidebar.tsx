@@ -1,15 +1,13 @@
 'use client'
 
 import { useState } from 'react'
+import { useSession } from 'next-auth/react'
 import {
     LayoutGrid,
-    TrendingUp,
     Activity,
     BarChart3,
     Settings,
-    Clock,
     Star,
-    List,
     ChevronLeft,
     ChevronRight,
     Zap,
@@ -19,24 +17,32 @@ import {
     Code,
     BarChart2,
     FileText,
-    FlaskConical
+    FlaskConical,
+    Database,
+    MonitorSmartphone,
+    TrendingUp,
+    ScrollText
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { isAdminRole } from '@/lib/roles'
 
 const menuItems = [
     { icon: LayoutGrid, label: 'Dashboard', href: '/dashboard' },
     { icon: Briefcase, label: 'Portfolio', href: '/portfolio' },
     { icon: Zap, label: 'Active Trader', href: '/active-trader' },
     { icon: BarChart2, label: 'Screener', href: '/screener' },
-    { icon: Activity, label: 'Data Command', href: '/data-doctor' },
     { icon: FileText, label: 'Trade History', href: '/history' },
     { icon: Star, label: 'Watchlist', href: '/watchlist' },
     { icon: Code, label: 'Script Editor', href: '/script-editor' },
     { icon: BarChart3, label: 'Backtester', href: '/backtest' },
+    { icon: TrendingUp, label: 'Trending Indicators', href: '/trending-indicators' },
+    { icon: Database, label: 'Schwab Data', href: '/schwab-data' },
     { icon: BookOpen, label: 'Learn', href: '/learn' },
     { icon: Code, label: 'AI Chat', href: '/ai-chat' },
-    { icon: FlaskConical, label: 'Dev Tests', href: '/dev-tests' },
+    { icon: MonitorSmartphone, label: 'Desktop Expansion', href: '/desktop-expansion' },
+    { icon: Activity, label: 'Admin Control', href: '/admin', requiresAdmin: true },
+    { icon: FlaskConical, label: 'Dev Tests', href: '/dev-tests', requiresAdmin: true },
 ]
 
 interface SidebarProps {
@@ -47,6 +53,10 @@ interface SidebarProps {
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
     const [collapsed, setCollapsed] = useState(false)
     const pathname = usePathname()
+    const { data: session } = useSession()
+    const canViewAdminItems = isAdminRole(session?.user?.role)
+
+    const visibleMenuItems = menuItems.filter((item) => !item.requiresAdmin || canViewAdminItems)
 
     return (
         <>
@@ -68,7 +78,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
                 {/* Menu Items */}
                 <nav className="flex-1 py-4 overflow-y-auto">
-                    {menuItems.map((item) => {
+                    {visibleMenuItems.map((item) => {
                         const Icon = item.icon
                         const isActive = pathname === item.href
 
@@ -95,6 +105,19 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
                 {/* Settings & Collapse at Bottom */}
                 <div className="border-t border-[#2A2E39]">
+                    <Link
+                        href="/docs"
+                        onClick={() => {
+                            if (window.innerWidth < 1024) onClose()
+                        }}
+                        className="flex items-center gap-3 px-4 py-3 text-gray-400 hover:bg-[#2A2E39] hover:text-white transition-colors"
+                    >
+                        <ScrollText className="w-5 h-5 flex-shrink-0" />
+                        <span className={`text-sm font-medium transition-opacity duration-300 ${collapsed ? 'lg:opacity-0 lg:w-0 overflow-hidden' : 'opacity-100'}`}>
+                            Documentation
+                        </span>
+                    </Link>
+
                     <Link
                         href="/settings"
                         onClick={() => {

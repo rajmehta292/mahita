@@ -1,20 +1,21 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useSession, signIn } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import dynamic from 'next/dynamic'
 import { MarketDataPoint } from '../services/market-data/types'
 import { MainLayout } from '../components/Layout/MainLayout'
 import { SymbolHeader } from '../components/Chart/SymbolHeader'
 import { ChartToolbar } from '../components/Chart/ChartToolbar'
 import { RightPanel } from '../components/Chart/RightPanel'
+import { AuthEntryCta } from '../components/Auth/AuthEntryCta'
 
 const Chart = dynamic(() => import('../components/Chart'), { ssr: false })
 
 export default function ChartPage() {
     const { data: session, status } = useSession()
     const [data, setData] = useState<MarketDataPoint[]>([])
-    const [inventory, setInventory] = useState<any[]>([])
+    const [catalog, setCatalog] = useState<Array<{ symbol: string; timeframes: string[] }>>([])
     const [dataMessage, setDataMessage] = useState('Loading market data...')
     const [selectedSymbol, setSelectedSymbol] = useState("AAPL")
     const [selectedTimeframe, setSelectedTimeframe] = useState("1d")
@@ -28,8 +29,8 @@ export default function ChartPage() {
             if (tf) setSelectedTimeframe(tf)
         }
     }, [])
-    const [chartType, setChartType] = useState<'Standard' | 'HeikinAshi'>('Standard')
-    const [activeIndicators, setActiveIndicators] = useState<string[]>(['Volume'])
+    const chartType: 'Standard' | 'HeikinAshi' = 'Standard'
+    const activeIndicators = ['Volume']
 
     const safeFetchJson = useCallback(async (url: string, options?: RequestInit) => {
         try {
@@ -51,8 +52,8 @@ export default function ChartPage() {
                 throw new Error('Server did not return a JSON response.')
             }
             return await res.json()
-        } catch (error: any) {
-            console.error(`[API Error] ${url}:`, error)
+        } catch (error) {
+            console.warn(`[API Error] ${url}:`, error)
             return null
         }
     }, [])
@@ -60,8 +61,8 @@ export default function ChartPage() {
     useEffect(() => {
         if (status !== 'authenticated') return
         const fetchInventory = async () => {
-            const json = await safeFetchJson('/api/trading/inventory')
-            if (json) setInventory(json)
+            const json = await safeFetchJson('/api/platform/chart-catalog')
+            if (json?.catalog) setCatalog(json.catalog)
         }
         fetchInventory()
     }, [status, safeFetchJson])
@@ -101,16 +102,10 @@ export default function ChartPage() {
     }, [selectedSymbol, selectedTimeframe])
 
     const availableSymbols = Array.from(
-        new Set([selectedSymbol, ...inventory.map((item) => item.symbol)])
+        new Set([selectedSymbol, ...catalog.map((item) => item.symbol)])
     ).sort()
 
-    const availableTimeframes = Array.from(
-        new Set(
-            inventory
-                .filter((item) => item.symbol === selectedSymbol)
-                .map((item) => item.timeframe)
-        )
-    ).sort((left, right) => {
+    const availableTimeframes = [...(catalog.find((item) => item.symbol === selectedSymbol)?.timeframes ?? [])].sort((left, right) => {
         const order = ['1m', '3m', '5m', '10m', '15m', '30m', '45m', '1h', '2h', '3h', '4h', '1d', '1w', '1M']
         return order.indexOf(left) - order.indexOf(right)
     })
@@ -135,12 +130,7 @@ export default function ChartPage() {
         return (
             <MainLayout showBottomPanel={false}>
                 <div className="flex items-center justify-center h-full">
-                    <button
-                        onClick={() => signIn('google')}
-                        className="px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-                    >
-                        Sign in with Google
-                    </button>
+                    <AuthEntryCta className="bg-blue-500 hover:bg-blue-600 text-white" />
                 </div>
             </MainLayout>
         )

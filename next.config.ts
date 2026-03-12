@@ -1,7 +1,27 @@
 import type { NextConfig } from "next";
+import { buildSecurityHeaders } from "./lib/security/http-headers";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  allowedDevOrigins: [
+    "http://localhost:6244",
+    "http://127.0.0.1:6244",
+    "http://localhost:6245",
+    "http://127.0.0.1:6245",
+    "mahita.ai",
+    "https://mahita.ai",
+  ],
+  poweredByHeader: false,
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: buildSecurityHeaders({
+          isDevelopment: process.env.NODE_ENV !== "production",
+          isProduction: process.env.NODE_ENV === "production",
+        }),
+      },
+    ];
+  },
 };
 
 export default nextConfig;

@@ -1,17 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth/next'
-import { authOptions } from '@/lib/auth'
 import { getSchwabClient } from '@/app/services/schwab/client'
-import prisma from '@/lib/prisma'
+import { getAppServerSession, getCurrentUser } from '@/lib/server-session'
+import { requireUserSchwabBrokerageConnection } from '@/lib/brokerage-connections'
+import { getSchwabCallbackUrl } from '@/lib/schwab-config'
+
+interface AccountLookupResponse {
+  data?: Array<{
+    securitiesAccount?: {
+      hashValue?: string
+    }
+    hashValue?: string
+  }>
+}
+
+interface OrderResponse {
+  data?: {
+    orderId?: string
+  } | null
+  headers?: {
+    location?: string | null
+  }
+}
+
+function getDefaultOrderWindow() {
+  const now = new Date()
+  const from = new Date(now.getTime() - 1000 * 60 * 60 * 24 * 30)
+
+  return {
+    fromEnteredTime: from.toISOString(),
+    toEnteredTime: now.toISOString(),
+  }
+}
 
 export async function GET(request: NextRequest) {
   try {
-    let session: any = await getServerSession(authOptions)
-
-    // DEV BYPASS
-    if (!session && process.env.NODE_ENV === 'development') {
-      session = { user: { email: 'dev@mahita.ai' } }
-    }
+    const session = await getAppServerSession()
 
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -26,30 +49,31 @@ export async function GET(request: NextRequest) {
 
       if (!accountId) {
         const accs = await client.getAccounts()
-        accountId = (accs as any).data?.[0]?.securitiesAccount?.hashValue || 'mock-hash'
+        accountId = (accs as AccountLookupResponse).data?.[0]?.securitiesAccount?.hashValue || 'mock-hash'
       }
 
-      const orders = await client.getOrders(accountId!)
+      const orders = await client.getOrders(accountId!, getDefaultOrderWindow())
       return NextResponse.json({ success: true, orders: orders.data })
     }
 
-    // Get user's Schwab config with tokens
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { schwabConfig: true }
-    })
+    const user = await getCurrentUser(session)
 
-    if (!user || !user.schwabConfig) {
-      return NextResponse.json({ error: 'Schwab credentials not configured' }, { status: 400 })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const config = user.schwabConfig
+    const resolved = await requireUserSchwabBrokerageConnection(user.id).catch(() => null)
+
+    if (!resolved) {
+      return NextResponse.json({ error: 'Schwab credentials not configured' }, { status: 400 })
+    }
+    const { config, connection } = resolved
 
     if (!config.accessToken || !config.refreshToken) {
       return NextResponse.json({ error: 'Please connect your Schwab account first' }, { status: 400 })
     }
 
-    const callbackUrl = `${process.env.NEXTAUTH_URL || 'https://mahita.ai'}/schwab/callback`
+    const callbackUrl = getSchwabCallbackUrl()
     const client = getSchwabClient({
       clientId: config.clientId,
       callbackUrl
@@ -64,9 +88,13 @@ export async function GET(request: NextRequest) {
 
     if (!accountId) {
       const accountsRes = await client.getAccounts()
-      const accountsList = (accountsRes as any).data || accountsRes
+      const accountsList = (accountsRes as AccountLookupResponse).data || []
       if (Array.isArray(accountsList) && accountsList.length > 0) {
-        accountId = accountsList[0].securitiesAccount?.hashValue || accountsList[0].hashValue
+        accountId = accountsList[0].securitiesAccount?.hashValue ?? accountsList[0].hashValue ?? null
+      }
+
+      if (!accountId) {
+        accountId = connection.accounts[0]?.accountHash || connection.accounts[0]?.providerAccountId || null
       }
 
       if (!accountId) {
@@ -74,16 +102,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const orders = await client.getOrders(accountId)
+    const orders = await client.getOrders(accountId, getDefaultOrderWindow())
 
     return NextResponse.json({
       success: true,
       orders: orders.data,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Schwab orders error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to fetch orders' },
+      { error: error instanceof Error ? error.message : 'Failed to fetch orders' },
       { status: 500 }
     )
   }
@@ -91,12 +119,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    let session: any = await getServerSession(authOptions)
-
-    // DEV BYPASS
-    if (!session && process.env.NODE_ENV === 'development') {
-      session = { user: { email: 'dev@mahita.ai' } }
-    }
+    const session = await getAppServerSession()
 
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -115,21 +138,24 @@ export async function POST(request: NextRequest) {
       const response = await client.placeOrder(accountId, order)
       return NextResponse.json({
         success: true,
-        orderId: (response as any).data?.orderId || 'mock-id'
+        orderId: (response as OrderResponse).data?.orderId || 'mock-id'
       })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { schwabConfig: true }
-    })
+    const user = await getCurrentUser(session)
 
-    if (!user || !user.schwabConfig) {
-      return NextResponse.json({ error: 'Schwab credentials not configured' }, { status: 400 })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const config = user.schwabConfig
-    const callbackUrl = `${process.env.NEXTAUTH_URL || 'https://mahita.ai'}/schwab/callback`
+    const resolved = await requireUserSchwabBrokerageConnection(user.id).catch(() => null)
+
+    if (!resolved) {
+      return NextResponse.json({ error: 'Schwab credentials not configured' }, { status: 400 })
+    }
+    const { config } = resolved
+
+    const callbackUrl = getSchwabCallbackUrl()
     const client = getSchwabClient({
       clientId: config.clientId,
       callbackUrl
@@ -138,15 +164,16 @@ export async function POST(request: NextRequest) {
     client.setAccessToken(config.accessToken!, config.refreshToken!)
 
     const response = await client.placeOrder(accountId, order)
+    const normalizedResponse = response as OrderResponse
 
     return NextResponse.json({
       success: true,
-      orderId: (response as any).data?.orderId,
+      orderId: normalizedResponse.data?.orderId || normalizedResponse.headers?.location || null,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Schwab place order error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to place order' },
+      { error: error instanceof Error ? error.message : 'Failed to place order' },
       { status: 500 }
     )
   }
@@ -154,12 +181,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    let session: any = await getServerSession(authOptions)
-
-    // DEV BYPASS
-    if (!session && process.env.NODE_ENV === 'development') {
-      session = { user: { email: 'dev@mahita.ai' } }
-    }
+    const session = await getAppServerSession()
 
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -177,17 +199,20 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: true, message: 'Order cancelled successfully' })
     }
 
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { schwabConfig: true }
-    })
+    const user = await getCurrentUser(session)
 
-    if (!user || !user.schwabConfig) {
-      return NextResponse.json({ error: 'Schwab credentials not configured' }, { status: 400 })
+    if (!user) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const config = user.schwabConfig
-    const callbackUrl = `${process.env.NEXTAUTH_URL || 'https://mahita.ai'}/schwab/callback`
+    const resolved = await requireUserSchwabBrokerageConnection(user.id).catch(() => null)
+
+    if (!resolved) {
+      return NextResponse.json({ error: 'Schwab credentials not configured' }, { status: 400 })
+    }
+    const { config } = resolved
+
+    const callbackUrl = getSchwabCallbackUrl()
     const client = getSchwabClient({
       clientId: config.clientId,
       callbackUrl
@@ -201,10 +226,10 @@ export async function DELETE(request: NextRequest) {
       success: true,
       message: 'Order cancelled successfully',
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Schwab cancel order error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to cancel order' },
+      { error: error instanceof Error ? error.message : 'Failed to cancel order' },
       { status: 500 }
     )
   }
