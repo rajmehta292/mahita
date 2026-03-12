@@ -292,8 +292,8 @@ export default function PortfolioPage() {
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 overflow-auto p-8 bg-gradient-to-b from-[#131722] to-[#0D0F14]">
-                        <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-700">
+                    <div className="flex-1 overflow-hidden p-8 bg-gradient-to-b from-[#131722] to-[#0D0F14]">
+                        <div className="mx-auto flex h-full max-w-7xl min-h-0 flex-col gap-8 animate-in fade-in duration-700">
                             {error && (
                                 <div className="bg-rose-500/10 border border-rose-500/20 rounded-2xl p-6 flex flex-col items-center gap-4 text-center">
                                     <AlertCircle className="w-12 h-12 text-rose-500" />
@@ -311,24 +311,26 @@ export default function PortfolioPage() {
                             )}
 
                             {!error && (
-                                <PositionTable
-                                    key={preferences?.portfolioColumns ?? 'default-columns'}
-                                    positions={positions}
-                                    onExport={handleExport}
-                                    onAction={handleAction}
-                                    initialColumns={preferredColumns}
-                                    onConfigChange={(config) => {
-                                        updatePreferences({
-                                            portfolioColumns: JSON.stringify(config)
-                                        }).catch((preferenceError) => {
-                                            console.warn('Failed to persist portfolio column preferences:', preferenceError)
-                                        })
-                                    }}
+                                <div className="min-h-0 flex-1">
+                                    <PositionTable
+                                        key={preferences?.portfolioColumns ?? 'default-columns'}
+                                        positions={positions}
+                                        onExport={handleExport}
+                                        onAction={handleAction}
+                                        initialColumns={preferredColumns}
+                                        onConfigChange={(config) => {
+                                            updatePreferences({
+                                                portfolioColumns: JSON.stringify(config)
+                                            }).catch((preferenceError) => {
+                                                console.warn('Failed to persist portfolio column preferences:', preferenceError)
+                                            })
+                                        }}
                                     />
+                                </div>
                             )}
 
                             {/* Summary Cards */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div className="grid shrink-0 grid-cols-1 gap-6 md:grid-cols-3">
                                 <div className="bg-[#1E222D] border border-[#2A2E39] rounded-2xl p-6 group hover:border-blue-500/30 transition-all cursor-pointer">
                                     <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4 flex justify-between items-center">
                                         Asset Exposure

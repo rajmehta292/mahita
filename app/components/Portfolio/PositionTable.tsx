@@ -121,7 +121,7 @@ export function PositionTable({
     const visibleColumns = [...columnConfig].sort((a, b) => a.order - b.order).filter(c => c.visible)
 
     return (
-        <div className="bg-[#1E222D] border border-[#2A2E39] rounded-3xl overflow-hidden shadow-2xl">
+        <div className="flex h-full min-h-0 flex-col bg-[#1E222D] border border-[#2A2E39] rounded-3xl overflow-hidden shadow-2xl">
             {/* Toolbar */}
             <div className="px-8 py-5 border-b border-[#2A2E39] flex items-center justify-between bg-white/[0.02]">
                 <div className="flex items-center gap-4">
@@ -205,8 +205,8 @@ export function PositionTable({
                 </div>
             )}
 
-            <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+            <div className="min-h-0 flex-1 overflow-auto">
+                <table className="w-full min-w-[960px] text-left border-collapse">
                     <thead>
                         <tr className="bg-[#131722]/80 border-b border-[#2A2E39]">
                             {visibleColumns.map(col => (
