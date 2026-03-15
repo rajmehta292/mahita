@@ -38,7 +38,7 @@ The Active Trader feature enables live trading through Charles Schwab's brokerag
 
 ### Step 1: Create Schwab Developer Account
 
-1. Go to [Schwab Developer Portal](https://beta-developer.schwab.com/)
+1. Go to [Schwab Developer Portal](https://developer.schwab.com/)
 2. Sign up for a developer account
 3. Complete the registration process
 
@@ -85,7 +85,11 @@ npm run dev
 3. A popup window will open with Schwab's authorization page
 4. Log in to your Schwab account
 5. Authorize the application
-6. The window will close automatically after authorization
+6. Mahita should return you to the connected Active Trader state on `https://mahita.ai`
+
+Current known issue on the March 15, 2026 Windows/public baseline:
+- account linking succeeds, but the popup can remain open on `?schwab=connected`
+- if that happens, close the extra window manually; the brokerage connection itself is still valid
 
 ### Viewing Positions
 

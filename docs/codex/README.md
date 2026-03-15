@@ -21,6 +21,7 @@ Do not treat the Codex desktop app transcript as the source of truth. Raw chat h
 ## Current primary files
 
 - [session-handoff-2026-03-14.md](/Users/rmehta01/Sites/mahita/docs/codex/session-handoff-2026-03-14.md)
+- [session-handoff-2026-03-15-windows-public.md](/Users/rmehta01/Sites/mahita/docs/codex/session-handoff-2026-03-15-windows-public.md)
 - [windows-migration.md](/Users/rmehta01/Sites/mahita/docs/codex/windows-migration.md)
 
 ## Canonical companion docs

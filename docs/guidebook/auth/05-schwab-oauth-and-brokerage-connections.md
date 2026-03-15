@@ -21,6 +21,17 @@ Mahita should only ever ask users to paste the first category into Settings.
 8. Mahita exchanges the code for tokens
 9. Tokens are attached to the user’s `BrokerageConnection`
 
+## Current Production/Windows Baseline
+- real-user Schwab brokerage authorization starts from `https://mahita.ai`
+- the production callback remains `https://mahita.ai/schwab/callback`
+- the current public runtime is being served from the Windows workspace at `C:\mahita\mahita`
+- the Cloudflare tunnel credential path is machine-local and must not be committed as shared source-of-truth
+
+## Current Known Popup Issue
+- brokerage authorization itself completes successfully
+- the post-callback popup may remain open as an orphan window on `?schwab=connected`
+- this is a popup lifecycle defect, not a token-exchange or account-linking defect
+
 ## Isolation Model
 - the callback URL identifies Mahita
 - the signed-in Mahita session plus the pending state identify which user/connection started the flow

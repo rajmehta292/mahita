@@ -80,7 +80,7 @@ export function SchwabSetupFAQ({
 
             <div className="mt-5 flex flex-wrap items-center gap-3 text-sm">
                 <Link
-                    href="https://beta-developer.schwab.com/"
+                    href="https://developer.schwab.com/"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 rounded-2xl border border-white/12 bg-white/6 px-4 py-2 text-white transition hover:border-white/24 hover:bg-white/10"

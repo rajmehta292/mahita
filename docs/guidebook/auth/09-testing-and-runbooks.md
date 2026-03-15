@@ -61,6 +61,17 @@ Check:
 - callback finished within the pending window
 - retry from Active Trader or Dashboard
 
+### Schwab popup orphan after successful callback
+Symptoms:
+- Schwab account linking succeeds
+- parent Mahita page shows connected state
+- popup survives on `/active-trader?schwab=connected` instead of closing
+
+Check:
+- callback originated from `https://mahita.ai/schwab/callback`
+- popup/opening route used the public Mahita origin
+- callback still had access to the initiating window relationship or an equivalent same-origin completion signal
+
 ### Admin access failures
 Symptoms:
 - admin route 403

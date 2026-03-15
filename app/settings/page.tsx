@@ -252,7 +252,7 @@ export default function SettingsPage() {
                                         <div>
                                             <p className="text-blue-500 font-medium mb-2">How to get your API credentials:</p>
                                             <ol className="text-sm text-gray-400 space-y-1 list-decimal list-inside">
-                                                <li>Visit the <a href="https://beta-developer.schwab.com/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline inline-flex items-center gap-1">Schwab Developer Portal <ExternalLink className="w-3 h-3" /></a></li>
+                                                <li>Visit the <a href="https://developer.schwab.com/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline inline-flex items-center gap-1">Schwab Developer Portal <ExternalLink className="w-3 h-3" /></a></li>
                                                 <li>Create an application and request API access</li>
                                                 <li>Once approved, copy your Client ID and Client Secret</li>
                                                 <li>Use <span className="font-mono text-blue-300">{callbackUrl || 'https://mahita.ai/schwab/callback'}</span> as the redirect URI in the Schwab Developer Portal</li>

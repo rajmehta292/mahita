@@ -25,6 +25,7 @@ They solve different problems and should never be conflated.
 - localhost requests default to dev-bypass mode
 - public-origin requests can report Google availability
 - auth health is the canonical runtime truth source for the UI
+- current public baseline runs from the Windows workspace rooted at `C:\mahita\mahita`, but the canonical user-facing origin remains `https://mahita.ai`
 
 ## Operator Rule
 Do not add localhost to the production Google OAuth client unless Mahita intentionally reintroduces a separate local-only Google setup. The default operating model is:

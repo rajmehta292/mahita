@@ -27,6 +27,8 @@
 .DS_Store
 *.pem
 next_output.log
+/windows-*.log
+/dev.db.pre_windows_bringup.bak
 
 # debug
 npm-debug.log*

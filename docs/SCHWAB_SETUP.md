@@ -16,7 +16,7 @@ This guide will help you set up Charles Schwab API integration for live trading 
 
 ### 1. Create Schwab Developer Account
 
-1. Visit [Schwab Developer Portal](https://beta-developer.schwab.com/)
+1. Visit [Schwab Developer Portal](https://developer.schwab.com/)
 2. Click "Sign Up" or "Register"
 3. Fill in your information:
    - Email address
@@ -27,7 +27,7 @@ This guide will help you set up Charles Schwab API integration for live trading 
 
 ### 2. Create Your Application
 
-1. Log in to the [Schwab Developer Portal](https://beta-developer.schwab.com/)
+1. Log in to the [Schwab Developer Portal](https://developer.schwab.com/)
 2. Navigate to **Dashboard** → **My Apps**
 3. Click **Create App** button
 4. Fill in the application form:
@@ -96,8 +96,11 @@ npm run dev
 4. A popup window will open
 5. Log in with your Schwab credentials
 6. Authorize the application
-7. The window should close automatically
-8. You should see "Connected" status
+7. You should see "Connected" status back on `https://mahita.ai`
+
+Current known issue on the March 15, 2026 Windows/public baseline:
+- account linking can finish successfully while the popup remains open on `?schwab=connected`
+- if that happens, close the extra window manually; the connection itself is still valid
 
 ## Troubleshooting
 
@@ -229,7 +232,7 @@ Set up monitoring for:
 ## Support Resources
 
 ### Official Documentation
-- [Schwab Developer Portal](https://beta-developer.schwab.com/)
+- [Schwab Developer Portal](https://developer.schwab.com/)
 - [API Documentation](https://developer.schwab.com/docs)
 - [OAuth Guide](https://developer.schwab.com/oauth)
 

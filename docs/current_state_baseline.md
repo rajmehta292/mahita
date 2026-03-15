@@ -2,6 +2,13 @@
 
 Status: Updated baseline audit as of March 11, 2026 after the latest stabilization tranche. This document supersedes any older documentation claiming the platform is complete or production-ready.
 
+Windows/public bring-up update (March 15, 2026):
+- the active operator workspace is now running in place on Windows from `C:\mahita\mahita`
+- local dev serves on port `6244`
+- `https://mahita.ai` is currently being served from this Windows machine through the recovered Cloudflare tunnel
+- public auth health is returning the expected public-origin contract
+- the remaining known brokerage UX defect is an orphan Schwab OAuth popup after a successful callback
+
 Documentation tranche update:
 - a site-visible documentation/wiki section now exists at `/docs`
 - public senior-project materials and signed-in technical guidebooks are now served from the application
