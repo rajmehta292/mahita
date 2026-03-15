@@ -17,12 +17,24 @@ updatedAt: 2026-03-11
 - sidebar and docs visibility tests
 - settings/admin/backtest UI regression tests
 - Schwab popup/callback UI tests
+- MahaCharts workspace DOM coverage
+- strategy library and indicator-catalog route coverage
+- deployment and TradingView webhook route coverage
 
 ## Browser/system coverage
 
 - sign-in and authenticated navigation flows
 - backtester editor fallback flow
 - admin/settings flows
+- MahaCharts workspace shell and visual baseline flow
+
+## MahaCharts-specific commands
+
+- `npm run test:mahacharts`
+- `npm run test:visual`
+- `npm run verify:mahacharts-context`
+- `npm run verify:mahacharts-doc-links`
+- `npm run verify:mahacharts-coverage`
 
 ## Export path
 

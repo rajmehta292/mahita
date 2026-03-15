@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { MainLayout } from '../components/Layout/MainLayout'
 import dynamic from 'next/dynamic'
-import { normalizeUnknownError, parseResponseError } from '@/lib/app-errors'
+import { normalizeUnknownError, parseResponseError, readJsonResponse } from '@/lib/app-errors'
 import {
     Play,
     Save,
@@ -25,8 +25,11 @@ import StrategyTester from '../components/StrategyTester'
 import { clsx } from 'clsx'
 import { MahitaCodeEditor } from '../components/Backtest/MahitaCodeEditor'
 import { ClientPaneErrorBoundary } from '../components/Error/ClientPaneErrorBoundary'
-import type { BacktestResult } from '../services/trading-engine/types'
+import type { BacktestResult, ParityBatchFixtureResult, ParityFixtureStatus } from '../services/trading-engine/types'
 import type { MarketDataPoint } from '../services/market-data/types'
+import type { ParityFixtureManifest, StrategyRunSettings } from '../services/trading-engine/types'
+import { useUserPreferences } from '../hooks/use-user-preferences'
+import { useViewDemand } from '../hooks/use-view-demand'
 
 const Chart = dynamic(() => import('../components/Chart'), { ssr: false })
 
@@ -37,8 +40,26 @@ interface Strategy {
     script: string
     symbol: string
     timeframe: string
+    engineMode?: string
+    lastParityStatus?: string | null
+    linkedFixtureId?: string | null
+    runSettings?: StrategyRunSettings | null
     createdAt: string
     updatedAt: string
+}
+
+interface ParityFixtureDocument {
+    id: string
+    fixtureKey: string
+    name: string
+    symbol: string
+    timeframe: string
+    status: ParityFixtureStatus
+    barCount: number
+    tradeCount: number
+    candles: MarketDataPoint[]
+    manifest?: ParityFixtureManifest | null
+    lastParityReport?: ParityBatchFixtureResult | null
 }
 
 const DEFAULT_SCRIPT = `//@version=5
@@ -62,12 +83,16 @@ plot(slowEma, "Slow EMA", color=color.red)
 `
 
 export default function BacktestPage() {
+    const { preferences } = useUserPreferences()
+    const [requestedScriptId, setRequestedScriptId] = useState<string | null>(null)
     const [strategies, setStrategies] = useState<Strategy[]>([])
     const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null)
     const [script, setScript] = useState(DEFAULT_SCRIPT)
     const [strategyName, setStrategyName] = useState('Untitled Strategy')
     const [selectedSymbol, setSelectedSymbol] = useState('AAPL')
     const [selectedTimeframe, setSelectedTimeframe] = useState('1d')
+    const [fixtures, setFixtures] = useState<ParityFixtureDocument[]>([])
+    const [selectedFixtureId, setSelectedFixtureId] = useState('')
 
     // UI States
     const [loading, setLoading] = useState(false)
@@ -80,14 +105,40 @@ export default function BacktestPage() {
     const [isResultsOpen, setIsResultsOpen] = useState(false)
     const [activeTab, setActiveTab] = useState<'editor' | 'ai' | 'history'>('editor')
 
+    useViewDemand({
+        enabled: true,
+        surface: 'backtest',
+        symbol: selectedSymbol,
+        timeframe: selectedTimeframe,
+        providerPreference: 'schwab',
+        priorityScore: 1.75,
+        refreshIntervalSeconds: preferences?.viewRefreshIntervalSeconds ?? 13,
+    })
+
+    const linkedFixture = selectedFixtureId
+        ? fixtures.find((fixture) => fixture.id === selectedFixtureId) ?? null
+        : null
+    const activeRunSettings = linkedFixture?.manifest?.runSettings ?? selectedStrategy?.runSettings ?? null
+
     const fetchMarketData = useCallback(async () => {
         try {
             setMarketDataError(null)
-            const response = await fetch(`/api/trading/market-data?symbol=${selectedSymbol}&timeframe=${selectedTimeframe}`)
-            if (!response.ok) {
-                throw await parseResponseError(response, 'Mahita could not load market data for the backtest workspace.')
+
+            if (selectedFixtureId) {
+                const fixture = fixtures.find((candidate) => candidate.id === selectedFixtureId)
+                if (fixture) {
+                    setData(fixture.candles)
+                    setSelectedSymbol(fixture.symbol)
+                    setSelectedTimeframe(fixture.timeframe)
+                    return
+                }
             }
-            const json = await response.json()
+
+            const response = await fetch(`/api/trading/market-data?symbol=${selectedSymbol}&timeframe=${selectedTimeframe}`)
+            const json = await readJsonResponse<{ data?: MarketDataPoint[] }>(
+                response,
+                'Mahita could not load market data for the backtest workspace.'
+            )
             if (json && json.data) setData(json.data)
         } catch (error) {
             const normalized = normalizeUnknownError(error, 'Mahita could not load market data.', {
@@ -97,40 +148,140 @@ export default function BacktestPage() {
             console.warn('Failed to fetch market data:', normalized)
             setMarketDataError(normalized.message)
         }
-    }, [selectedSymbol, selectedTimeframe])
+    }, [fixtures, selectedFixtureId, selectedSymbol, selectedTimeframe])
 
     useEffect(() => {
-        loadStrategies()
-        fetchMarketData()
+        if (typeof window === 'undefined') {
+            return
+        }
+
+        const params = new URLSearchParams(window.location.search)
+        setRequestedScriptId(params.get('script'))
+    }, [])
+
+    useEffect(() => {
+        void loadStrategies(requestedScriptId)
+    }, [requestedScriptId])
+
+    useEffect(() => {
+        void loadFixtures()
+    }, [loadFixtures])
+
+    useEffect(() => {
+        void fetchMarketData()
     }, [fetchMarketData])
 
-    const loadStrategies = async () => {
-        const saved = localStorage.getItem('strategies')
-        if (saved) {
-            setStrategies(JSON.parse(saved))
+    const applySavedStrategy = useCallback((strategy: Strategy) => {
+        setSelectedStrategy(strategy)
+        setStrategyName(strategy.name)
+        setScript(strategy.script)
+        setSelectedSymbol(strategy.symbol)
+        setSelectedTimeframe(strategy.timeframe)
+        setSelectedFixtureId(strategy.linkedFixtureId ?? '')
+    }, [])
+
+    async function loadFixtures() {
+        try {
+            const response = await fetch('/api/script-editor/fixtures', { cache: 'no-store' })
+            if (!response.ok) {
+                return
+            }
+
+            const json = await response.json()
+            const nextFixtures: ParityFixtureDocument[] = json.fixtures ?? []
+            setFixtures(nextFixtures)
+        } catch (error) {
+            console.warn('Failed to load parity fixtures for backtest workspace:', error)
         }
     }
 
-    const saveStrategy = () => {
-        const strategy: Strategy = {
-            id: selectedStrategy?.id || Date.now().toString(),
-            name: strategyName,
-            description: '',
-            script,
-            symbol: selectedSymbol,
-            timeframe: selectedTimeframe,
-            createdAt: selectedStrategy?.createdAt || new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+    const loadStrategies = async (targetId: string | null) => {
+        try {
+            const response = await fetch('/api/script-editor/scripts', { cache: 'no-store' })
+            if (!response.ok) {
+                return
+            }
+
+            const json = await response.json()
+            const savedStrategies: Strategy[] = (json.drafts ?? []).map((draft: any) => ({
+                id: draft.id,
+                name: draft.name,
+                description: draft.description ?? '',
+                script: draft.source,
+                symbol: draft.symbol,
+                timeframe: draft.timeframe,
+                engineMode: draft.engineMode ?? 'pinets',
+                lastParityStatus: draft.lastParityStatus ?? null,
+                linkedFixtureId: draft.linkedFixtureId ?? null,
+                runSettings: draft.runSettings ?? null,
+                createdAt: draft.createdAt,
+                updatedAt: draft.updatedAt,
+            }))
+
+            setStrategies(savedStrategies)
+
+            const matched = targetId
+                ? savedStrategies.find((strategy) => strategy.id === targetId)
+                : savedStrategies[0]
+
+            if (matched) {
+                applySavedStrategy(matched)
+            }
+        } catch (error) {
+            console.warn('Failed to load saved scripts for backtest workspace:', error)
         }
+    }
 
-        const updated = selectedStrategy
-            ? strategies.map(s => s.id === strategy.id ? strategy : s)
-            : [...strategies, strategy]
+    const saveStrategy = async () => {
+        try {
+            const response = await fetch('/api/script-editor/scripts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: selectedStrategy?.id,
+                    name: strategyName,
+                    description: selectedStrategy?.description ?? '',
+                    source: script,
+                    symbol: selectedSymbol,
+                    timeframe: selectedTimeframe,
+                    engineMode: 'pinets',
+                    linkedFixtureId: selectedFixtureId || null,
+                    runSettings: activeRunSettings,
+                }),
+            })
 
-        setStrategies(updated)
-        localStorage.setItem('strategies', JSON.stringify(updated))
-        setSelectedStrategy(strategy)
-        setShowSaveDialog(false)
+            const json = await response.json()
+            if (!response.ok) {
+                throw new Error(json.error || 'Failed to save script.')
+            }
+
+            const savedStrategy: Strategy = {
+                id: json.draft.id,
+                name: json.draft.name,
+                description: json.draft.description ?? '',
+                script: json.draft.source,
+                symbol: json.draft.symbol,
+                timeframe: json.draft.timeframe,
+                engineMode: json.draft.engineMode ?? 'pinets',
+                lastParityStatus: json.draft.lastParityStatus ?? null,
+                linkedFixtureId: json.draft.linkedFixtureId ?? null,
+                runSettings: json.draft.runSettings ?? null,
+                createdAt: json.draft.createdAt,
+                updatedAt: json.draft.updatedAt,
+            }
+
+            setStrategies((current) => {
+                const withoutSaved = current.filter((strategy) => strategy.id !== savedStrategy.id)
+                return [savedStrategy, ...withoutSaved]
+            })
+            applySavedStrategy(savedStrategy)
+            setShowSaveDialog(false)
+        } catch (error) {
+            const normalized = normalizeUnknownError(error, 'Mahita could not save this script.', {
+                code: 'UNKNOWN_ERROR',
+            })
+            setBacktestError(normalized.message)
+        }
     }
 
     const runBacktest = async () => {
@@ -140,8 +291,8 @@ export default function BacktestPage() {
         try {
             if (data.length === 0) return
 
-            const startTime = Date.now() / 1000 - 365 * 24 * 60 * 60
-            const endTime = Date.now() / 1000
+            const startTime = linkedFixture?.candles[0]?.time ?? (Date.now() / 1000 - 365 * 24 * 60 * 60)
+            const endTime = linkedFixture?.candles[linkedFixture.candles.length - 1]?.time ?? (Date.now() / 1000)
 
             const response = await fetch('/api/trading/backtest', {
                 method: 'POST',
@@ -150,8 +301,8 @@ export default function BacktestPage() {
                     strategy: {
                         id: selectedStrategy?.id || 'temp',
                         name: strategyName,
-                        asset: selectedSymbol,
-                        timeframe: selectedTimeframe,
+                        asset: linkedFixture?.symbol ?? selectedSymbol,
+                        timeframe: linkedFixture?.timeframe ?? selectedTimeframe,
                         script: script,
                         riskManagement: {
                             positionSizingPercent: 100,
@@ -161,7 +312,9 @@ export default function BacktestPage() {
                     },
                     startTime,
                     endTime,
-                    initialCapital: 100000
+                    initialCapital: linkedFixture ? undefined : 100000,
+                    fixtureId: linkedFixture?.id,
+                    runSettings: activeRunSettings,
                 })
             })
 
@@ -172,11 +325,49 @@ export default function BacktestPage() {
             const json = await response.json()
             if (json) {
                 setResults(json)
+
+                if (selectedStrategy?.id) {
+                    const nextParityStatus = json.parityComparison
+                        ? (json.parityComparison.exactMatch
+                            ? 'exact-match'
+                            : json.parityComparison.expectedTradeCount === 0
+                                ? 'no-overlap'
+                                : 'diverged')
+                        : null
+
+                    void fetch('/api/script-editor/scripts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            id: selectedStrategy.id,
+                            name: strategyName,
+                            description: selectedStrategy.description ?? '',
+                            source: script,
+                            symbol: linkedFixture?.symbol ?? selectedSymbol,
+                            timeframe: linkedFixture?.timeframe ?? selectedTimeframe,
+                            engineMode: 'pinets',
+                            linkedFixtureId: selectedFixtureId || null,
+                            lastParityStatus: nextParityStatus,
+                            runSettings: activeRunSettings,
+                        }),
+                    }).catch((saveError) => {
+                        console.warn('Failed to persist script parity status:', saveError)
+                    })
+
+                    setSelectedStrategy((current) => current
+                        ? {
+                            ...current,
+                            lastParityStatus: nextParityStatus,
+                            linkedFixtureId: selectedFixtureId || null,
+                            runSettings: activeRunSettings,
+                        }
+                        : current)
+                }
             }
         } catch (error) {
             const normalized = normalizeUnknownError(error, 'Mahita could not complete this prototype backtest run.', {
                 code: 'UNKNOWN_ERROR',
-                hint: 'This workspace still runs the prototype engine. Save your script, confirm market data is loaded, then retry.',
+                hint: 'Save your script, confirm the fixture or market data is loaded, then retry.',
             })
             console.warn('Backtest error:', normalized)
             setBacktestError(normalized.message)
@@ -194,8 +385,8 @@ export default function BacktestPage() {
                         <div className="flex items-center gap-2">
                             <BarChart3 className="w-5 h-5 text-blue-500" />
                             <span className="font-bold text-sm tracking-tight">MAHITA ENGINE v6</span>
-                            <span className="rounded-full border border-amber-500/20 bg-amber-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-amber-200">
-                                Prototype Engine
+                            <span className="rounded-full border border-blue-500/20 bg-blue-500/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.2em] text-blue-200">
+                                PineTS Primary
                             </span>
                         </div>
                         <div className="h-4 w-[1px] bg-[#2A2E39]"></div>
@@ -206,6 +397,7 @@ export default function BacktestPage() {
                                     className="bg-transparent text-[13px] font-bold outline-none cursor-pointer hover:text-blue-500 transition-colors"
                                     value={selectedSymbol}
                                     onChange={(e) => setSelectedSymbol(e.target.value)}
+                                    disabled={Boolean(selectedFixtureId)}
                                 >
                                     <option value="AAPL">AAPL</option>
                                     <option value="TSLA">TSLA</option>
@@ -219,10 +411,27 @@ export default function BacktestPage() {
                                     className="bg-transparent text-[13px] font-bold outline-none cursor-pointer hover:text-blue-500 transition-colors"
                                     value={selectedTimeframe}
                                     onChange={(e) => setSelectedTimeframe(e.target.value)}
+                                    disabled={Boolean(selectedFixtureId)}
                                 >
+                                    <option value="1m">1m</option>
                                     <option value="1h">1h</option>
                                     <option value="1d">1d</option>
                                     <option value="15m">15m</option>
+                                </select>
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] text-gray-500 font-black uppercase tracking-widest leading-none">Dataset</span>
+                                <select
+                                    className="bg-transparent text-[13px] font-bold outline-none cursor-pointer hover:text-blue-500 transition-colors"
+                                    value={selectedFixtureId}
+                                    onChange={(e) => setSelectedFixtureId(e.target.value)}
+                                >
+                                    <option value="">Live market data</option>
+                                    {fixtures.map((fixture) => (
+                                        <option key={fixture.id} value={fixture.id}>
+                                            {fixture.name} [{fixture.status}]
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
                         </div>
@@ -319,6 +528,84 @@ export default function BacktestPage() {
                                 {backtestError && (
                                     <div className="mb-4 rounded-2xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
                                         {backtestError}
+                                    </div>
+                                )}
+                                {results?.diagnostics && (
+                                    <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                        <div className="rounded-2xl border border-[#2A2E39] bg-[#131722] px-4 py-3">
+                                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-500">Engine</p>
+                                            <p className="mt-2 text-sm font-semibold text-white">{results.diagnostics.engineMode.toUpperCase()}</p>
+                                            <p className="mt-1 text-xs text-gray-400">
+                                                {results.diagnostics.dataSource === 'tradingview-fixture' ? 'Fixture-backed parity run' : 'Live-provider run'}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-2xl border border-[#2A2E39] bg-[#131722] px-4 py-3">
+                                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-500">Dataset</p>
+                                            <p className="mt-2 text-sm font-semibold text-white">
+                                                {selectedFixtureId
+                                                    ? linkedFixture?.name ?? 'Fixture'
+                                                    : `${selectedSymbol} ${selectedTimeframe}`}
+                                            </p>
+                                            <p className="mt-1 text-xs text-gray-400">
+                                                {selectedFixtureId
+                                                    ? `${linkedFixture?.barCount ?? data.length} imported bars • ${linkedFixture?.status ?? 'staged'}`
+                                                    : `${data.length} fetched bars`}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-2xl border border-[#2A2E39] bg-[#131722] px-4 py-3">
+                                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-500">Run settings</p>
+                                            <p className="mt-2 text-sm font-semibold text-white">
+                                                {activeRunSettings
+                                                    ? `$${activeRunSettings.defaultQtyValue} ${activeRunSettings.defaultQtyType}`
+                                                    : 'Script defaults'}
+                                            </p>
+                                            <p className="mt-1 text-xs text-gray-400">
+                                                {activeRunSettings
+                                                    ? `${activeRunSettings.pyramiding} pyramids • ${activeRunSettings.source ?? 'active'}`
+                                                    : 'No override manifest linked'}
+                                            </p>
+                                        </div>
+                                        <div className="rounded-2xl border border-[#2A2E39] bg-[#131722] px-4 py-3">
+                                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-500">Parity</p>
+                                            <p className={clsx('mt-2 text-sm font-semibold', results.parityComparison?.exactMatch ? 'text-emerald-300' : 'text-amber-200')}>
+                                                {results.parityComparison
+                                                    ? (results.parityComparison.exactMatch ? 'Exact match' : 'Divergence detected')
+                                                    : 'No fixture comparison'}
+                                            </p>
+                                            <p className="mt-1 text-xs text-gray-400">
+                                                {results.parityComparison
+                                                    ? `${results.parityComparison.matchingTradeCount}/${results.parityComparison.expectedTradeCount} trades matched`
+                                                    : 'Select a TradingView fixture to compare trades.'}
+                                            </p>
+                                            {linkedFixture?.lastParityReport && (
+                                                <p className="mt-2 text-[11px] text-gray-500">
+                                                    Batch status: {linkedFixture.lastParityReport.status} • replay {linkedFixture.lastParityReport.replayComparison?.exactMatch ? 'exact' : 'diff'} • engine {linkedFixture.lastParityReport.engineComparison?.exactMatch ? 'exact' : 'diff'}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="rounded-2xl border border-[#2A2E39] bg-[#131722] px-4 py-3">
+                                            <p className="text-[10px] font-black uppercase tracking-[0.22em] text-gray-500">Warnings</p>
+                                            <p className="mt-2 text-sm font-semibold text-white">{results.diagnostics.warnings?.length ?? 0}</p>
+                                            <p className="mt-1 text-xs text-gray-400">{results.diagnostics.warnings?.[0] ?? 'No runtime warnings recorded.'}</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {results?.parityComparison && !results.parityComparison.exactMatch && (
+                                    <div className="mb-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                                        <p className="font-semibold">First divergence</p>
+                                        <p className="mt-1">
+                                            {results.parityComparison.firstDivergenceMessage ?? 'Mahita detected a trade mismatch against the selected TradingView fixture.'}
+                                        </p>
+                                        {(results.parityComparison.firstDivergenceBarLabel || results.parityComparison.firstDivergenceRuntimeVariable) && (
+                                            <p className="mt-2 text-xs text-amber-100/80">
+                                                {results.parityComparison.firstDivergenceBarLabel
+                                                    ? `Bar ${results.parityComparison.firstDivergenceBarLabel}`
+                                                    : 'Bar unavailable'}
+                                                {results.parityComparison.firstDivergenceRuntimeVariable
+                                                    ? ` • ${results.parityComparison.firstDivergenceRuntimeVariable}=${String(results.parityComparison.firstDivergenceRuntimeValue)}`
+                                                    : ''}
+                                            </p>
+                                        )}
                                     </div>
                                 )}
                                 <StrategyTester results={results} />

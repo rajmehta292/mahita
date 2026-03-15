@@ -38,3 +38,21 @@ Any meaningful platform change should update:
 1. the code,
 2. the current-state docs,
 3. the relevant deterministic/browser tests.
+
+## MahaCharts rule
+
+MahaCharts changes have a stricter four-part requirement:
+
+1. code
+2. canonical MahaCharts guidebook docs
+3. generated MahaCharts context packet
+4. deterministic and browser evidence
+
+Use these scripts:
+
+- `npm run generate:mahacharts-context`
+- `npm run verify:mahacharts-context`
+- `npm run verify:mahacharts-doc-links`
+- `npm run verify:mahacharts-coverage`
+- `npm run test:mahacharts`
+- `npm run test:visual`

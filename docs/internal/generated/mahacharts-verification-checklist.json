@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-03-15",
+  "deterministic": [
+    "strategy route coverage",
+    "indicator catalog route coverage",
+    "deployment and webhook route coverage",
+    "market-data route coverage",
+    "workspace DOM coverage for modal, dock, and chart shell",
+    "single-overlay controller coverage for editor and right-side overlays"
+  ],
+  "browser": [
+    "mahacharts shell smoke",
+    "indicator modal flow",
+    "right utility strip and overlay geometry",
+    "chart visibility above the fold",
+    "runtime-noise gate for update depth, nested buttons, and disposed chart objects",
+    "desktop visual baselines",
+    "concurrent-session propagation for strategies and deployments"
+  ],
+  "manual": [
+    "chart readability and pane density",
+    "indicator add/remove ergonomics",
+    "strategy version restore/delete flow",
+    "dock and overlay resize balance",
+    "long-session chart stability"
+  ]
+}

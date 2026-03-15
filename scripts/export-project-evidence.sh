@@ -46,5 +46,10 @@ cp docs/public/project-overview/presentation-for-reviewers.md "$OUTPUT_DIR/27-pr
 cp docs/public/senior-project/demo-modes.md "$OUTPUT_DIR/28-demo-modes.md"
 cp docs/internal/guidebook/post-presentation-recovery-plan.md "$OUTPUT_DIR/29-post-presentation-recovery-plan.md"
 cp docs/internal/runbooks/operator-cheatsheet.md "$OUTPUT_DIR/30-operator-cheatsheet.md"
+cp docs/internal/guidebook/platform-data-architecture-audit.md "$OUTPUT_DIR/31-platform-data-architecture-audit.md"
+cp docs/internal/runbooks/platform-data-backup-and-restore.md "$OUTPUT_DIR/32-platform-data-backup-and-restore.md"
+cp docs/internal/runbooks/platform-data-migrations.md "$OUTPUT_DIR/33-platform-data-migrations.md"
+cp docs/internal/evidence/build-log-2026-03-11-platform-data.md "$OUTPUT_DIR/34-build-log-2026-03-11-platform-data.md"
+cp docs/public/project-overview/platform-data-summary.md "$OUTPUT_DIR/35-platform-data-summary.md"
 
 echo "Evidence exported to $OUTPUT_DIR"

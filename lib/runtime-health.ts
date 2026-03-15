@@ -10,9 +10,29 @@ const REQUIRED_RUNTIME_PRISMA_MODELS = [
   "adminSecretRevealGrant",
 ] as const
 
+const REQUIRED_DI_UI_PRISMA_MODELS = [
+  "ingestionProfile",
+  "ingestionLane",
+  "ingestionTarget",
+  "ingestionTargetSymbol",
+  "ingestionJob",
+  "ingestionDispatchLog",
+  "verificationPolicy",
+  "verificationJob",
+  "verificationObservation",
+  "ingestionViewDemand",
+] as const
+
 export type RuntimePrismaModel = (typeof REQUIRED_RUNTIME_PRISMA_MODELS)[number]
+export type DiUiRuntimePrismaModel = (typeof REQUIRED_DI_UI_PRISMA_MODELS)[number]
 
 function hasPrismaModel(model: RuntimePrismaModel) {
+  const client = prisma as unknown as Record<string, unknown>
+  const value = client[model]
+  return Boolean(value && typeof value === "object")
+}
+
+function hasAnyPrismaModel(model: string) {
   const client = prisma as unknown as Record<string, unknown>
   const value = client[model]
   return Boolean(value && typeof value === "object")
@@ -30,6 +50,21 @@ export function getPrismaModelReadiness() {
   return {
     readiness,
     missingModels: REQUIRED_RUNTIME_PRISMA_MODELS.filter((model) => !readiness[model]),
+  }
+}
+
+export function getDiUiPrismaModelReadiness() {
+  const readiness = REQUIRED_DI_UI_PRISMA_MODELS.reduce<Record<DiUiRuntimePrismaModel, boolean>>(
+    (accumulator, model) => {
+      accumulator[model] = hasAnyPrismaModel(model)
+      return accumulator
+    },
+    {} as Record<DiUiRuntimePrismaModel, boolean>
+  )
+
+  return {
+    readiness,
+    missingModels: REQUIRED_DI_UI_PRISMA_MODELS.filter((model) => !readiness[model]),
   }
 }
 
@@ -53,15 +88,46 @@ export function assertRequiredRuntimeModels(models: RuntimePrismaModel[] = [...R
   })
 }
 
+export function assertRequiredDiUiModels(
+  models: DiUiRuntimePrismaModel[] = [...REQUIRED_DI_UI_PRISMA_MODELS]
+) {
+  const client = prisma as unknown as Record<string, unknown>
+  const missingModels = models.filter((model) => !(model in client) || !client[model])
+
+  if (missingModels.length === 0) {
+    return
+  }
+
+  throw new AppError("Mahita detected a Prisma schema/client mismatch in DI-UI.", {
+    code: "RUNTIME_SCHEMA_MISMATCH",
+    status: 503,
+    details: {
+      missingModels,
+      scope: "di-ui",
+    },
+    hint:
+      "Run `npx prisma generate` and restart the dev server so the generated Prisma client matches the current DI-UI scheduler and verification schema.",
+    recoverable: true,
+  })
+}
+
 export async function getRuntimeHealthSnapshot() {
   const modelReadiness = getPrismaModelReadiness()
+  const diUiModelReadiness = getDiUiPrismaModelReadiness()
   const runtime = {
     prismaClientReady: modelReadiness.missingModels.length === 0,
     missingPrismaModels: modelReadiness.missingModels,
+    diUiPrismaClientReady: diUiModelReadiness.missingModels.length === 0,
+    missingDiUiPrismaModels: diUiModelReadiness.missingModels,
     insecureUserBrokeragePlatformFallbackEnabled: allowInsecureUserBrokeragePlatformFallback(),
     hasDedicatedAppSecretKey: Boolean(
       process.env.MAHITA_SECRET_KEY || process.env.ENCRYPTION_KEY
     ),
+    platformData: {
+      canonicalBarSource: "vault-sqlite",
+      parquetRouteStatus: "experimental",
+      inventoryAuthority: "main-prisma-db",
+    },
   }
 
   if (!runtime.prismaClientReady) {

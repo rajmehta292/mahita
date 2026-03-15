@@ -6,6 +6,7 @@ import {
     AlertTriangle,
     CheckCircle2,
     Database,
+    Layers3,
     Play,
     RefreshCw,
     Shield,
@@ -15,8 +16,9 @@ import {
 } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { parseResponseError } from '@/lib/app-errors'
+import { DiUiWorkspace } from '@/app/components/Admin/DiUiWorkspace'
 
-type AdminTab = 'overview' | 'providers' | 'data-command' | 'users' | 'audits'
+type AdminTab = 'overview' | 'providers' | 'data-command' | 'di-ui' | 'users' | 'audits'
 
 interface RuntimeHealthResponse {
     ok: boolean
@@ -212,6 +214,7 @@ const tabs: Array<{ id: AdminTab; label: string; icon: typeof Shield }> = [
     { id: 'overview', label: 'Overview', icon: Shield },
     { id: 'providers', label: 'Provider Pool', icon: Database },
     { id: 'data-command', label: 'Data Command', icon: Wrench },
+    { id: 'di-ui', label: 'DI-UI', icon: Layers3 },
     { id: 'users', label: 'Users', icon: Users },
     { id: 'audits', label: 'Audit Log', icon: Activity },
 ]
@@ -293,6 +296,7 @@ export function AdminControlPlane() {
     const [revealReason, setRevealReason] = useState('')
     const [revealedCredential, setRevealedCredential] = useState<ProviderCredentialRevealResponse | null>(null)
     const [globalError, setGlobalError] = useState<string | null>(null)
+    const [diUiRefreshToken, setDiUiRefreshToken] = useState(0)
 
     const users = useMemo(() => usersState.data?.users ?? [], [usersState.data])
     const usersWithBrokerage = useMemo(
@@ -495,6 +499,10 @@ export function AdminControlPlane() {
                 return
             }
 
+            if (tab === 'di-ui') {
+                return
+            }
+
             if (tab === 'users') {
                 await loadUsers(force)
                 return
@@ -525,6 +533,10 @@ export function AdminControlPlane() {
     }
 
     const refreshVisibleTab = async () => {
+        if (activeTab === 'di-ui') {
+            setDiUiRefreshToken((current) => current + 1)
+            return
+        }
         await loadTab(activeTab, true)
     }
 
@@ -1027,6 +1039,10 @@ export function AdminControlPlane() {
                             </div>
                         ) : null}
                     </>
+                )}
+
+                {activeTab === 'di-ui' && (
+                    <DiUiWorkspace refreshToken={diUiRefreshToken} />
                 )}
 
                 {activeTab === 'users' && (

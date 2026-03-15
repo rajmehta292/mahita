@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
-import prisma from "@/lib/prisma"
 import { parquetStore } from "@/app/services/market-data/parquet-store"
 import { Timeframe } from "@/app/services/market-data/timeframe-math"
 
@@ -39,7 +38,7 @@ export async function GET(request: NextRequest) {
         // For MVP, we will construct the past 5 years of partitions directly 
         // until the Metadata Database query logic is stitched into the API layer.
 
-        let targetPartitionsToRead: Date[] = []
+        const targetPartitionsToRead: Date[] = []
         const now = new Date()
 
         if (timeframe === '1d' || timeframe === '1w' || timeframe === '1M') {
@@ -75,7 +74,8 @@ export async function GET(request: NextRequest) {
                 data: [],
                 metadata: {
                     source: "parquet",
-                    count: 0
+                    count: 0,
+                    status: "experimental"
                 }
             })
         }
@@ -92,6 +92,7 @@ export async function GET(request: NextRequest) {
             data: trimmedBars,
             metadata: {
                 source: "parquet",
+                status: "experimental",
                 count: trimmedBars.length,
                 firstBar: trimmedBars[0]?.time,
                 lastBar: trimmedBars[trimmedBars.length - 1]?.time

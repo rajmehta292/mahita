@@ -78,6 +78,7 @@ interface LiveStrategy {
     pnl: number
     trades: number
     winRate: number
+    webhookUrl?: string | null
 }
 
 interface SavedStrategy {
@@ -111,12 +112,14 @@ function ActiveTraderPageContent() {
     const [balance, setBalance] = useState<AccountBalance | null>(null)
     const [savedStrategies, setSavedStrategies] = useState<SavedStrategy[]>([])
     const [showDeployModal, setShowDeployModal] = useState(false)
+    const [liveStrategies, setLiveStrategies] = useState<LiveStrategy[]>([])
     const [orders, setOrders] = useState<BrokerageOrder[]>([])
     const [ordersLoading, setOrdersLoading] = useState(false)
     const [orderSubmitting, setOrderSubmitting] = useState(false)
     const [showOrderPreview, setShowOrderPreview] = useState(false)
     const [orderDraft, setOrderDraft] = useState<OrderDraft>(EMPTY_ORDER_DRAFT)
     const [orderFeedback, setOrderFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null)
+    const [deploymentSubmitting, setDeploymentSubmitting] = useState(false)
     const { preferences, updatePreferences } = useUserPreferences()
 
     const handleConnectionExpired = useCallback((message: string) => {
@@ -146,19 +149,136 @@ function ActiveTraderPageContent() {
     }, [searchParams])
 
     useEffect(() => {
-        const saved = localStorage.getItem('strategies')
-        if (!saved) {
-            return
+        let cancelled = false
+
+        async function loadStrategyControlPlane() {
+            try {
+                const [draftResponse, deploymentResponse] = await Promise.all([
+                    fetch('/api/script-editor/scripts', { cache: 'no-store' }),
+                    fetch('/api/trading/deployments', { cache: 'no-store' }),
+                ])
+
+                const [draftJson, deploymentJson] = await Promise.all([
+                    draftResponse.json(),
+                    deploymentResponse.json(),
+                ])
+
+                if (cancelled) {
+                    return
+                }
+
+                setSavedStrategies(((draftJson.drafts ?? []) as Array<any>).map((draft) => ({
+                    id: draft.id,
+                    name: draft.name,
+                    symbol: draft.symbol,
+                    description: draft.description,
+                    timeframe: draft.timeframe,
+                })))
+
+                setLiveStrategies(((deploymentJson.deployments ?? []) as Array<any>).map((deployment) => ({
+                    id: deployment.id,
+                    name: deployment.name,
+                    symbol: deployment.symbol,
+                    status: deployment.status === 'active' ? 'running' : deployment.status === 'paused' ? 'stopped' : 'error',
+                    pnl: 0,
+                    trades: Array.isArray(deployment.executionIntents) ? deployment.executionIntents.length : 0,
+                    winRate: 0,
+                    webhookUrl: deployment.webhookUrl || null,
+                })))
+            } catch (strategyError) {
+                console.warn('Failed to load strategy control plane:', strategyError)
+            }
         }
 
-        try {
-            setSavedStrategies(JSON.parse(saved) as SavedStrategy[])
-        } catch (parseError) {
-            console.warn('Failed to parse saved strategies:', parseError)
+        void loadStrategyControlPlane()
+
+        return () => {
+            cancelled = true
         }
     }, [])
 
-    const liveStrategies: LiveStrategy[] = []
+    const refreshDeployments = useCallback(async () => {
+        try {
+            const deploymentResponse = await fetch('/api/trading/deployments', { cache: 'no-store' })
+            const deploymentJson = await deploymentResponse.json()
+            setLiveStrategies(((deploymentJson.deployments ?? []) as Array<any>).map((deployment) => ({
+                id: deployment.id,
+                name: deployment.name,
+                symbol: deployment.symbol,
+                status: deployment.status === 'active' ? 'running' : deployment.status === 'paused' ? 'stopped' : 'error',
+                pnl: 0,
+                trades: Array.isArray(deployment.executionIntents) ? deployment.executionIntents.length : 0,
+                winRate: 0,
+                webhookUrl: deployment.webhookUrl || null,
+            })))
+        } catch (refreshError) {
+            console.warn('Failed to refresh deployments:', refreshError)
+        }
+    }, [])
+
+    const handleDeploySavedStrategy = useCallback(async (strategy: SavedStrategy) => {
+        setDeploymentSubmitting(true)
+        try {
+            const response = await fetch('/api/trading/deployments', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    linkedScriptDraftId: strategy.id,
+                    name: `${strategy.name} • Active Trader`,
+                    description: strategy.description || null,
+                    symbol: strategy.symbol,
+                    timeframe: strategy.timeframe || '1d',
+                    target: accountId ? 'schwab-live' : 'paper',
+                    linkedAccountId: accountId || null,
+                    executionConfig: {
+                        defaultQuantity: 1,
+                        autoSubmit: true,
+                        orderType: 'MARKET',
+                    },
+                }),
+            })
+            const json = await response.json()
+            if (!response.ok) {
+                throw new Error(json.error || 'Failed to deploy strategy.')
+            }
+
+            setOrderFeedback({
+                type: 'success',
+                message: `Strategy deployed. Webhook ready at ${json.deployment.webhookUrl}`,
+            })
+            setShowDeployModal(false)
+            await refreshDeployments()
+        } catch (deployError) {
+            setOrderFeedback({
+                type: 'error',
+                message: deployError instanceof Error ? deployError.message : 'Failed to deploy strategy.',
+            })
+        } finally {
+            setDeploymentSubmitting(false)
+        }
+    }, [accountId, refreshDeployments])
+
+    const handleToggleLiveStrategy = useCallback(async (strategy: LiveStrategy) => {
+        try {
+            await fetch(`/api/trading/deployments/${strategy.id}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    status: strategy.status === 'running' ? 'paused' : 'active',
+                }),
+            })
+            await refreshDeployments()
+        } catch (toggleError) {
+            setOrderFeedback({
+                type: 'error',
+                message: toggleError instanceof Error ? toggleError.message : 'Failed to toggle deployment state.',
+            })
+        }
+    }, [refreshDeployments])
 
     const fetchAccounts = useCallback(async () => {
         try {
@@ -970,7 +1090,7 @@ function ActiveTraderPageContent() {
                                             </div>
                                             <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">No Active Strategies</p>
                                             <p className="text-[9px] tracking-tight text-gray-600">
-                                                Live strategy deployment stays feature-gated until backtester/runtime parity is complete.
+                                                Deploy a saved Pine strategy to paper mode or the selected Schwab account from this panel.
                                             </p>
                                         </div>
                                     ) : (
@@ -984,7 +1104,10 @@ function ActiveTraderPageContent() {
                                                             </div>
                                                             <span className="text-sm font-bold tracking-tight text-white">{strategy.name}</span>
                                                         </div>
-                                                        <button className="rounded-lg border border-[#2A2E39] p-1.5 text-rose-500/40 transition-colors hover:bg-rose-500/10 hover:text-rose-500">
+                                                        <button
+                                                            onClick={() => void handleToggleLiveStrategy(strategy)}
+                                                            className="rounded-lg border border-[#2A2E39] p-1.5 text-rose-500/40 transition-colors hover:bg-rose-500/10 hover:text-rose-500"
+                                                        >
                                                             <Pause className="h-3.5 w-3.5" />
                                                         </button>
                                                     </div>
@@ -1004,6 +1127,11 @@ function ActiveTraderPageContent() {
                                                             </span>
                                                         </div>
                                                     </div>
+                                                    {strategy.webhookUrl ? (
+                                                        <div className="mt-3 rounded-lg border border-[#2A2E39] bg-[#0D1016] px-3 py-2 text-[9px] text-gray-400">
+                                                            Webhook: {strategy.webhookUrl}
+                                                        </div>
+                                                    ) : null}
                                                 </div>
                                             ))}
                                         </div>
@@ -1083,7 +1211,7 @@ function ActiveTraderPageContent() {
                             </div>
                             <div>
                                 <h3 className="text-xl font-black tracking-tight text-white">Deploy Strategy</h3>
-                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Feature-gated until runtime parity</p>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Create a shared Mahita deployment with a webhook endpoint.</p>
                             </div>
                         </div>
 
@@ -1103,7 +1231,7 @@ function ActiveTraderPageContent() {
                                     <div
                                         key={strategy.id}
                                         className="group cursor-pointer rounded-2xl border border-[#2A2E39] bg-[#131722] p-4 transition-all hover:border-blue-500/50"
-                                        onClick={() => setShowDeployModal(false)}
+                                        onClick={() => void handleDeploySavedStrategy(strategy)}
                                     >
                                         <div className="mb-3 flex items-start justify-between">
                                             <h4 className="text-sm font-bold text-white transition-colors group-hover:text-blue-400">{strategy.name}</h4>
@@ -1112,10 +1240,10 @@ function ActiveTraderPageContent() {
                                             </span>
                                         </div>
                                         <p className="mb-4 line-clamp-2 text-[10px] font-medium leading-relaxed text-gray-500">
-                                            {strategy.description || 'Operational strategy profile with runtime gating still enabled.'}
+                                            {strategy.description || 'Deploy this strategy into Mahita’s shared webhook/runtime control plane.'}
                                         </p>
                                         <div className="border-t border-[#2A2E39] pt-3 text-[8px] font-black uppercase tracking-widest text-gray-600 transition-colors group-hover:text-gray-400">
-                                            {strategy.timeframe || 'Unknown timeframe'}
+                                            {deploymentSubmitting ? 'Deploying…' : strategy.timeframe || 'Unknown timeframe'}
                                         </div>
                                     </div>
                                 ))
@@ -1130,10 +1258,10 @@ function ActiveTraderPageContent() {
                                 Close
                             </button>
                             <button
-                                disabled
-                                className="flex-1 rounded-2xl bg-blue-500 py-4 text-[10px] font-black uppercase tracking-widest text-white opacity-30"
+                                onClick={() => setShowDeployModal(false)}
+                                className="flex-1 rounded-2xl bg-blue-500 py-4 text-[10px] font-black uppercase tracking-widest text-white transition-all hover:bg-blue-600"
                             >
-                                Initiate Live Trading
+                                Choose A Strategy Above
                             </button>
                         </div>
                     </div>

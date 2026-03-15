@@ -16,8 +16,10 @@ import {
     Activity
 } from 'lucide-react'
 import { SchwabSetupFAQ } from '@/app/components/Auth/SchwabSetupFAQ'
+import { useUserPreferences } from '@/app/hooks/use-user-preferences'
 
 export default function SettingsPage() {
+    const { preferences, updatePreferences } = useUserPreferences()
     const [clientId, setClientId] = useState('')
     const [clientSecret, setClientSecret] = useState('')
     const [showClientSecret, setShowClientSecret] = useState(false)
@@ -25,8 +27,11 @@ export default function SettingsPage() {
     const [callbackUrl, setCallbackUrl] = useState<string | null>(null)
     const [saving, setSaving] = useState(false)
     const [testing, setTesting] = useState(false)
+    const [savingRefreshPreference, setSavingRefreshPreference] = useState(false)
     const [runtimeHint, setRuntimeHint] = useState<string | null>(null)
     const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info', text: string } | null>(null)
+    const [refreshMessage, setRefreshMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+    const [viewRefreshIntervalSeconds, setViewRefreshIntervalSeconds] = useState(13)
 
     const maybeSetRuntimeHint = (error: unknown) => {
         const errorWithHint = error as { hint?: unknown }
@@ -58,6 +63,29 @@ export default function SettingsPage() {
     useEffect(() => {
         void fetchConfig()
     }, [fetchConfig])
+
+    useEffect(() => {
+        if (typeof preferences?.viewRefreshIntervalSeconds === 'number') {
+            setViewRefreshIntervalSeconds(Math.max(3, preferences.viewRefreshIntervalSeconds))
+        }
+    }, [preferences?.viewRefreshIntervalSeconds])
+
+    const saveRefreshPreference = useCallback(async (nextValue: number) => {
+        const clampedValue = Math.max(3, Math.floor(nextValue))
+        setSavingRefreshPreference(true)
+        setRefreshMessage(null)
+        setViewRefreshIntervalSeconds(clampedValue)
+
+        try {
+            await updatePreferences({ viewRefreshIntervalSeconds: clampedValue })
+            setRefreshMessage({ type: 'success', text: `Live page refresh interval set to ${clampedValue}s.` })
+        } catch (error) {
+            const normalized = error instanceof Error ? error.message : 'Mahita could not save the live page refresh interval.'
+            setRefreshMessage({ type: 'error', text: normalized })
+        } finally {
+            setSavingRefreshPreference(false)
+        }
+    }, [updatePreferences])
 
     const handleSave = async () => {
         if (!clientId.trim() || !clientSecret.trim()) {
@@ -361,6 +389,63 @@ export default function SettingsPage() {
 
                         <div className="mt-6">
                             <SchwabSetupFAQ callbackUrl={callbackUrl} compact />
+                        </div>
+
+                        <div className="mt-6 bg-[#1E222D] border border-[#2A2E39] rounded-lg overflow-hidden">
+                            <div className="p-6 border-b border-[#2A2E39]">
+                                <div className="flex items-center gap-3 mb-2">
+                                    <Activity className="w-5 h-5 text-blue-500" />
+                                    <h2 className="text-white font-semibold text-lg">Live Page Refresh</h2>
+                                </div>
+                                <p className="text-gray-400 text-sm">
+                                    Controls how aggressively Mahita refreshes active dashboard, portfolio, chart, and backtest views for your signed-in session.
+                                </p>
+                            </div>
+
+                            <div className="p-6 flex flex-col gap-5">
+                                <div className="rounded-lg border border-[#2A2E39] bg-[#131722] p-5">
+                                    <div className="flex items-center justify-between gap-4">
+                                        <div>
+                                            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-gray-500">Refresh Interval</p>
+                                            <p className="mt-2 text-3xl font-black tracking-tight text-white">{viewRefreshIntervalSeconds}s</p>
+                                            <p className="mt-2 text-sm text-gray-400">
+                                                Default is 13 seconds. Minimum allowed is 3 seconds.
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => void saveRefreshPreference(viewRefreshIntervalSeconds - 1)}
+                                                disabled={savingRefreshPreference || viewRefreshIntervalSeconds <= 3}
+                                                className="rounded-xl border border-[#2A2E39] bg-[#1E222D] px-4 py-3 text-lg font-bold text-white transition-colors hover:border-blue-500 disabled:opacity-40"
+                                            >
+                                                -
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => void saveRefreshPreference(viewRefreshIntervalSeconds + 1)}
+                                                disabled={savingRefreshPreference}
+                                                className="rounded-xl border border-[#2A2E39] bg-[#1E222D] px-4 py-3 text-lg font-bold text-white transition-colors hover:border-blue-500 disabled:opacity-40"
+                                            >
+                                                +
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 px-4 py-3 text-sm text-blue-100/80">
+                                    Mahita uses this setting to register active view demand with the scheduler so visible surfaces are prioritized ahead of background ingestion lanes.
+                                </div>
+
+                                {refreshMessage && (
+                                    <div className={`rounded-lg px-4 py-3 text-sm ${refreshMessage.type === 'success'
+                                        ? 'border border-green-500/30 bg-green-500/10 text-green-300'
+                                        : 'border border-red-500/30 bg-red-500/10 text-red-300'
+                                        }`}>
+                                        {refreshMessage.text}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>

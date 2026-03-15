@@ -15,6 +15,8 @@
 
 # next.js
 /.next/
+/.next-playwright/
+/.next-prebuild-*/
 /out/
 /public/monaco/
 
@@ -48,7 +50,10 @@ next-env.d.ts
 /dev.db
 /prisma/*.db
 /data/vaults/*.db
+/data/vaults/*.db-shm
+/data/vaults/*.db-wal
 /logs/*.jsonl
 /test-results/
 /tmp/
 /artifacts/senior-project/
+/artifacts/platform-data-backups/

@@ -19,6 +19,7 @@ import { useRouter } from 'next/navigation'
 import { SchwabGating } from '../components/SchwabGating'
 import { AlphaInsightsWidget } from '../components/AI/AlphaInsightsWidget'
 import { useUserPreferences } from '../hooks/use-user-preferences'
+import { useViewDemand } from '../hooks/use-view-demand'
 import { parseStoredStringArray } from '@/lib/preferences-serialization'
 import { resolveHydratedAccountId } from '@/lib/account-selection'
 
@@ -83,6 +84,7 @@ interface MetricCardProps {
 export default function DashboardPage() {
     const router = useRouter()
     const { preferences, updatePreferences } = useUserPreferences()
+    const viewRefreshIntervalSeconds = Math.max(3, preferences?.viewRefreshIntervalSeconds ?? 13)
 
     // State for Account Management
     const [connected, setConnected] = useState(false)
@@ -104,6 +106,14 @@ export default function DashboardPage() {
     const selectedAccountSummary = accountSummaries.find(
         (account) => account.accountKey === selectedAccount || account.accountId === selectedAccount
     ) || null
+
+    useViewDemand({
+        enabled: connected,
+        surface: 'dashboard',
+        providerPreference: 'schwab',
+        priorityScore: 1.2,
+        refreshIntervalSeconds: viewRefreshIntervalSeconds,
+    })
 
     const fetchDashboardData = useCallback(async () => {
         if (!connected) return
@@ -161,9 +171,13 @@ export default function DashboardPage() {
             // eslint-disable-next-line react-hooks/set-state-in-effect
             void fetchDashboardData()
         }
-        const timer = setInterval(() => { if (connected) fetchDashboardData() }, 60000)
+        const timer = setInterval(() => {
+            if (connected) {
+                void fetchDashboardData()
+            }
+        }, viewRefreshIntervalSeconds * 1000)
         return () => clearInterval(timer)
-    }, [connected, fetchDashboardData])
+    }, [connected, fetchDashboardData, viewRefreshIntervalSeconds])
 
     useEffect(() => {
         if (accounts.length === 0) {
@@ -225,10 +239,12 @@ export default function DashboardPage() {
             const data = await res.json()
             if (data.success) setWatchlistQuotes(data.quotes)
         }
-        fetchQuotes()
-        const timer = setInterval(fetchQuotes, 10000)
+        void fetchQuotes()
+        const timer = setInterval(() => {
+            void fetchQuotes()
+        }, viewRefreshIntervalSeconds * 1000)
         return () => clearInterval(timer)
-    }, [symbols])
+    }, [symbols, viewRefreshIntervalSeconds])
 
     return (
         <MainLayout>

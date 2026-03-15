@@ -1,0 +1,147 @@
+{
+  "generatedAt": "2026-03-15",
+  "route": "/superchart",
+  "majorRegions": [
+    {
+      "id": "mahacharts-topbar",
+      "description": "Top command bar for symbol, timeframe, indicator, strategy, and save actions."
+    },
+    {
+      "id": "mahacharts-left-rail",
+      "description": "Left drawing/tool rail."
+    },
+    {
+      "id": "mahacharts-stage",
+      "description": "Center chart stage, chart shell, legend, and range controls."
+    },
+    {
+      "id": "mahacharts-dock",
+      "description": "Bottom dock for editor, tester, orders, logs, and trading."
+    },
+    {
+      "id": "mahacharts-right-strip",
+      "description": "Permanent right utility strip that keeps icon affordances visible while the chart remains dominant."
+    },
+    {
+      "id": "mahacharts-right-overlay",
+      "description": "Shared right-side overlay spanning chart plus dock without reflowing the chart stage."
+    },
+    {
+      "id": "mahacharts-indicators-modal",
+      "description": "Indicators, strategies, profiles, and patterns modal."
+    }
+  ],
+  "dockTabs": [
+    "editor",
+    "tester",
+    "trades",
+    "orders",
+    "positions",
+    "logs",
+    "trading"
+  ],
+  "railTabs": [
+    "watchlist",
+    "details",
+    "trade",
+    "automation"
+  ],
+  "modalTabs": [
+    "indicators",
+    "strategies",
+    "profiles",
+    "patterns"
+  ],
+  "workspaceTestIds": [
+    "mahacharts-automation-rail",
+    "mahacharts-chart-panel",
+    "mahacharts-chart-select",
+    "mahacharts-chart-shell",
+    "mahacharts-compare-select",
+    "mahacharts-deployment-card",
+    "mahacharts-deployment-form",
+    "mahacharts-details-rail",
+    "mahacharts-dock",
+    "mahacharts-dock-panel",
+    "mahacharts-dock-tabs",
+    "mahacharts-editor-panel",
+    "mahacharts-indicators-close",
+    "mahacharts-indicators-modal",
+    "mahacharts-left-rail",
+    "mahacharts-log-row",
+    "mahacharts-logs-panel",
+    "mahacharts-metric-net-percent",
+    "mahacharts-metric-net-pnl",
+    "mahacharts-metric-trades",
+    "mahacharts-metric-win-rate",
+    "mahacharts-open-indicators",
+    "mahacharts-open-strategies",
+    "mahacharts-order-ticket",
+    "mahacharts-orders-panel",
+    "mahacharts-positions-panel",
+    "mahacharts-provider-select",
+    "mahacharts-range-toolbar",
+    "mahacharts-reference-select",
+    "mahacharts-right-strip",
+    "mahacharts-stage",
+    "mahacharts-stage-header",
+    "mahacharts-tester-metrics",
+    "mahacharts-tester-panel",
+    "mahacharts-topbar",
+    "mahacharts-trade-rail",
+    "mahacharts-trades-panel",
+    "mahacharts-trading-panel",
+    "mahacharts-watchlist-card",
+    "mahacharts-watchlist-rail",
+    "mahacharts-watchlist-remove",
+    "mahacharts-workspace"
+  ],
+  "chartPaneTestIds": [
+    "mahacharts-chart-main",
+    "mahacharts-chart-root"
+  ],
+  "requiredTestIds": [
+    "mahacharts-workspace",
+    "mahacharts-topbar",
+    "mahacharts-open-indicators",
+    "mahacharts-open-strategies",
+    "mahacharts-left-rail",
+    "mahacharts-stage",
+    "mahacharts-chart-shell",
+    "mahacharts-chart-main",
+    "mahacharts-right-strip",
+    "mahacharts-right-icon-watchlist",
+    "mahacharts-right-icon-details",
+    "mahacharts-right-icon-trade",
+    "mahacharts-right-icon-automation",
+    "mahacharts-right-overlay",
+    "mahacharts-right-overlay-close",
+    "mahacharts-right-overlay-resize-handle",
+    "mahacharts-dock",
+    "mahacharts-editor-overlay",
+    "mahacharts-editor-panel",
+    "mahacharts-editor-resize-handle",
+    "mahacharts-tester-panel",
+    "mahacharts-logs-panel",
+    "mahacharts-indicators-modal",
+    "mahacharts-deployment-form"
+  ],
+  "actionToRouteLinks": [
+    {
+      "action": "Open active trader",
+      "route": "/active-trader"
+    },
+    {
+      "action": "Open backtester",
+      "route": "/backtest"
+    },
+    {
+      "action": "Open script editor",
+      "route": "/script-editor"
+    },
+    {
+      "action": "Open chart",
+      "route": "/chart"
+    }
+  ]
+}

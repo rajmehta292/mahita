@@ -15,6 +15,7 @@ export interface VaultInfo {
 
 class VaultManager {
     private clients: Map<string, PrismaClient> = new Map()
+    private clientInit: Map<string, Promise<void>> = new Map()
 
     constructor() {
         if (!fs.existsSync(VAULTS_DIR)) {
@@ -27,16 +28,28 @@ class VaultManager {
      * Initializes the DB if it doesn't exist.
      */
     async getClient(vaultName: string): Promise<PrismaClient> {
-        const vault = await prisma.vault.findUnique({
+        let vault = await prisma.vault.findUnique({
             where: { name: vaultName }
         })
+
+        if (!vault) {
+            await this.seedVaults()
+            vault = await prisma.vault.findUnique({
+                where: { name: vaultName }
+            })
+        }
 
         if (!vault) {
             throw new Error(`Vault "${vaultName}" not found in registry.`)
         }
 
         if (this.clients.has(vault.id)) {
-            return this.clients.get(vault.id)!
+            const client = this.clients.get(vault.id)!
+            const init = this.clientInit.get(vault.id)
+            if (init) {
+                await init
+            }
+            return client
         }
 
         const dbFile = vault.dbPath || path.join(VAULTS_DIR, `${vault.name}.db`)
@@ -63,7 +76,19 @@ class VaultManager {
         })
 
         this.clients.set(vault.id, client)
+        const init = this.initializeClient(client)
+        this.clientInit.set(vault.id, init)
+        await init
         return client
+    }
+
+    private async initializeClient(client: PrismaClient) {
+        await client.$connect()
+        await client.$queryRawUnsafe("PRAGMA journal_mode=WAL;")
+        await client.$queryRawUnsafe("PRAGMA synchronous=NORMAL;")
+        await client.$queryRawUnsafe("PRAGMA busy_timeout=10000;")
+        await client.$queryRawUnsafe("PRAGMA temp_store=MEMORY;")
+        await client.$queryRawUnsafe("PRAGMA foreign_keys=ON;")
     }
 
     /**
@@ -117,7 +142,40 @@ class VaultManager {
             await client.$disconnect()
         }
         this.clients.clear()
+        this.clientInit.clear()
     }
+}
+
+export function isVaultBusyError(error: unknown) {
+    if (!(error instanceof Error)) {
+        return false
+    }
+
+    const message = error.message
+    return (
+        message.includes("Socket timeout") ||
+        message.includes("database is locked") ||
+        message.includes("SQLITE_BUSY")
+    )
+}
+
+export async function withVaultQueryRetry<T>(operation: () => Promise<T>, attempts = 3): Promise<T> {
+    let lastError: unknown
+
+    for (let attempt = 1; attempt <= attempts; attempt += 1) {
+        try {
+            return await operation()
+        } catch (error) {
+            lastError = error
+            if (!isVaultBusyError(error) || attempt === attempts) {
+                throw error
+            }
+
+            await new Promise((resolve) => setTimeout(resolve, 150 * attempt))
+        }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error("Vault query retry failed")
 }
 
 // Singleton instance

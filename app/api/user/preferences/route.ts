@@ -31,7 +31,11 @@ export async function PATCH(request: NextRequest) {
         portfolioSortDirection: body.portfolioSortDirection ?? undefined,
         dashboardLayout: body.dashboardLayout ?? undefined,
         watchlistSymbols: body.watchlistSymbols ?? undefined,
+        indicatorFavorites: body.indicatorFavorites ?? undefined,
         trendingStrategyIds: body.trendingStrategyIds ?? undefined,
+        viewRefreshIntervalSeconds: typeof body.viewRefreshIntervalSeconds === 'number'
+            ? Math.max(3, Math.floor(body.viewRefreshIntervalSeconds))
+            : undefined,
     })
 
     return NextResponse.json({

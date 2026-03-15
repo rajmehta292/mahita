@@ -8,6 +8,9 @@ Documentation tranche update:
 - a presentation-safe demo/bootstrap path now exists through `scripts/bootstrap-demo.sh`
 - senior-project evidence export now exists through `scripts/export-project-evidence.sh`
 - report appendices, speaking notes, visual asset lists, reviewer guides, and post-presentation recovery plans now exist as first-class project artifacts
+- the admin DI-UI workspace now exists as a real Stage 2 control surface for scheduler, caller telemetry, processor flow, verification, and raw storage browsing
+- Stage 2 provider/request validation is now documented and Stage 3 has been explicitly deferred pending stronger scheduler evidence
+- MahaCharts now has a dedicated signed-in guidebook cluster plus generated AI context artifacts for future chart, strategy, and deployment work
 
 ## Verified Release Gate Status
 
@@ -75,6 +78,12 @@ Verified combined lane coverage on the current tree:
 - unit/DOM regression suite passes
 - Playwright browser lane passes
 
+### MahaCharts-specific verification
+Current state:
+- `npm run test:mahacharts` is the focused MahaCharts gate for DOM coverage, deployment/webhook contracts, and the Playwright workspace lane.
+- `npm run test:visual` is the focused desktop screenshot lane for the MahaCharts shell.
+- `npm run verify:mahacharts-context`, `npm run verify:mahacharts-doc-links`, and `npm run verify:mahacharts-coverage` now enforce the docs/context packet and coverage contracts for future AI-assisted MahaCharts changes.
+
 ## Verified Product State
 
 ### Auth and roles
@@ -121,6 +130,28 @@ Implication:
   - audit event
 - The `next-auth` client/session path now has first-pass browser regression coverage, but admin and callback failure matrices still need deeper coverage.
 
+### MahaCharts workspace and strategy library
+Current state:
+- `/superchart` is now framed as a five-region MahaCharts workspace instead of a dashboard card layout.
+- The workspace shell is owned by [app/components/SuperChart/SuperChartWorkspace.tsx](/Users/rmehta01/Sites/mahita/app/components/SuperChart/SuperChartWorkspace.tsx).
+- The chart renderer is owned by [app/components/Chart.tsx](/Users/rmehta01/Sites/mahita/app/components/Chart.tsx) and now supports built-in overlay indicators plus stacked oscillator panes.
+- The Pine editing surface now lives as a resizable overlay over the workspace rather than as a permanent bottom-dock slab, so the chart remains primary until editing is explicitly opened.
+- The right side now targets a permanent utility strip plus contextual overlays rather than a width-taking rail, matching the TradingView-style screenshot geometry used for current UI acceptance.
+- A first-pass indicator catalog now exists in [lib/indicator-catalog.ts](/Users/rmehta01/Sites/mahita/lib/indicator-catalog.ts) and is exposed through [app/api/indicators/catalog/route.ts](/Users/rmehta01/Sites/mahita/app/api/indicators/catalog/route.ts).
+- Script drafts now flow through a strategy library model in [lib/strategy-library.ts](/Users/rmehta01/Sites/mahita/lib/strategy-library.ts):
+  - `Strategy`
+  - `StrategyVersion`
+  - `StrategyWorkspaceSession`
+- Existing `ScriptDraft` behavior is currently shimmed for compatibility in [lib/script-drafts.ts](/Users/rmehta01/Sites/mahita/lib/script-drafts.ts), but the intended long-term product model is strategy-first, not draft-first.
+- Deployment records now carry `strategyId` and `strategyVersionId` in addition to the legacy linked-draft path.
+- A dedicated MahaCharts guidebook cluster now exists under [docs/internal/guidebook/mahacharts/README.md](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/mahacharts/README.md).
+- Generated AI-facing context artifacts now exist under `docs/internal/generated/`.
+
+Implication:
+- Future chart, indicator, strategy-history, tester, and deployment work now has a project-local source-of-truth packet instead of relying on vague repo memory.
+- The strategy lifecycle is now explicitly split between mutable autosave workspace state and immutable deployable versions.
+- Any doc or README that still describes MahaCharts as a generic status-rail dashboard is stale.
+
 ### Auth architecture audit appendix
 Secure and working:
 - Mahita identity is now clearly separated from Schwab brokerage authorization.
@@ -162,6 +193,62 @@ Current state:
 Implication:
 - Schema/client drift in development is now diagnosable from the app instead of surfacing as raw browser crashes.
 - Customer-visible errors are now much more likely to present a typed message and remediation hint.
+
+### DI-UI scheduler and verification
+Current state:
+- The admin control plane now includes a `DI-UI` workspace with five sections:
+  - `Scheduler`
+  - `Caller`
+  - `Processor`
+  - `Verification`
+  - `Storage`
+- Stage 2 scheduler and verification models now exist in [prisma/schema.prisma](/Users/rmehta01/Sites/mahita/prisma/schema.prisma):
+  - `IngestionProfile`
+  - `IngestionLane`
+  - `IngestionTarget`
+  - `IngestionTargetSymbol`
+  - `IngestionJob`
+  - `IngestionDispatchLog`
+  - `VerificationPolicy`
+  - `VerificationJob`
+  - `VerificationObservation`
+  - `IngestionViewDemand`
+- DI-UI now uses typed runtime guards for stale Prisma client cases instead of surfacing raw `findFirst`/`findMany` crashes.
+- The Stage 2 scheduler path is now capable of:
+  - seeding a default `presentation-default` profile
+  - queuing persisted ingestion jobs by lane
+  - dispatching real ingestion through the compatibility executor
+  - writing bars into the active vault source
+  - queuing repeat verification jobs
+  - rebalancing toward after-hours verification when applicable
+- Stage 2 now treats verification as an explicit recorded state, not a loose label. Current surfaced fields include:
+  - `vaultName`
+  - `provider`
+  - `canonicalInterval`
+  - `nativeOrDerived`
+  - `verificationStatus`
+  - `verificationMethod`
+  - `lastVerifiedAt`
+- Current short-term policy defaults are:
+  - `USER_VIEW` highest priority
+  - `DOW30_REALTIME` reserved high-priority lane
+  - `SELECTED_OR_SP500_REALTIME` and `SELECTED_ALL_1M` share remaining budget
+  - after-hours shifts more capacity toward verification and `1m` completeness
+- Current storage truth remains:
+  - vault SQLite for cached bars
+  - main Prisma DB for auth, metadata, provider pool, inventory, and control state
+  - parquet remains experimental
+
+Implication:
+- DI-UI Stage 2 is now a real and useful operator surface rather than a placeholder panel.
+- The current implementation is intentionally a compatibility-driven scheduler foundation, not yet the final durable dispatch engine.
+- Stage 3 queue-engine rewrite is still deferred.
+- The current stage is intended to be truthful rather than fully autonomous: DI-UI can run ingestion, show processor and verification state, and browse storage, but it still relies on the Stage 2 compatibility executor rather than the final queue engine.
+
+Stage decision:
+- **Stage 2 remains active**
+- **Stage 3 is deferred pending provider and scheduler validation evidence**
+- The original `CRM 1m` Schwab failure is no longer treated as a Stage 3 trigger because provider validation now shows the corrected Stage 2 request path succeeds
 
 ### Tenant isolation and Schwab runtime
 Current state:
@@ -257,6 +344,34 @@ Current state:
 
 Implication:
 - Alpha Insights is not yet the advisory/risk-assessment system described in product plans.
+
+### Platform data architecture appendix
+Secure and working:
+- The active chart/backtest runtime path now uses vault-backed market data reads rather than falling back to the main Prisma `MarketData` table.
+- Vault SQLite is now the documented short-term source of truth for cached OHLCV bars.
+- The main Prisma DB remains the source of truth for auth, user state, brokerage metadata, provider-pool metadata, vault registry, and `DataInventory`.
+- Route-visible provenance now exposes the current vault, storage timeframe, derived-vs-native classification, and verification classification.
+- Sampled Schwab `1m` validation for `CRM`, `AAPL`, `MSFT`, `UNH`, `V`, `WMT`, and `XOM` now passes with the corrected Stage 2 request-shape/fallback logic.
+
+Structurally acceptable but transitional:
+- The parquet lake and `/api/v2/market-data` route still exist, but remain experimental and not the primary production path.
+- `DataInventory` is a derived metadata layer and still depends on refresh discipline to stay current.
+- The provider-pool runtime still supports a temporary superuser-backed Schwab bridge.
+- DI-UI is now a real Stage 2 operator surface, but it still uses the Stage 2 compatibility executor rather than a final durable queue engine.
+
+Known weak points:
+- Verification is still weak. `DataConsolidator` can promote single-source data, so “verified” language must stay narrow.
+- Vault schema creation still uses runtime `prisma db push` for newly created vault files.
+- Timeframe support is broader at the UI surface than at the provider-native layer, which means some ranges depend on derivation or provider-specific degradation behavior.
+- Inventory refresh parity is still incomplete. Sampled symbols like `CRM`, `MSFT`, and `WMT` can have vault-backed bars without refreshed `DataInventory` provenance rows.
+- Derived `30s` views are structurally represented through `1s` storage, but the sampled local state still lacks broad `1s` base coverage.
+
+Intentionally deferred:
+- dedicated platform-only provider credentials
+- parity-tested promotion of parquet as a canonical read layer
+- stronger reconciliation/manifests/checksums for market data
+- formal vault migration tooling beyond the current backup/restore discipline
+- Stage 3 queue-engine rewrite, unless later evidence proves the Stage 2 executor cannot meet freshness, verification, or after-hours backfill requirements
 
 ### Schwab Data Center
 Current state:

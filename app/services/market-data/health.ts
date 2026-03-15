@@ -1,7 +1,7 @@
 import prisma from "@/lib/prisma"
 import { Timeframe } from "./types"
 import { getMissingRanges, timeframeToSeconds } from "./utils"
-import { vaultManager } from "./vault-manager"
+import { vaultManager, withVaultQueryRetry } from "./vault-manager"
 
 export interface DataGap {
     start: Date
@@ -67,11 +67,11 @@ export class DataHealthManager {
 
     static async getHealth(symbol: string, timeframe: Timeframe, vaultName = 'schwab'): Promise<HealthReport> {
         const client = await vaultManager.getClient(vaultName)
-        const rows = await client.marketData.findMany({
+        const rows = await withVaultQueryRetry(() => client.marketData.findMany({
             where: { symbol, timeframe },
             orderBy: { time: 'asc' },
             select: { time: true, source: true }
-        })
+        }))
 
         if (rows.length === 0) {
             return {
@@ -169,9 +169,9 @@ export class DataHealthManager {
 
         for (const name of vaultNames) {
             const client = await vaultManager.getClient(name)
-            const groups = await client.marketData.groupBy({
+            const groups = await withVaultQueryRetry(() => client.marketData.groupBy({
                 by: ['symbol', 'timeframe']
-            })
+            }))
 
             const reports = await Promise.all(
                 groups.map((item) => this.getHealth(item.symbol, item.timeframe as Timeframe, name))
@@ -183,9 +183,9 @@ export class DataHealthManager {
 
     static async getAllHealth(vaultName = 'schwab'): Promise<HealthReport[]> {
         const client = await vaultManager.getClient(vaultName)
-        const groups = await client.marketData.groupBy({
+        const groups = await withVaultQueryRetry(() => client.marketData.groupBy({
             by: ['symbol', 'timeframe']
-        })
+        }))
 
         if (groups.length === 0) {
             // Cleanup inventory for this vault?
@@ -236,7 +236,9 @@ export class DataHealthManager {
                     healthScore: report.healthScore,
                     targetCoveragePercent: report.targetCoveragePercent,
                     barCount: report.count,
-                    gapCount: report.gapCount || report.gaps.length
+                    gapCount: report.gapCount || report.gaps.length,
+                    storageClass: 'native-cached',
+                    canonicalInterval: report.timeframe,
                 },
                 create: {
                     vaultId: vault.id,
@@ -249,7 +251,10 @@ export class DataHealthManager {
                     healthScore: report.healthScore,
                     targetCoveragePercent: report.targetCoveragePercent,
                     barCount: report.count,
-                    gapCount: report.gapCount || report.gaps.length
+                    gapCount: report.gapCount || report.gaps.length,
+                    storageClass: 'native-cached',
+                    canonicalInterval: report.timeframe,
+                    verificationStatus: 'single-source-unverified',
                 }
             })
         }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from '@/lib/auth'
 import { ScriptCompiler } from "@/app/services/trading-engine/script-engine"
+import type { StrategyRunSettings } from '@/app/services/trading-engine/types'
+import { validateWithPinets } from "@/app/services/trading-engine/pinets-series"
 
 export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions)
@@ -11,15 +13,32 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-        const { script } = await req.json()
+        const { script, runSettings } = await req.json() as {
+            script?: string
+            runSettings?: Partial<StrategyRunSettings>
+        }
 
         if (!script) {
             return NextResponse.json({ error: "No script provided" }, { status: 400 })
         }
 
         try {
-            ScriptCompiler.compile(script)
-            return NextResponse.json({ success: true, message: "Script compiled successfully." })
+            await validateWithPinets(script)
+            const compiled = ScriptCompiler.compileDetailed(script)
+            return NextResponse.json({
+                success: true,
+                engineMode: 'pinets',
+                message: "Script validated against the PineTS-backed Mahita runtime.",
+                diagnostics: {
+                    normalizedScriptSource: compiled.normalizedScriptSource,
+                    strategySettings: compiled.strategySettings,
+                    activeRunSettings: ScriptCompiler.toRunSettings(
+                        compiled.strategySettings,
+                        runSettings ?? null,
+                        runSettings ? 'saved-draft' : 'script-header'
+                    ),
+                },
+            })
         } catch (e: any) {
             return NextResponse.json({
                 success: false,

@@ -1,3 +1,9 @@
+export const DOW30_SYMBOLS = [
+    "AAPL", "AMGN", "AMZN", "AXP", "BA", "CAT", "CRM", "CSCO", "CVX", "DIS",
+    "GS", "HD", "HON", "IBM", "JNJ", "JPM", "KO", "MCD", "MMM", "MRK",
+    "MSFT", "NKE", "NVDA", "PG", "SHW", "TRV", "UNH", "V", "VZ", "WMT",
+];
+
 export const SP500_SYMBOLS = [
     "AAPL", "MSFT", "NVDA", "AMZN", "META", "GOOGL", "GOOG", "BRK.B", "LLY", "AVGO",
     "JPM", "TSLA", "UNH", "V", "XOM", "MA", "JNJ", "PG", "HD", "COST",

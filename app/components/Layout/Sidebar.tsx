@@ -21,7 +21,8 @@ import {
     Database,
     MonitorSmartphone,
     TrendingUp,
-    ScrollText
+    ScrollText,
+    Wallet
 } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -29,8 +30,10 @@ import { isAdminRole } from '@/lib/roles'
 
 const menuItems = [
     { icon: LayoutGrid, label: 'Dashboard', href: '/dashboard' },
+    { icon: Wallet, label: 'Accounts', href: '/accounts' },
     { icon: Briefcase, label: 'Portfolio', href: '/portfolio' },
     { icon: Zap, label: 'Active Trader', href: '/active-trader' },
+    { icon: BarChart3, label: 'MahaCharts', href: '/superchart' },
     { icon: BarChart2, label: 'Screener', href: '/screener' },
     { icon: FileText, label: 'Trade History', href: '/history' },
     { icon: Star, label: 'Watchlist', href: '/watchlist' },

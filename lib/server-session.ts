@@ -4,8 +4,38 @@ import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
 import { isSuperuserRole } from "@/lib/roles"
 
+const RECOVERABLE_SESSION_ERROR_PATTERNS = [
+    "JWT_SESSION_ERROR",
+    "decryption operation failed",
+    "JWEDecryptionFailed",
+    "no matching decryption secret",
+]
+
+export function isRecoverableSessionError(error: unknown) {
+    if (!(error instanceof Error)) {
+        return false
+    }
+
+    const haystack = `${error.name} ${error.message}`.toLowerCase()
+    return RECOVERABLE_SESSION_ERROR_PATTERNS.some((pattern) =>
+        haystack.includes(pattern.toLowerCase())
+    )
+}
+
 export async function getAppServerSession(): Promise<Session | null> {
-    return getServerSession(authOptions)
+    try {
+        return await getServerSession(authOptions)
+    } catch (error) {
+        if (isRecoverableSessionError(error)) {
+            console.warn(
+                "[auth] Recoverable session error while reading NextAuth session; treating request as signed out.",
+                error instanceof Error ? { name: error.name, message: error.message } : error
+            )
+            return null
+        }
+
+        throw error
+    }
 }
 
 export async function getCurrentUser(

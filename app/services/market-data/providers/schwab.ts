@@ -28,41 +28,113 @@ interface SchwabPriceHistoryResponse {
     } | null
 }
 
+export const SCHWAB_SUPPORTED_MINUTE_PERIODS = [1, 2, 3, 4, 5, 10] as const
+export const SCHWAB_MINUTE_CHUNK_SIZE_MS = 5 * 24 * 60 * 60 * 1000
+export const SCHWAB_SUPPORTED_YEAR_PERIODS = [1, 2, 3, 5, 10, 15, 20] as const
+
+function isMinuteTimeframe(timeframe: Timeframe) {
+    return timeframe === '1m' || timeframe === '5m' || timeframe === '10m' || timeframe === '15m' || timeframe === '30m' || timeframe === '1h'
+}
+
+export function getSupportedMinutePeriod(daysDiff: number) {
+    if (daysDiff <= 1) return 1
+    if (daysDiff <= 2) return 2
+    if (daysDiff <= 3) return 3
+    if (daysDiff <= 4) return 4
+    if (daysDiff <= 5) return 5
+    return 10
+}
+
+function getSupportedYearPeriod(daysDiff: number) {
+    const years = Math.max(1, Math.ceil(daysDiff / 365))
+    for (const period of SCHWAB_SUPPORTED_YEAR_PERIODS) {
+        if (years <= period) {
+            return period
+        }
+    }
+
+    return SCHWAB_SUPPORTED_YEAR_PERIODS[SCHWAB_SUPPORTED_YEAR_PERIODS.length - 1]
+}
+
+function getMinuteFrequency(timeframe: Timeframe) {
+    switch (timeframe) {
+        case '1m':
+            return 1
+        case '5m':
+            return 5
+        case '10m':
+            return 10
+        case '15m':
+            return 15
+        case '30m':
+        case '1h':
+            return 30
+        default:
+            return 1
+    }
+}
+
+export function buildSchwabHistoryParams(
+    timeframe: Timeframe,
+    startTime: number,
+    endTime: number,
+    mode: 'range' | 'period' = 'range'
+): SchwabHistoryParams | null {
+    const startDate = startTime * 1000
+    const endDate = endTime * 1000
+    const daysDiff = Math.max(1, Math.ceil((endTime - startTime) / 86400))
+
+    if (isMinuteTimeframe(timeframe)) {
+        const frequency = getMinuteFrequency(timeframe)
+        if (mode === 'period') {
+            return {
+                periodType: 'day',
+                period: getSupportedMinutePeriod(daysDiff),
+                frequencyType: 'minute',
+                frequency,
+            }
+        }
+
+        return {
+            frequencyType: 'minute',
+            frequency,
+            startDate,
+            endDate,
+        }
+    }
+
+    switch (timeframe) {
+        case '1d':
+            return mode === 'period'
+                ? { periodType: 'year', period: getSupportedYearPeriod(daysDiff), frequencyType: 'daily', frequency: 1 }
+                : { periodType: 'year', frequencyType: 'daily', frequency: 1, startDate, endDate }
+        case '1w':
+            return mode === 'period'
+                ? { periodType: 'year', period: getSupportedYearPeriod(daysDiff), frequencyType: 'weekly', frequency: 1 }
+                : { periodType: 'year', frequencyType: 'weekly', frequency: 1, startDate, endDate }
+        case '1M':
+            return mode === 'period'
+                ? { periodType: 'year', period: getSupportedYearPeriod(daysDiff), frequencyType: 'monthly', frequency: 1 }
+                : { periodType: 'year', frequencyType: 'monthly', frequency: 1, startDate, endDate }
+        default:
+            console.warn(`[SchwabProvider] Unsupported timeframe: ${timeframe}. Defaulting to daily fallback.`)
+            return mode === 'period'
+                ? { periodType: 'year', period: getSupportedYearPeriod(daysDiff), frequencyType: 'daily', frequency: 1 }
+                : { periodType: 'year', frequencyType: 'daily', frequency: 1, startDate, endDate }
+    }
+}
+
 export class SchwabProvider implements IDataProvider {
     private buildParams(timeframe: Timeframe, startTime: number, endTime: number): SchwabHistoryParams | null {
-        const startDate = startTime * 1000
-        const endDate = endTime * 1000
+        return buildSchwabHistoryParams(timeframe, startTime, endTime, "range")
+    }
 
-        // Schwab requires 'period' instead of 'startDate'/'endDate' for minute frequencies
-        // Calculate days between start and end (min 1, max 10 for minute grids)
-        const daysDiff = Math.max(1, Math.ceil((endTime - startTime) / 86400))
-        const minutePeriod = Math.min(10, daysDiff)
+    private buildFallbackMinuteParams(timeframe: Timeframe, startTime: number, endTime: number): SchwabHistoryParams | null {
+        return buildSchwabHistoryParams(timeframe, startTime, endTime, "period")
+    }
 
-        switch (timeframe) {
-            case '1m':
-                return { periodType: 'day', period: minutePeriod, frequencyType: 'minute', frequency: 1 }
-            case '5m':
-                return { periodType: 'day', period: minutePeriod, frequencyType: 'minute', frequency: 5 }
-            case '10m':
-                return { periodType: 'day', period: minutePeriod, frequencyType: 'minute', frequency: 10 }
-            case '15m':
-                return { periodType: 'day', period: minutePeriod, frequencyType: 'minute', frequency: 15 }
-            case '30m':
-                return { periodType: 'day', period: minutePeriod, frequencyType: 'minute', frequency: 30 }
-            case '1h':
-                // Schwab doesn't have an explicit 'hour' frequencyType, and rejects 60m frequency.
-                // We request 30m candles using 'day' period, and let our DB aggregate them into 1h intervals.
-                return { periodType: 'day', period: minutePeriod, frequencyType: 'minute', frequency: 30 }
-            case '1d':
-                return { periodType: 'year', frequencyType: 'daily', frequency: 1, startDate, endDate }
-            case '1w':
-                return { periodType: 'year', frequencyType: 'weekly', frequency: 1, startDate, endDate }
-            case '1M':
-                return { periodType: 'year', frequencyType: 'monthly', frequency: 1, startDate, endDate }
-            default:
-                console.warn(`[SchwabProvider] Unsupported timeframe: ${timeframe}. Defaulting to daily fallback.`)
-                return { periodType: 'year', frequencyType: 'daily', frequency: 1, startDate, endDate }
-        }
+    private buildFallbackRangeParams(timeframe: Timeframe, startTime: number, endTime: number): SchwabHistoryParams | null {
+        return buildSchwabHistoryParams(timeframe, startTime, endTime, "period")
     }
 
     private supportsSymbol(symbol: string): boolean {
@@ -82,19 +154,67 @@ export class SchwabProvider implements IDataProvider {
         try {
             let allCandles: SchwabCandle[] = []
 
-            // Chunking logic for minute data (Schwab caps this strictly to 10 days per request)
+            await providerTelemetryBus.log({
+                kind: "control",
+                provider: "schwab",
+                symbol,
+                timeframe,
+                rangeStart: startTime,
+                rangeEnd: endTime,
+                message: "Prepared Schwab history request.",
+                request: {
+                    params,
+                },
+            })
+
+            // Chunk minute data with explicit date windows so historical 1m coverage can be backfilled and verified.
             if (params.frequencyType === 'minute' && params.startDate && params.endDate) {
-                const CHUNK_SIZE_MS = 5 * 24 * 60 * 60 * 1000 // Safely pull 5 days at a time to prevent 400 Bad Request boundaries
                 let currentStart = params.startDate
                 const finalEnd = params.endDate
 
                 while (currentStart < finalEnd) {
-                    const currentEnd = Math.min(currentStart + CHUNK_SIZE_MS, finalEnd)
+                    const currentEnd = Math.min(currentStart + SCHWAB_MINUTE_CHUNK_SIZE_MS, finalEnd)
                     const chunkParams = { ...params, startDate: currentStart, endDate: currentEnd }
+                    try {
+                        const response = await this.fetchPriceHistoryWithRetry(symbol, chunkParams, options?.providerClient)
+                        const candles = Array.isArray(response.data?.candles) ? response.data.candles : []
+                        allCandles = allCandles.concat(candles)
+                    } catch (error) {
+                        const fallbackParams = this.buildFallbackMinuteParams(
+                            timeframe,
+                            Math.floor(currentStart / 1000),
+                            Math.floor(currentEnd / 1000)
+                        )
 
-                    const response = await this.fetchPriceHistoryWithRetry(symbol, chunkParams, options?.providerClient)
-                    const candles = Array.isArray(response.data?.candles) ? response.data.candles : []
-                    allCandles = allCandles.concat(candles)
+                        const shouldTryFallback =
+                            fallbackParams &&
+                            error instanceof Error &&
+                            error.message.includes("400") &&
+                            currentEnd === finalEnd &&
+                            Math.ceil((currentEnd - currentStart) / 86400000) <= 10
+
+                        if (!shouldTryFallback) {
+                            throw error
+                        }
+
+                        await providerTelemetryBus.log({
+                            kind: "control",
+                            provider: "schwab",
+                            symbol,
+                            timeframe,
+                            rangeStart: Math.floor(currentStart / 1000),
+                            rangeEnd: Math.floor(currentEnd / 1000),
+                            message: "Minute range request failed; retrying with period-based Schwab fallback.",
+                            request: {
+                                primary: chunkParams,
+                                fallback: fallbackParams,
+                            },
+                        })
+
+                        const response = await this.fetchPriceHistoryWithRetry(symbol, fallbackParams, options?.providerClient)
+                        const candles = Array.isArray(response.data?.candles) ? response.data.candles : []
+                        allCandles = allCandles.concat(candles)
+                    }
 
                     currentStart = currentEnd + 1
                     if (currentStart < finalEnd) {
@@ -102,8 +222,37 @@ export class SchwabProvider implements IDataProvider {
                     }
                 }
             } else {
-                const response = await this.fetchPriceHistoryWithRetry(symbol, params, options?.providerClient)
-                allCandles = Array.isArray(response.data?.candles) ? response.data.candles : []
+                try {
+                    const response = await this.fetchPriceHistoryWithRetry(symbol, params, options?.providerClient)
+                    allCandles = Array.isArray(response.data?.candles) ? response.data.candles : []
+                } catch (error) {
+                    const fallbackParams = this.buildFallbackRangeParams(timeframe, startTime, endTime)
+                    const shouldTryFallback =
+                        fallbackParams &&
+                        error instanceof Error &&
+                        error.message.includes("400")
+
+                    if (!shouldTryFallback) {
+                        throw error
+                    }
+
+                    await providerTelemetryBus.log({
+                        kind: "control",
+                        provider: "schwab",
+                        symbol,
+                        timeframe,
+                        rangeStart: startTime,
+                        rangeEnd: endTime,
+                        message: "Schwab range request failed; retrying with period-based fallback.",
+                        request: {
+                            primary: params,
+                            fallback: fallbackParams,
+                        },
+                    })
+
+                    const response = await this.fetchPriceHistoryWithRetry(symbol, fallbackParams, options?.providerClient)
+                    allCandles = Array.isArray(response.data?.candles) ? response.data.candles : []
+                }
             }
 
             return allCandles

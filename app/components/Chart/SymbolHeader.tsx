@@ -12,6 +12,8 @@ interface SymbolHeaderProps {
     availableTimeframes?: string[]
     onSymbolChange?: (symbol: string) => void
     onTimeframeChange?: (timeframe: string) => void
+    isFavorite?: boolean
+    onToggleFavorite?: () => void
 }
 
 export function SymbolHeader({ 
@@ -23,7 +25,9 @@ export function SymbolHeader({
     availableSymbols = [],
     availableTimeframes = ['1m', '5m', '15m', '1h', '4h', '1d', '1w', '1M'],
     onSymbolChange,
-    onTimeframeChange
+    onTimeframeChange,
+    isFavorite = false,
+    onToggleFavorite
 }: SymbolHeaderProps) {
     const isPositive = change >= 0
 
@@ -49,10 +53,15 @@ export function SymbolHeader({
                 <ChevronDown className="w-4 h-4 text-gray-400" />
             </label>
 
-            {/* Favorite */}
-            <button className="p-1.5 hover:bg-[#2A2E39] rounded transition-colors">
-                <Star className="w-4 h-4 text-gray-400 hover:text-yellow-500" />
-            </button>
+            {onToggleFavorite ? (
+                <button
+                    onClick={onToggleFavorite}
+                    className="p-1.5 hover:bg-[#2A2E39] rounded transition-colors"
+                    title={isFavorite ? 'Remove from watchlist' : 'Save to watchlist'}
+                >
+                    <Star className={`w-4 h-4 ${isFavorite ? 'fill-yellow-500 text-yellow-500' : 'text-gray-400 hover:text-yellow-500'}`} />
+                </button>
+            ) : null}
 
             {/* Price Info */}
             <div className="flex items-center gap-4 pl-4 border-l border-[#2A2E39]">

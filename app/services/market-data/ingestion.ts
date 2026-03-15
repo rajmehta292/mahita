@@ -73,16 +73,21 @@ class IngestionService {
         }
 
         // --- Multi-Key Pooling Implementation ---
-        const { getSchwabClientPool } = await import('@/app/services/schwab/runtime')
-        const clientPool = await getSchwabClientPool()
+        const requiresSchwabPool = !options.provider || options.provider === 'auto' || options.provider === 'schwab'
+        let clientPool: SchwabClient[] = []
 
-        if (clientPool.length === 0 && process.env.USE_MOCK_DATA !== 'true') {
-            const errorMessage = getPlatformCredentialIsolationError()
-            await providerTelemetryBus.log({
-                kind: 'error',
-                message: `SYS-CRITICAL: ${errorMessage}`,
-            })
-            throw new Error(`IngestionService Halted: ${errorMessage}`)
+        if (requiresSchwabPool) {
+            const { getSchwabClientPool } = await import('@/app/services/schwab/runtime')
+            clientPool = await getSchwabClientPool()
+
+            if (clientPool.length === 0 && process.env.USE_MOCK_DATA !== 'true') {
+                const errorMessage = getPlatformCredentialIsolationError()
+                await providerTelemetryBus.log({
+                    kind: 'error',
+                    message: `SYS-CRITICAL: ${errorMessage}`,
+                })
+                throw new Error(`IngestionService Halted: ${errorMessage}`)
+            }
         }
 
         this.running = true
@@ -124,8 +129,12 @@ class IngestionService {
 
                 try {
                     // Rotate provider throughout the pool for each symbol to balance load
-                    const activeClient = clientPool[poolIndex % clientPool.length]
-                    poolIndex++
+                    const activeClient = clientPool.length > 0
+                        ? clientPool[poolIndex % clientPool.length]
+                        : undefined
+                    if (clientPool.length > 0) {
+                        poolIndex++
+                    }
 
                     for (const timeframe of timeframes) {
                         await logger({ message: `Checking ${symbol} @ ${timeframe}...`, symbol, timeframe })

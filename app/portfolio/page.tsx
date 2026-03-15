@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { ColumnConfig, PositionTable } from '../components/Portfolio/PositionTable'
 import { useUserPreferences } from '../hooks/use-user-preferences'
+import { useViewDemand } from '../hooks/use-view-demand'
 import { createOrderDraft, OrderDraft, serializeOrderDraft } from '@/lib/trading/order-draft'
 import { resolveHydratedAccountId } from '@/lib/account-selection'
 
@@ -64,6 +65,7 @@ export default function PortfolioPage() {
     const [isRefreshing, setIsRefreshing] = useState(false)
     const [pendingOrderDraft, setPendingOrderDraft] = useState<OrderDraft | null>(null)
     const { preferences, updatePreferences } = useUserPreferences()
+    const viewRefreshIntervalSeconds = Math.max(3, preferences?.viewRefreshIntervalSeconds ?? 13)
 
     const preferredColumns = useMemo(() => {
         if (!preferences?.portfolioColumns) {
@@ -76,6 +78,14 @@ export default function PortfolioPage() {
             return undefined
         }
     }, [preferences?.portfolioColumns])
+
+    useViewDemand({
+        enabled: connected,
+        surface: 'portfolio',
+        providerPreference: 'schwab',
+        priorityScore: 1.35,
+        refreshIntervalSeconds: viewRefreshIntervalSeconds,
+    })
 
     const fetchAccounts = async () => {
         try {
@@ -163,6 +173,18 @@ export default function PortfolioPage() {
             console.warn('Failed to persist account preference:', preferenceError)
         })
     }, [preferences?.selectedAccountId, selectedAccount, updatePreferences, fetchPositions])
+
+    useEffect(() => {
+        if (!connected || !selectedAccount) {
+            return
+        }
+
+        const timer = setInterval(() => {
+            void fetchPositions(selectedAccount)
+        }, viewRefreshIntervalSeconds * 1000)
+
+        return () => clearInterval(timer)
+    }, [connected, fetchPositions, selectedAccount, viewRefreshIntervalSeconds])
 
     const activeColumnConfig = preferredColumns && preferredColumns.length > 0
         ? preferredColumns

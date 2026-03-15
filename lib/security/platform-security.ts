@@ -96,6 +96,10 @@ export async function writeAdminAuditEvent(input: {
   reason?: string | null
   metadata?: string | null
 }) {
+  if (!input.actorUserId) {
+    return null
+  }
+
   return prisma.adminAuditEvent.create({
     data: {
       actorUserId: input.actorUserId,

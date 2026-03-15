@@ -5,6 +5,18 @@ vi.mock('@/app/components/Layout/MainLayout', () => ({
     MainLayout: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }))
 
+vi.mock('@/app/hooks/use-user-preferences', () => ({
+    useUserPreferences: () => ({
+        preferences: {
+            viewRefreshIntervalSeconds: 13,
+        },
+        loading: false,
+        updatePreferences: vi.fn().mockResolvedValue({
+            viewRefreshIntervalSeconds: 13,
+        }),
+    }),
+}))
+
 describe('SettingsPage', () => {
     it('shows a typed runtime hint when saving credentials fails with a schema mismatch', async () => {
         const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

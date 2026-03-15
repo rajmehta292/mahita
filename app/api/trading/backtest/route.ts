@@ -3,7 +3,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { BacktestEngine } from '@/app/services/trading-engine/backtester'
 import { marketDataStore } from '@/app/services/market-data/store'
-import { StrategyAST } from '@/app/services/trading-engine/types'
+import { BacktestDataSource, EngineComparisonMode, StrategyAST, StrategyRunSettings } from '@/app/services/trading-engine/types'
+import { getParityFixture } from '@/lib/parity-fixtures'
 
 export async function POST(req: Request) {
     const session = await getServerSession(authOptions)
@@ -14,11 +15,19 @@ export async function POST(req: Request) {
 
     try {
         const body = await req.json()
-        const { strategy, startTime, endTime, initialCapital } = body as {
+        const { strategy, startTime, endTime, initialCapital, fixtureId, snapshotFixtureId, runSettings, strictParity, comparisonMode, providerOverride, marketDataSource, comparisonReferenceId } = body as {
             strategy: StrategyAST,
             startTime: number,
             endTime: number,
             initialCapital?: number
+            fixtureId?: string
+            snapshotFixtureId?: string
+            runSettings?: Partial<StrategyRunSettings>
+            strictParity?: boolean
+            comparisonMode?: EngineComparisonMode
+            providerOverride?: string
+            marketDataSource?: BacktestDataSource
+            comparisonReferenceId?: string | null
         }
 
         if (!strategy || !startTime || !endTime) {
@@ -26,9 +35,53 @@ export async function POST(req: Request) {
         }
 
         const engine = new BacktestEngine(marketDataStore)
+        const resolvedFixtureId = snapshotFixtureId || fixtureId
+        const fixture = resolvedFixtureId && session.user?.id
+            ? await getParityFixture(session.user.id, resolvedFixtureId)
+            : null
 
-        // Run the backtest using our local chronological loop
-        const results = await engine.run(strategy, startTime, endTime, initialCapital)
+        const results = await engine.run(
+            strategy,
+            startTime,
+            endTime,
+            initialCapital,
+            fixture
+                ? {
+                    fixture: {
+                        id: fixture.id,
+                        name: fixture.name,
+                        symbol: fixture.symbol,
+                        timeframe: fixture.timeframe,
+                        manifest: fixture.manifest,
+                        candles: fixture.candles,
+                        trades: fixture.trades,
+                    },
+                    runSettings,
+                    strictParity: Boolean(strictParity),
+                    comparisonMode,
+                    providerOverride,
+                    marketDataSource,
+                    comparisonReferenceId,
+                }
+                : {
+                    runSettings,
+                    strictParity: Boolean(strictParity),
+                    comparisonMode,
+                    providerOverride,
+                    marketDataSource,
+                    comparisonReferenceId,
+                }
+        )
+
+        if (strictParity && fixture && !results.parityComparison?.exactMatch) {
+            return NextResponse.json(
+                {
+                    error: 'Strict parity failed for the selected TradingView fixture.',
+                    results,
+                },
+                { status: 409 }
+            )
+        }
 
         return NextResponse.json(results)
     } catch (error: any) {

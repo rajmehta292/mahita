@@ -12,7 +12,9 @@ export interface UserPreferencesState {
     portfolioSortDirection?: string | null
     dashboardLayout?: string | null
     watchlistSymbols?: string | null
+    indicatorFavorites?: string | null
     trendingStrategyIds?: string | null
+    viewRefreshIntervalSeconds?: number | null
 }
 
 export function useUserPreferences() {

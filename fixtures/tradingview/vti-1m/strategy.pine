@@ -1,0 +1,83 @@
+//@version=6
+strategy("Pyramiding Base: 0.1% Gate + PSAR", overlay=true, pyramiding=10, initial_capital=10000, default_qty_type=strategy.cash, default_qty_value=500)
+
+maxEntries         = input.int(10, "Max Pyramid Entries", minval=1, maxval=20, group="Entry Parameters")
+
+profitThresholdPct = input.float(0.1, "Minimum Profit % Before Any Exit Logic", step=0.1, group="Exit Parameters")
+psarStart          = input.float(0.02, "PSAR Start", step=0.01, group="Exit Parameters")
+psarIncrement      = input.float(0.02, "PSAR Increment", step=0.01, group="Exit Parameters")
+psarMax            = input.float(0.2, "PSAR Max", step=0.01, group="Exit Parameters")
+
+fastLen            = input.int(9, "Fast EMA", minval=1, group="Entry Parameters")
+slowLen            = input.int(21, "Slow EMA", minval=1, group="Entry Parameters")
+
+dmiLen             = input.int(14, "DMI Length", minval=1, group="ADX/DMI Entry Logic")
+adxSmooth          = input.int(14, "ADX Smoothing", minval=1, group="ADX/DMI Entry Logic")
+adxThreshold       = input.float(20.0, "ADX Threshold", minval=1, group="ADX/DMI Entry Logic", tooltip="ADX above this level indicates a strong trend")
+
+showDebug          = input.bool(true, "Show Debug Labels", group="UI / Debug")
+
+psar = ta.sar(psarStart, psarIncrement, psarMax)
+fastEma = ta.ema(close, fastLen)
+slowEma = ta.ema(close, slowLen)
+
+[diPlus, diMinus, adx] = ta.dmi(dmiLen, adxSmooth)
+
+emaBullish = fastEma > slowEma
+dmiBullish = diPlus > diMinus
+adxStrong  = adx > adxThreshold
+
+triggerCondition = ta.crossover(fastEma, slowEma) or ta.crossover(diPlus, diMinus) or ta.crossover(adx, adxThreshold)
+
+longEntry = triggerCondition and emaBullish and dmiBullish and adxStrong
+
+if longEntry and strategy.opentrades < maxEntries
+    strategy.entry("Long", strategy.long)
+
+inLong = strategy.position_size > 0
+avgPrice = strategy.position_avg_price
+
+profitPct = inLong ? ((close - avgPrice) / avgPrice) * 100.0 : na
+notInLoss = inLong and close >= avgPrice
+profitGateOpen = inLong and profitPct >= profitThresholdPct
+psarAbove = inLong and psar > close
+
+var int psarAboveCount = 0
+
+if inLong
+    if profitGateOpen
+        if psarAbove
+            psarAboveCount += 1
+        else
+            psarAboveCount := 0
+    else
+        psarAboveCount := 0
+else
+    psarAboveCount := 0
+
+exitLong = inLong and notInLoss and profitGateOpen and psarAboveCount >= 2
+
+if exitLong
+    strategy.close("Long", comment="PSAR 2-bar exit")
+
+plot(psar, "PSAR", style=plot.style_cross, linewidth=2, color=color.gray)
+plot(fastEma, "Fast EMA", color=color.green)
+plot(slowEma, "Slow EMA", color=color.red)
+
+plotshape(longEntry and strategy.opentrades < maxEntries, title="Long Entry", style=shape.triangleup, location=location.belowbar, color=color.green, size=size.small, text="BUY")
+plotshape(exitLong, title="Exit", style=shape.triangledown, location=location.abovebar, color=color.red, size=size.small, text="SELL")
+
+if showDebug and barstate.islast
+    var label infoLabel = na
+    label.delete(infoLabel)
+
+    statusText =
+         "Open Trades: " + str.tostring(strategy.opentrades) + "/" + str.tostring(maxEntries) + "\n" +
+         "Avg Price: " + (inLong ? str.tostring(avgPrice, format.mintick) : "N/A") + "\n" +
+         "Net Profit %: " + (inLong ? str.tostring(profitPct, "#.##") : "0.00") + "\n" +
+         "Profit Gate Open: " + str.tostring(profitGateOpen) + "\n" +
+         "Not In Loss: " + str.tostring(notInLoss) + "\n" +
+         "PSAR Exit Counter: " + str.tostring(psarAboveCount) + "/2\n" +
+         "Current ADX: " + str.tostring(adx, "#.##")
+
+    infoLabel := label.new(bar_index + 2, close, statusText, style=label.style_label_left, textcolor=color.white, color=color.new(color.black, 30))

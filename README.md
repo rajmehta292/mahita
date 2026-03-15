@@ -10,6 +10,16 @@ Mahita is a trading-terminal senior project that combines:
 
 The live docs entry point inside the app is `/docs`. For repo readers, this README is the fastest map to the rest of the project.
 
+## ⚡ Quick Start (Dev & Tunnel)
+
+```bash
+# Start development server
+npm run dev
+
+# Start Cloudflare tunnel
+cloudflared tunnel --config cloudflared/config.yml run
+```
+
 A professional-grade algorithmic trading platform inspired by TradingView, built with Next.js, React, and TypeScript.
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
@@ -25,11 +35,11 @@ A professional-grade algorithmic trading platform inspired by TradingView, built
 - **Responsive Design** - Works on desktop, tablet, and mobile devices
 
 ### Advanced Charting
-- **Professional Charts** - Powered by Lightweight Charts library
-- **Drawing Tools** - Trendlines, Fibonacci, shapes, and text annotations
-- **Technical Indicators** - Volume, MACD, RSI, and more
-- **Multiple Timeframes** - From 1-minute to monthly charts
-- **Chart Types** - Candlestick, Heikin-Ashi, and more
+- **MahaCharts Workspace** - Single-chart-first shell with top bar, left rail, dominant chart stage, adjustable Pine editor overlay, bottom report dock, and a permanent right utility strip that launches contextual overlays
+- **Built-In Indicators** - Volume, MACD, RSI, EMA, SMA, Bollinger Bands, VWAP, and ATR
+- **Strategy Library** - Saved strategies, immutable versions, and autosave workspace sessions
+- **Multiple Timeframes** - Current workspace flow from 1-minute through daily charts
+- **Chart Types** - Candlestick and Heikin-Ashi in the current workspace
 
 ### Live Trading (Active Trader)
 - **Schwab API Integration** - Connect your Charles Schwab brokerage account
@@ -43,7 +53,8 @@ A professional-grade algorithmic trading platform inspired by TradingView, built
 - **Real-Time Compilation** - Instant feedback on strategy code
 - **Comprehensive Backtesting** - Test strategies against historical data
 - **Performance Metrics** - Win rate, Sharpe ratio, max drawdown, profit factor
-- **Trade Visualization** - See entry/exit points directly on charts
+- **Trade Visualization** - Entry/exit markers directly on charts
+- **Versioned Strategies** - Workspace autosave plus immutable strategy versions for deployment-safe history
 
 ### Market Intelligence
 - **Data Command Center (Data Doctor)** - Visual global heatmap mapping all internal system knowledge and API health.
@@ -64,12 +75,18 @@ A professional-grade algorithmic trading platform inspired by TradingView, built
 If you need to understand the project quickly, start here:
 
 - Project current state: [docs/current_state_baseline.md](/Users/rmehta01/Sites/mahita/docs/current_state_baseline.md)
+- MahaCharts AI start-here guide: [docs/internal/guidebook/mahacharts/README.md](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/mahacharts/README.md)
+- MahaCharts generated handoff: [docs/internal/generated/mahacharts-handoff.md](/Users/rmehta01/Sites/mahita/docs/internal/generated/mahacharts-handoff.md)
+- Codex handoff folder: [docs/codex/README.md](/Users/rmehta01/Sites/mahita/docs/codex/README.md)
+- Windows migration checklist: [docs/codex/windows-migration.md](/Users/rmehta01/Sites/mahita/docs/codex/windows-migration.md)
 - Website-visible documentation portal: [docs/public/project-overview/how-to-use-this-documentation.md](/Users/rmehta01/Sites/mahita/docs/public/project-overview/how-to-use-this-documentation.md)
 - Senior project report draft: [docs/public/senior-project/report-draft.md](/Users/rmehta01/Sites/mahita/docs/public/senior-project/report-draft.md)
 - Presentation outline: [docs/public/senior-project/presentation-outline.md](/Users/rmehta01/Sites/mahita/docs/public/senior-project/presentation-outline.md)
 - Fast reviewer guide: [docs/public/project-overview/presentation-for-reviewers.md](/Users/rmehta01/Sites/mahita/docs/public/project-overview/presentation-for-reviewers.md)
 - Architecture/codebase map: [docs/internal/guidebook/architecture-map.md](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/architecture-map.md)
 - Auth guidebook: [docs/guidebook/auth/README.md](/Users/rmehta01/Sites/mahita/docs/guidebook/auth/README.md)
+- Platform data summary: [docs/public/project-overview/platform-data-summary.md](/Users/rmehta01/Sites/mahita/docs/public/project-overview/platform-data-summary.md)
+- Platform data audit: [docs/internal/guidebook/platform-data-architecture-audit.md](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/platform-data-architecture-audit.md)
 - Local/demo bootstrap: [docs/internal/runbooks/local-bootstrap.md](/Users/rmehta01/Sites/mahita/docs/internal/runbooks/local-bootstrap.md)
 - Presentation-day recovery: [docs/internal/runbooks/presentation-day-recovery.md](/Users/rmehta01/Sites/mahita/docs/internal/runbooks/presentation-day-recovery.md)
 - Post-presentation engineering roadmap: [docs/public/project-overview/post-presentation-recovery-roadmap.md](/Users/rmehta01/Sites/mahita/docs/public/project-overview/post-presentation-recovery-roadmap.md)
@@ -86,6 +103,8 @@ Use this map to find the important code and documentation quickly:
   - faculty-facing and presentation-facing docs
 - `docs/internal/`
   - internal guidebooks, evidence, and runbooks
+- `docs/codex/`
+  - portable Codex handoffs, migration notes, and normalized session context snapshots
 - `docs/internal/evidence/archive/`
   - historical notes and external reference captures that informed the project, but are not active runtime code
 - `scripts/`

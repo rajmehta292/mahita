@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from '@/lib/auth'
-import prisma from '@/lib/prisma'
 import { marketDataStore } from '@/app/services/market-data/store'
+import {
+    classifyPlatformDataProvenance,
+    getInventoryProvenance,
+    listDistinctVaultSources,
+} from '@/app/services/market-data/read-service'
+import { getBaseRequirement } from '@/app/services/market-data/timeframe-math'
 import { Timeframe } from '@/app/services/market-data/types'
 
 const DEFAULT_LOOKBACKS: Record<Timeframe, number> = {
@@ -39,6 +44,7 @@ export async function GET(req: NextRequest) {
     const provider = searchParams.get("provider") || undefined
     const forceRefresh = searchParams.get("refresh") === "true"
     const now = Math.floor(Date.now() / 1000)
+    const targetVault = provider || "schwab"
 
     if (!symbol) {
         return NextResponse.json({ error: "Symbol is required" }, { status: 400 })
@@ -61,20 +67,27 @@ export async function GET(req: NextRequest) {
             forceRefresh
         })
 
-        const sourceRows = await prisma.marketData.findMany({
-            where: {
-                symbol,
-                timeframe,
-                time: {
-                    gte: new Date(startTime * 1000),
-                    lte: new Date(endTime * 1000)
-                }
-            },
-            select: { source: true },
-            distinct: ['source']
+        const storageTimeframe = getBaseRequirement(timeframe)
+        const sources = await listDistinctVaultSources({
+            symbol,
+            timeframe: storageTimeframe,
+            startTime,
+            endTime,
+            vaultName: targetVault,
         })
-
-        const sources = sourceRows.map((row) => row.source).filter(Boolean)
+        const inventoryProvenance = await getInventoryProvenance({
+            symbol,
+            timeframe,
+            vaultName: targetVault,
+        })
+        const provenance = classifyPlatformDataProvenance({
+            requestedTimeframe: timeframe,
+            vaultName: targetVault,
+            sources,
+            verificationStatus: inventoryProvenance?.verificationStatus as any,
+            verificationMethod: inventoryProvenance?.verificationMethod ?? null,
+            lastVerifiedAt: inventoryProvenance?.lastVerifiedAt?.toISOString() ?? null,
+        })
 
         const formattedData = result.data.map((point) => ({
             time: point.time,
@@ -98,6 +111,7 @@ export async function GET(req: NextRequest) {
                 persistedBars: result.report.persistedBars,
                 dbBarCount: result.report.dbTotalAfterFetch,
                 sources,
+                provenance,
                 warnings: result.report.warnings,
                 chunks: result.report.chunkReports
             }

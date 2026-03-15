@@ -114,7 +114,7 @@ export function MahitaCodeEditor({ value, onChange }: MahitaCodeEditorProps) {
 
   if (fallbackMode) {
     return (
-      <div className="h-full flex flex-col bg-[#0d0e12]">
+      <div data-testid="mahita-code-editor-fallback" className="h-full flex flex-col bg-[#0d0e12]">
         <div className="flex items-center gap-3 border-b border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
           <AlertTriangle className="h-4 w-4 text-amber-300" />
           <span>{errorMessage || 'Monaco is unavailable. Mahita switched to the fallback editor.'}</span>
@@ -130,7 +130,7 @@ export function MahitaCodeEditor({ value, onChange }: MahitaCodeEditorProps) {
   }
 
   return (
-    <div className="h-full bg-[#0d0e12]">
+    <div data-testid="mahita-code-editor" className="h-full bg-[#0d0e12]">
       {monacoReady ? (
         <Editor
           height="100%"
@@ -153,7 +153,7 @@ export function MahitaCodeEditor({ value, onChange }: MahitaCodeEditorProps) {
           options={editorOptions}
         />
       ) : (
-        <div className="h-full flex items-center justify-center text-white/55">
+        <div data-testid="mahita-code-editor-loading" className="h-full flex items-center justify-center text-white/55">
           <div className="flex flex-col items-center gap-3">
             <Code2 className="h-5 w-5 animate-pulse" />
             <span className="text-sm">Loading editor…</span>

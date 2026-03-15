@@ -53,6 +53,34 @@ function stringifyUnknownObject(value: unknown) {
   }
 }
 
+function isPrismaSchemaMismatchError(value: unknown): value is {
+  code?: unknown
+  name?: unknown
+  message?: unknown
+  meta?: unknown
+} {
+  if (!value || typeof value !== "object") {
+    return false
+  }
+
+  const candidate = value as {
+    code?: unknown
+    name?: unknown
+    message?: unknown
+    meta?: unknown
+  }
+
+  if (candidate.code === "P2022") {
+    return true
+  }
+
+  if (typeof candidate.message === "string" && candidate.message.includes("does not exist in the current database")) {
+    return true
+  }
+
+  return false
+}
+
 function isEventLikeObject(value: unknown): value is {
   type?: unknown
   message?: unknown
@@ -68,6 +96,21 @@ export function normalizeUnknownError(
   fallbackMessage = "Mahita hit an unexpected error.",
   options?: AppErrorOptions
 ): AppError {
+  if (isPrismaSchemaMismatchError(error)) {
+    return new AppError("Mahita detected a Prisma schema/client mismatch.", {
+      code: "RUNTIME_SCHEMA_MISMATCH",
+      status: 503,
+      details:
+        typeof error === "object" && error && "meta" in error && error.meta && typeof error.meta === "object"
+          ? (error.meta as Record<string, unknown>)
+          : options?.details ?? null,
+      hint:
+        options?.hint ??
+        "Run `npx prisma generate`, apply the current Prisma schema to the active database, and restart the app so runtime models and database columns match.",
+      recoverable: true,
+    })
+  }
+
   if (error instanceof AppError) {
     return error
   }
@@ -186,5 +229,75 @@ export async function parseResponseError(
     details: payload?.details ?? null,
     hint: payload?.hint ?? null,
     recoverable: payload?.recoverable ?? response.status < 500,
+  })
+}
+
+export async function readJsonResponse<T>(
+  response: Response,
+  fallbackMessage: string
+): Promise<T> {
+  const contentType = response.headers.get("content-type")?.toLowerCase() ?? ""
+  const expectsJson = contentType.includes("application/json")
+
+  if (expectsJson) {
+    let payload: unknown
+
+    try {
+      payload = await response.json()
+    } catch {
+      throw new AppError(fallbackMessage, {
+        code: "UPSTREAM_FETCH_FAILED",
+        status: response.status || 500,
+        hint: "Mahita expected JSON but could not parse the response body.",
+        recoverable: true,
+      })
+    }
+
+    if (!response.ok) {
+      const errorPayload = payload as Partial<AppErrorPayload> | null
+      throw new AppError(errorPayload?.error || fallbackMessage, {
+        code: errorPayload?.code ?? "UPSTREAM_FETCH_FAILED",
+        status: response.status || errorPayload?.status || 500,
+        details: errorPayload?.details ?? null,
+        hint: errorPayload?.hint ?? null,
+        recoverable: errorPayload?.recoverable ?? response.status < 500,
+      })
+    }
+
+    return payload as T
+  }
+
+  const text = await response.text().catch(() => "")
+  const looksLikeHtml = /^\s*</.test(text)
+  const unauthorized = response.status === 401 || response.status === 403
+
+  if (looksLikeHtml) {
+    throw new AppError(
+      unauthorized
+        ? "Your session expired. Refresh and sign in again."
+        : "Mahita received an HTML document instead of JSON.",
+      {
+        code: unauthorized ? "UNAUTHORIZED" : "UPSTREAM_FETCH_FAILED",
+        status: response.status || 500,
+        details: {
+          contentType,
+          preview: text.slice(0, 160),
+        },
+        hint: unauthorized
+          ? "An auth redirect or expired session intercepted an API request."
+          : "Check the upstream route or proxy; a JSON API returned an HTML document.",
+        recoverable: true,
+      }
+    )
+  }
+
+  throw new AppError(fallbackMessage, {
+    code: "UPSTREAM_FETCH_FAILED",
+    status: response.status || 500,
+    details: {
+      contentType,
+      preview: text.slice(0, 160),
+    },
+    recoverable: response.status < 500,
   })
 }

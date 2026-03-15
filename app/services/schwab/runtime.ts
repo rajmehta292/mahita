@@ -18,7 +18,7 @@ export async function getRuntimeSchwabClient(): Promise<SchwabClient | null> {
     return getRuntimeSchwabClientWithOptions()
 }
 
-export async function getRuntimeSchwabClientWithOptions(options: { forceRefresh?: boolean } = {}): Promise<SchwabClient | null> {
+export async function getRuntimeSchwabClientWithOptions(options: { forceRefresh?: boolean; silent?: boolean } = {}): Promise<SchwabClient | null> {
     if (process.env.USE_MOCK_DATA === 'true') {
         return getSchwabClient({
             clientId: 'mock-client',
@@ -34,7 +34,9 @@ export async function getRuntimeSchwabClientWithOptions(options: { forceRefresh?
 
     if (!primaryMember) {
         if (!allowInsecureUserBrokeragePlatformFallback()) {
-            console.warn(`[SchwabRuntime] ${getPlatformCredentialIsolationError()}`)
+            if (!options.silent) {
+                console.warn(`[SchwabRuntime] ${getPlatformCredentialIsolationError()}`)
+            }
             return null
         }
 

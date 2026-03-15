@@ -39,6 +39,57 @@ enum BrokerageConnectionStatus {
   DISCONNECTED
 }
 
+enum IngestionProfileStatus {
+  ACTIVE
+  PAUSED
+}
+
+enum IngestionTargetPreset {
+  DOW30
+  SP500
+  CUSTOM
+  ALL_ENABLED
+}
+
+enum IngestionLaneKind {
+  USER_VIEW
+  DOW30_REALTIME
+  SELECTED_OR_SP500_REALTIME
+  SELECTED_ALL_1M
+  AFTER_HOURS_VERIFY
+  REPEAT_FETCH_VERIFY
+}
+
+enum IngestionJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum VerificationMode {
+  SAME_SOURCE
+  CROSS_SOURCE
+  BOTH
+}
+
+enum VerificationJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  SKIPPED
+}
+
+enum VerificationObservationClassification {
+  EXACT_MATCH
+  WITHIN_TOLERANCE
+  MATERIAL_DIFFERENCE
+  PARTIAL_OVERLAP
+  PROVIDER_GAP
+}
+
 // NextAuth Models
 model Account {
   id                String  @id @default(cuid())
@@ -77,6 +128,7 @@ model User {
   accounts          Account[]
   sessions          Session[]
   strategies        Strategy[]
+  scriptDrafts      ScriptDraft[]
   schwabConfig      SchwabConfig?
   brokerageConnections BrokerageConnection[]
   preferences       UserPreference?
@@ -87,6 +139,12 @@ model User {
   adminAuditTargets AdminAuditEvent[] @relation("AdminTarget")
   adminSecretRevealGrants AdminSecretRevealGrant[] @relation("AdminSecretRevealActor")
   providerCredentialsCreated ProviderCredential[] @relation("ProviderCredentialCreator")
+  viewDemands       IngestionViewDemand[]
+  screenerPresets   ScreenerPreset[]
+  screenerRunCaches ScreenerRunCache[]
+  parityFixtures    ParityFixture[]
+  strategyDeployments StrategyDeployment[]
+  strategyWorkspaceSessions StrategyWorkspaceSession[]
 }
 
 model VerificationToken {
@@ -214,7 +272,9 @@ model UserPreference {
   portfolioSortDirection String?
   dashboardLayout        String?
   watchlistSymbols       String?
+  indicatorFavorites     String?
   trendingStrategyIds    String?
+  viewRefreshIntervalSeconds Int   @default(13)
   lastVisitedPath        String?
   lastVisitedAt          DateTime?
   lastSignInAt           DateTime?
@@ -311,18 +371,381 @@ model AdminSecretRevealGrant {
 model Strategy {
   id             String   @id @default(cuid())
   userId         String
+  legacyScriptDraftId String? @unique
   name           String
   description    String?
   asset          String
   timeframe      String
-  astJson        String // Stringified AST JSON defining entry/exit rules
-  riskManagement String // Stringified JSON defining stopLoss, target
+  astJson        String? // Legacy AST payload for older strategy surfaces
+  riskManagement String? // Legacy risk payload for older strategy surfaces
   isLiveDeployed Boolean  @default(false)
+  language       String   @default("pine-v6")
+  engineMode     String   @default("pinets")
+  favorite       Boolean  @default(false)
+  pinned         Boolean  @default(false)
+  tagsJson       String?
+  latestVersionId String?
+  lastOpenedAt   DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedLegacyDraft ScriptDraft? @relation("LegacyScriptDraftMigration", fields: [legacyScriptDraftId], references: [id], onDelete: SetNull)
+  latestVersion StrategyVersion? @relation("StrategyLatestVersion", fields: [latestVersionId], references: [id], onDelete: SetNull)
+  versions StrategyVersion[] @relation("StrategyVersions")
+  workspaceSession StrategyWorkspaceSession?
+  deployments StrategyDeployment[]
   trades Trade[]
+
+  @@index([userId, updatedAt])
+}
+
+model StrategyVersion {
+  id              String   @id @default(cuid())
+  strategyId       String
+  versionNumber    Int
+  label            String?
+  description      String?
+  symbol           String
+  timeframe        String
+  source           String
+  language         String   @default("pine-v6")
+  engineMode       String   @default("pinets")
+  linkedFixtureId  String?
+  runSettingsJson  String?
+  diagnosticsJson  String?
+  sourceHash       String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  strategy        Strategy @relation("StrategyVersions", fields: [strategyId], references: [id], onDelete: Cascade)
+  latestFor       Strategy[] @relation("StrategyLatestVersion")
+  workspaceSessions StrategyWorkspaceSession[]
+  deployments     StrategyDeployment[]
+
+  @@unique([strategyId, versionNumber])
+  @@index([strategyId, createdAt])
+}
+
+model StrategyWorkspaceSession {
+  id               String   @id @default(cuid())
+  strategyId        String   @unique
+  userId           String
+  baseVersionId    String?
+  symbol           String
+  timeframe        String
+  source           String
+  language         String   @default("pine-v6")
+  engineMode       String   @default("pinets")
+  linkedFixtureId  String?
+  runSettingsJson  String?
+  autosaveRevision Int      @default(1)
+  lastOpenedAt     DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  strategy    Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  baseVersion StrategyVersion? @relation(fields: [baseVersionId], references: [id], onDelete: SetNull)
+
+  @@index([userId, updatedAt])
+}
+
+model ScriptDraft {
+  id            String   @id @default(cuid())
+  userId        String
+  name          String
+  description   String?
+  symbol        String   @default("AAPL")
+  timeframe     String   @default("1d")
+  source        String
+  language      String   @default("pine-v6")
+  engineMode    String   @default("pinets")
+  lastParityStatus String?
+  linkedFixtureId String?
+  runSettingsJson String?
+  lastOpenedAt  DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  migratedStrategy Strategy? @relation("LegacyScriptDraftMigration")
+  deployments StrategyDeployment[]
+
+  @@index([userId, updatedAt])
+}
+
+model StrategyDeployment {
+  id                String   @id @default(cuid())
+  userId            String
+  linkedScriptDraftId String?
+  strategyId        String?
+  strategyVersionId String?
+  name              String
+  description       String?
+  symbol            String
+  timeframe         String
+  target            String   @default("paper")
+  status            String   @default("active")
+  linkedAccountId   String?
+  marketDataSource  String   @default("live-data-dependent")
+  webhookSecret     String   @unique
+  nodeGraphJson     String?
+  runSettingsJson   String?
+  lastSignalAt      DateTime?
+  lastRunAt         DateTime?
+  lastError         String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user            User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  linkedScriptDraft ScriptDraft?        @relation(fields: [linkedScriptDraftId], references: [id], onDelete: SetNull)
+  strategy        Strategy?             @relation(fields: [strategyId], references: [id], onDelete: SetNull)
+  strategyVersion StrategyVersion?      @relation(fields: [strategyVersionId], references: [id], onDelete: SetNull)
+  webhookEndpoint StrategyWebhookEndpoint?
+  runs            StrategyRun[]
+  signalEvents    StrategySignalEvent[]
+  executionIntents ExecutionIntent[]
+  executionNodeConfigs ExecutionNodeConfig[]
+
+  @@index([userId, updatedAt])
+  @@index([symbol, timeframe, status])
+  @@index([strategyId, strategyVersionId])
+}
+
+model StrategyWebhookEndpoint {
+  id              String   @id @default(cuid())
+  deploymentId    String   @unique
+  secret          String   @unique
+  isEnabled       Boolean  @default(true)
+  lastTriggeredAt DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  deployment StrategyDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+}
+
+model StrategyRun {
+  id              String   @id @default(cuid())
+  deploymentId    String
+  status          String   @default("received")
+  summaryJson     String?
+  diagnosticsJson String?
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  deployment      StrategyDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  signalEvents    StrategySignalEvent[]
+  executionIntents ExecutionIntent[]
+
+  @@index([deploymentId, createdAt])
+}
+
+model StrategySignalEvent {
+  id                    String   @id @default(cuid())
+  deploymentId          String
+  strategyRunId         String?
+  status                String   @default("received")
+  source                String   @default("tradingview")
+  eventType             String?
+  symbol                String?
+  timeframe             String?
+  action                String?
+  payloadJson           String
+  normalizedPayloadJson String?
+  receivedAt            DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  deployment      StrategyDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  strategyRun     StrategyRun?       @relation(fields: [strategyRunId], references: [id], onDelete: SetNull)
+  executionIntents ExecutionIntent[]
+
+  @@index([deploymentId, receivedAt])
+  @@index([symbol, timeframe])
+}
+
+model ExecutionIntent {
+  id            String   @id @default(cuid())
+  deploymentId  String
+  strategyRunId String?
+  signalEventId String?
+  status        String   @default("pending")
+  mode          String   @default("paper")
+  broker        String   @default("paper")
+  accountId     String?
+  symbol        String
+  side          String
+  orderType     String   @default("MARKET")
+  quantity      Float?
+  limitPrice    Float?
+  stopPrice     Float?
+  requestJson   String?
+  responseJson  String?
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  deployment  StrategyDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+  strategyRun StrategyRun?       @relation(fields: [strategyRunId], references: [id], onDelete: SetNull)
+  signalEvent StrategySignalEvent? @relation(fields: [signalEventId], references: [id], onDelete: SetNull)
+
+  @@index([deploymentId, createdAt])
+  @@index([accountId, status])
+}
+
+model ExecutionNodeConfig {
+  id           String   @id @default(cuid())
+  deploymentId String
+  nodeType     String
+  label        String
+  isEnabled    Boolean  @default(true)
+  orderIndex   Int      @default(0)
+  configJson   String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  deployment StrategyDeployment @relation(fields: [deploymentId], references: [id], onDelete: Cascade)
+
+  @@index([deploymentId, orderIndex])
+}
+
+model ParityFixture {
+  id             String   @id @default(cuid())
+  userId         String
+  fixtureKey     String   @default("")
+  name           String
+  status         String   @default("verified-fixture-replay")
+  source         String   @default("tradingview-fixture")
+  symbol         String
+  timeframe      String
+  engineMode     String   @default("pinets")
+  notes          String?
+  manifestJson   String?
+  lastParityReportJson String?
+  candleRowsJson String
+  tradeRowsJson  String?
+  firstBarTime   DateTime?
+  lastBarTime    DateTime?
+  barCount       Int      @default(0)
+  tradeCount     Int      @default(0)
+  importedAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, fixtureKey])
+  @@index([userId, updatedAt])
+  @@index([symbol, timeframe, source])
+}
+
+model InstrumentMaster {
+  id              String                   @id @default(cuid())
+  symbol          String                   @unique
+  name            String?
+  assetType       String                   @default("equity")
+  exchange        String?
+  country         String?
+  sector          String?
+  industry        String?
+  isEtf           Boolean                  @default(false)
+  sponsor         String?
+  tags            String?
+  enabled         Boolean                  @default(true)
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  profileSnapshot InstrumentProfileSnapshot?
+  metricSnapshot  InstrumentMetricSnapshot?
+
+  @@index([assetType, enabled])
+  @@index([exchange, sector, industry])
+}
+
+model InstrumentProfileSnapshot {
+  id               String           @id @default(cuid())
+  instrumentId     String           @unique
+  source           String
+  asOf             DateTime         @default(now())
+  descriptiveJson  String?
+  companyJson      String?
+  newsJson         String?
+  etfJson          String?
+  freshnessNote    String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  instrument InstrumentMaster @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@index([source, asOf])
+}
+
+model InstrumentMetricSnapshot {
+  id               String           @id @default(cuid())
+  instrumentId     String           @unique
+  source           String
+  asOf             DateTime         @default(now())
+  price            Float?
+  changePercent    Float?
+  volume           Float?
+  marketCap        Float?
+  sector           String?
+  industry         String?
+  country          String?
+  exchange         String?
+  assetType        String?
+  descriptiveJson  String?
+  fundamentalJson  String?
+  technicalJson    String?
+  newsJson         String?
+  etfJson          String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  instrument InstrumentMaster @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@index([asOf])
+  @@index([marketCap])
+  @@index([price])
+  @@index([volume])
+}
+
+model ScreenerPreset {
+  id             String   @id @default(cuid())
+  userId         String
+  name           String
+  groupTab       String
+  resultTab      String
+  orderKey       String
+  orderDirection String
+  signal         String
+  filtersJson    String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([userId, updatedAt])
+}
+
+model ScreenerRunCache {
+  id           String   @id @default(cuid())
+  userId       String?
+  queryHash    String   @unique
+  requestJson  String
+  responseJson String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId, updatedAt])
 }
 
 model Trade {
@@ -384,10 +807,232 @@ model DataInventory {
   targetCoveragePercent Float     @default(0)
   barCount              Int       @default(0)
   gapCount              Int       @default(0)
+  storageClass          String    @default("native-cached")
+  canonicalInterval     String?
+  verificationStatus    String    @default("single-source-unverified")
+  verificationMethod    String?
+  lastVerifiedAt        DateTime?
 
   vault Vault? @relation(fields: [vaultId], references: [id], onDelete: SetNull)
 
   @@unique([vaultId, symbol, timeframe])
+}
+
+model IngestionProfile {
+  id                 String                  @id @default(cuid())
+  name               String                  @unique
+  label              String?
+  description        String?
+  status             IngestionProfileStatus  @default(ACTIVE)
+  isDefault          Boolean                 @default(false)
+  providerBudgetsJson String?
+  metadata           String?
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+
+  lanes              IngestionLane[]
+  targets            IngestionTarget[]
+  jobs               IngestionJob[]
+  dispatchLogs       IngestionDispatchLog[]
+  verificationPolicies VerificationPolicy[]
+  verificationJobs   VerificationJob[]
+}
+
+model IngestionLane {
+  id                  String            @id @default(cuid())
+  profileId           String
+  kind                IngestionLaneKind
+  enabled             Boolean           @default(true)
+  priorityOrder       Int               @default(0)
+  weight              Float             @default(1)
+  reservedCallsPerMinute Int?
+  minCallsPerMinute   Int?
+  targetRefreshSeconds Int?
+  providerPreference  String?
+  canonicalIntervals  String?
+  cursor              Int               @default(0)
+  metadata            String?
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+
+  profile IngestionProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, kind])
+  @@index([profileId, priorityOrder])
+}
+
+model IngestionTarget {
+  id                 String               @id @default(cuid())
+  profileId          String
+  name               String
+  preset             IngestionTargetPreset
+  enabled            Boolean              @default(true)
+  priorityOrder      Int                  @default(0)
+  providerPreference String?
+  canonicalIntervals String?
+  metadata           String?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+
+  profile IngestionProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  symbols IngestionTargetSymbol[]
+
+  @@index([profileId, priorityOrder])
+}
+
+model IngestionTargetSymbol {
+  id                 String   @id @default(cuid())
+  targetId           String
+  symbol             String
+  enabled            Boolean  @default(true)
+  canonicalIntervals String?
+  metadata           String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  target IngestionTarget @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, symbol])
+  @@index([symbol, enabled])
+}
+
+model IngestionJob {
+  id                 String             @id @default(cuid())
+  profileId          String
+  laneKind           IngestionLaneKind
+  symbol             String
+  requestedTimeframe String
+  storageTimeframe   String
+  provider           String
+  status             IngestionJobStatus @default(QUEUED)
+  priorityScore      Float              @default(0)
+  queueBucket        String?
+  scheduledFor       DateTime           @default(now())
+  startedAt          DateTime?
+  completedAt        DateTime?
+  attemptCount       Int                @default(0)
+  lastError          String?
+  resultSummary      String?
+  vaultName          String?
+  provenanceStatus   String?
+  verificationStatus String?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  profile      IngestionProfile     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  dispatchLogs IngestionDispatchLog[]
+
+  @@index([profileId, laneKind, status, scheduledFor])
+  @@index([symbol, requestedTimeframe, status])
+}
+
+model IngestionDispatchLog {
+  id                 String            @id @default(cuid())
+  profileId          String?
+  ingestionJobId     String?
+  laneKind           IngestionLaneKind?
+  stage              String
+  message            String
+  provider           String?
+  symbol             String?
+  requestedTimeframe String?
+  storageTimeframe   String?
+  metadata           String?
+  createdAt          DateTime          @default(now())
+
+  profile      IngestionProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  ingestionJob IngestionJob?     @relation(fields: [ingestionJobId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([profileId, laneKind, createdAt])
+}
+
+model VerificationPolicy {
+  id                         String           @id @default(cuid())
+  profileId                  String?
+  timeframe                  String
+  mode                       VerificationMode @default(BOTH)
+  enabled                    Boolean          @default(true)
+  sameSourcePriceToleranceBps Float           @default(5)
+  crossSourcePriceToleranceBps Float          @default(10)
+  volumeTolerancePct         Float            @default(5)
+  metadata                   String?
+  createdAt                  DateTime         @default(now())
+  updatedAt                  DateTime         @updatedAt
+
+  profile IngestionProfile? @relation(fields: [profileId], references: [id], onDelete: SetNull)
+
+  @@unique([profileId, timeframe])
+}
+
+model VerificationJob {
+  id                 String                @id @default(cuid())
+  profileId          String?
+  laneKind           IngestionLaneKind     @default(AFTER_HOURS_VERIFY)
+  mode               VerificationMode      @default(BOTH)
+  symbol             String
+  timeframe          String
+  sourceProvider     String?
+  comparisonProvider String?
+  status             VerificationJobStatus @default(QUEUED)
+  scheduledFor       DateTime              @default(now())
+  startedAt          DateTime?
+  completedAt        DateTime?
+  attemptCount       Int                   @default(0)
+  lastError          String?
+  resultSummary      String?
+  lastVerifiedAt     DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  profile      IngestionProfile?       @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  observations VerificationObservation[]
+
+  @@index([status, scheduledFor])
+  @@index([symbol, timeframe, status])
+}
+
+model VerificationObservation {
+  id                String                               @id @default(cuid())
+  verificationJobId String
+  barTime           DateTime
+  classification    VerificationObservationClassification
+  decision          String
+  primaryProvider   String?
+  secondaryProvider String?
+  primaryClose      Float?
+  secondaryClose    Float?
+  priceDiffBps      Float?
+  primaryVolume     Float?
+  secondaryVolume   Float?
+  volumeDiffPct     Float?
+  metadata          String?
+  createdAt         DateTime                             @default(now())
+
+  verificationJob VerificationJob @relation(fields: [verificationJobId], references: [id], onDelete: Cascade)
+
+  @@index([verificationJobId, barTime])
+}
+
+model IngestionViewDemand {
+  id                     String   @id @default(cuid())
+  surfaceKey             String   @unique
+  userId                 String
+  surface                String
+  symbol                 String?
+  timeframe              String?
+  providerPreference     String?
+  priorityScore          Float    @default(1)
+  refreshIntervalSeconds Int      @default(13)
+  lastSeenAt             DateTime @default(now())
+  expiresAt              DateTime
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt])
+  @@index([userId, surface])
 }
 
 // V2 Data Engine Metadata Catalog
@@ -447,7 +1092,7 @@ model DataSpan {
   @@unique([symbol, timeframe, source, startTime])
 }
 
-model IngestionJob {
+model V2IngestionJob {
   id           String    @id @default(cuid())
   type         String // "bootstrap", "backfill", "catchup", "derive"
   symbol       String
@@ -463,10 +1108,10 @@ model IngestionJob {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  events IngestionEvent[]
+  events V2IngestionEvent[]
 }
 
-model IngestionEvent {
+model V2IngestionEvent {
   id             String   @id @default(cuid())
   ingestionJobId String
   level          String // "info", "warn", "error"
@@ -474,5 +1119,5 @@ model IngestionEvent {
   meta           String?
   createdAt      DateTime @default(now())
 
-  job IngestionJob @relation(fields: [ingestionJobId], references: [id], onDelete: Cascade)
+  job V2IngestionJob @relation(fields: [ingestionJobId], references: [id], onDelete: Cascade)
 }

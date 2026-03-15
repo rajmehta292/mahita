@@ -15,7 +15,7 @@ import { MockDataProvider } from './mock-provider'
 import { providerTelemetryBus } from './provider-telemetry'
 import { dedupeMarketDataPoints, getMissingRanges } from './utils'
 import { getBaseRequirement, deriveBars } from './timeframe-math'
-import { vaultManager } from './vault-manager'
+import { vaultManager, withVaultQueryRetry } from './vault-manager'
 
 interface ProviderEntry {
     name: string
@@ -93,9 +93,9 @@ export class MarketDataStore {
             cacheBars: cachedData.length,
             fetchedBars: 0,
             persistedBars: 0,
-            dbTotalAfterFetch: await client.marketData.count({
+            dbTotalAfterFetch: await withVaultQueryRetry(() => client.marketData.count({
                 where: { symbol: normalizedSymbol, timeframe: requiredBaseTimeframe }
-            }),
+            })),
             chunkReports: [],
             warnings: []
         }
@@ -163,7 +163,7 @@ export class MarketDataStore {
         vaultName = 'schwab'
     ): Promise<MarketDataPoint[]> {
         const client = await vaultManager.getClient(vaultName)
-        const rows = await client.marketData.findMany({
+        const rows = await withVaultQueryRetry(() => client.marketData.findMany({
             where: {
                 symbol,
                 timeframe,
@@ -173,7 +173,7 @@ export class MarketDataStore {
                 }
             },
             orderBy: { time: 'asc' }
-        })
+        }))
 
         return rows.map((row) => ({
             time: Math.floor(row.time.getTime() / 1000),
@@ -199,9 +199,9 @@ export class MarketDataStore {
         const client = await vaultManager.getClient(vaultName)
 
         if (providers.length === 0) {
-            const dbTotalAfterChunk = await client.marketData.count({
+            const dbTotalAfterChunk = await withVaultQueryRetry(() => client.marketData.count({
                 where: { symbol, timeframe }
-            })
+            }))
 
             return {
                 provider: providerOverride || 'auto',
@@ -233,9 +233,9 @@ export class MarketDataStore {
                     vaultName
                 )
 
-                const dbTotalAfterChunk = await client.marketData.count({
+                const dbTotalAfterChunk = await withVaultQueryRetry(() => client.marketData.count({
                     where: { symbol, timeframe }
-                })
+                }))
 
                 if (fetchedData.length === 0) {
                     warnings.push(
@@ -262,9 +262,9 @@ export class MarketDataStore {
             }
         }
 
-        const dbTotalAfterChunk = await client.marketData.count({
+        const dbTotalAfterChunk = await withVaultQueryRetry(() => client.marketData.count({
             where: { symbol, timeframe }
-        })
+        }))
 
         return {
             provider: providerOverride || 'auto',
@@ -365,7 +365,7 @@ export class MarketDataStore {
         }
 
         if (overwriteExisting) {
-            await client.marketData.deleteMany({
+            await withVaultQueryRetry(() => client.marketData.deleteMany({
                 where: {
                     symbol,
                     timeframe,
@@ -374,14 +374,14 @@ export class MarketDataStore {
                         lte: endDate
                     }
                 }
-            })
+            }))
         }
 
         const CHUNK_SIZE = 250
         let persistedBars = 0
-        let totalRowsBefore = await client.marketData.count({
+        let totalRowsBefore = await withVaultQueryRetry(() => client.marketData.count({
             where: { symbol, timeframe }
-        })
+        }))
 
         for (let index = 0; index < barsToPersist.length; index += CHUNK_SIZE) {
             const chunk = barsToPersist.slice(index, index + CHUNK_SIZE)
@@ -398,12 +398,12 @@ export class MarketDataStore {
             }))
 
             try {
-                await client.marketData.createMany({
+                await withVaultQueryRetry(() => client.marketData.createMany({
                     data: dbChunk
-                })
+                }))
             } catch (error) {
                 for (const row of dbChunk) {
-                    await client.marketData.upsert({
+                    await withVaultQueryRetry(() => client.marketData.upsert({
                         where: {
                             symbol_timeframe_time: {
                                 symbol: row.symbol,
@@ -420,13 +420,13 @@ export class MarketDataStore {
                             source: row.source
                         },
                         create: row
-                    })
+                    }))
                 }
             }
 
-            const totalRowsAfter = await client.marketData.count({
+            const totalRowsAfter = await withVaultQueryRetry(() => client.marketData.count({
                 where: { symbol, timeframe }
-            })
+            }))
             persistedBars += Math.max(0, totalRowsAfter - totalRowsBefore)
             totalRowsBefore = totalRowsAfter
         }

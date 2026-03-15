@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import prisma from "@/lib/prisma"
 import { DataHealthManager } from "@/app/services/market-data/health"
+import { readVaultBarsPage } from "@/app/services/market-data/read-service"
 import { Timeframe } from "@/app/services/market-data/types"
 import { requireRouteAccess } from "@/lib/security/platform-security"
 
@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
         const { searchParams } = new URL(req.url)
         const symbol = searchParams.get('symbol')
         const timeframe = searchParams.get('timeframe') as Timeframe
+        const vault = searchParams.get('vault') || 'schwab'
         const page = parseInt(searchParams.get('page') || '1')
         const pageSize = parseInt(searchParams.get('pageSize') || '100')
 
@@ -21,23 +22,21 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: "Missing symbol or timeframe" }, { status: 400 })
         }
 
-        const [data, totalCount, health] = await Promise.all([
-            prisma.marketData.findMany({
-                where: { symbol, timeframe },
-                orderBy: { time: 'desc' },
-                skip: (page - 1) * pageSize,
-                take: pageSize
+        const [pageResult, health] = await Promise.all([
+            readVaultBarsPage({
+                symbol,
+                timeframe,
+                page,
+                pageSize,
+                vaultName: vault,
             }),
-            prisma.marketData.count({
-                where: { symbol, timeframe }
-            }),
-            DataHealthManager.getHealth(symbol, timeframe)
+            DataHealthManager.getHealth(symbol, timeframe, vault)
         ])
 
         return NextResponse.json({
-            data: data.map(d => ({
+            data: pageResult.bars.map(d => ({
                 id: d.id,
-                time: Math.floor(d.time.getTime() / 1000),
+                time: d.time,
                 open: d.open,
                 high: d.high,
                 low: d.low,
@@ -48,10 +47,11 @@ export async function GET(req: NextRequest) {
             pagination: {
                 page,
                 pageSize,
-                totalCount,
-                totalPages: Math.ceil(totalCount / pageSize)
+                totalCount: pageResult.totalCount,
+                totalPages: Math.ceil(pageResult.totalCount / pageSize)
             },
-            health
+            health,
+            vaultName: vault,
         })
     } catch (error) {
         console.error("Data Inspect Error:", error)

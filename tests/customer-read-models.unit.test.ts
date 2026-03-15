@@ -15,6 +15,8 @@ describe('customer read models', () => {
                 providerOverride: 'schwab',
                 intervalMs: 60000,
                 lastError: null,
+                schedulerEnabled: true,
+                lastCycleSummary: null,
             },
             ['schwab', 'yahoo'],
             {

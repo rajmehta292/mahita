@@ -1,25 +1,32 @@
-import { describe, expect, it } from 'vitest'
-import { normalizeUnknownError } from '@/lib/app-errors'
+import { describe, expect, it } from "vitest"
+import { readJsonResponse } from "@/lib/app-errors"
 
-describe('normalizeUnknownError', () => {
-  it('turns Event objects into readable app errors', () => {
-    const error = normalizeUnknownError(new Event('error'), 'Mahita hit an unexpected error.')
+describe("readJsonResponse", () => {
+  it("turns HTML auth redirects into a readable session-expired error", async () => {
+    const response = new Response("<!DOCTYPE html><html><body>Sign in</body></html>", {
+      status: 401,
+      headers: {
+        "content-type": "text/html; charset=utf-8",
+      },
+    })
 
-    expect(error.message).toBe('Mahita hit an unexpected error.')
-    expect(error.details).toMatchObject({ eventType: 'error' })
+    await expect(readJsonResponse(response, "Failed to load chart data.")).rejects.toMatchObject({
+      message: "Your session expired. Refresh and sign in again.",
+      code: "UNAUTHORIZED",
+      status: 401,
+    })
   })
 
-  it('uses message-bearing objects instead of stringifying them as [object Object]', () => {
-    const error = normalizeUnknownError({ message: 'Something broke', type: 'worker' })
+  it("passes through JSON payloads when the response is ok", async () => {
+    const response = new Response(JSON.stringify({ data: [{ close: 100 }] }), {
+      status: 200,
+      headers: {
+        "content-type": "application/json",
+      },
+    })
 
-    expect(error.message).toBe('Something broke')
-    expect(error.details).toMatchObject({ rawType: 'worker' })
-  })
-
-  it('turns event-like objects into readable app errors instead of [object Event]', () => {
-    const error = normalizeUnknownError({ type: 'error', isTrusted: true }, 'Monaco failed to initialize.')
-
-    expect(error.message).toBe('Monaco failed to initialize.')
-    expect(error.details).toMatchObject({ eventType: 'error', isTrusted: true })
+    await expect(readJsonResponse<{ data: Array<{ close: number }> }>(response, "Failed.")).resolves.toEqual({
+      data: [{ close: 100 }],
+    })
   })
 })

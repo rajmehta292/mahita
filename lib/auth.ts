@@ -151,21 +151,29 @@ export const authOptions: NextAuthOptions = {
                 return
             }
 
-            const existingPreferences = await prisma.userPreference.findUnique({
-                where: { userId: user.id },
-                select: { lastSignInAt: true }
-            })
+            try {
+                const existingPreferences = await prisma.userPreference.findUnique({
+                    where: { userId: user.id },
+                    select: { lastSignInAt: true }
+                })
 
-            await upsertUserPreferences(user.id, {
-                previousSignInAt: existingPreferences?.lastSignInAt ?? null,
-                lastSignInAt: new Date(),
-            })
+                await upsertUserPreferences(user.id, {
+                    previousSignInAt: existingPreferences?.lastSignInAt ?? null,
+                    lastSignInAt: new Date(),
+                })
+            } catch (error) {
+                console.warn("Mahita could not update sign-in preference metadata:", error)
+            }
 
             if (account?.provider === "google") {
-                await scrubUnusedOAuthAccountTokens({
-                    userId: user.id,
-                    provider: account.provider,
-                })
+                try {
+                    await scrubUnusedOAuthAccountTokens({
+                        userId: user.id,
+                        provider: account.provider,
+                    })
+                } catch (error) {
+                    console.warn("Mahita could not scrub unused OAuth provider tokens:", error)
+                }
             }
         },
     },

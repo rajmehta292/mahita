@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Search, Bell, Settings, User, TrendingUp, Menu, X, LogOut, ChevronDown } from 'lucide-react'
+import { Search, Bell, Settings, User, TrendingUp, Menu, LogOut, ChevronDown, Command } from 'lucide-react'
 import { useSession, signOut } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
 import { resolveClientCallbackUrl } from '@/lib/auth-redirect'
+import { GlobalSearchPalette } from '@/app/components/Search/GlobalSearchPalette'
 
 interface TopBarProps {
     onMenuClick: () => void
@@ -12,9 +12,7 @@ interface TopBarProps {
 
 export function TopBar({ onMenuClick }: TopBarProps) {
     const { data: session } = useSession()
-    const router = useRouter()
-    const [searchQuery, setSearchQuery] = useState('')
-    const [isSearchOpen, setIsSearchOpen] = useState(false)
+    const [searchOpen, setSearchOpen] = useState(false)
     const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
     const accountMenuRef = useRef<HTMLDivElement | null>(null)
     const landingUrl = resolveClientCallbackUrl('/')
@@ -30,16 +28,9 @@ export function TopBar({ onMenuClick }: TopBarProps) {
         return () => document.removeEventListener('mousedown', handleOutsideClick)
     }, [])
 
-    const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter' && searchQuery.trim()) {
-            router.push(`/chart?symbol=${searchQuery.trim().toUpperCase()}&timeframe=1d`)
-            setIsSearchOpen(false)
-            setSearchQuery('')
-        }
-    }
-
     return (
-        <div className="h-12 bg-[#1E222D] border-b border-[#2A2E39] flex items-center px-4 gap-4 sticky top-0 z-50">
+        <>
+            <div className="h-12 bg-[#1E222D] border-b border-[#2A2E39] flex items-center px-4 gap-4 sticky top-0 z-50">
             {/* Mobile Menu Toggle */}
             <button
                 className="lg:hidden p-2 hover:bg-[#2A2E39] rounded text-gray-400"
@@ -56,34 +47,26 @@ export function TopBar({ onMenuClick }: TopBarProps) {
             </div>
 
             {/* Symbol Search */}
-            <div className={`flex-1 max-w-md ${isSearchOpen ? 'fixed inset-x-0 top-0 h-12 bg-[#1E222D] px-4 flex items-center z-50 lg:relative lg:inset-auto lg:h-auto lg:bg-transparent lg:px-0' : 'hidden lg:block'}`}>
-                <div className="relative w-full">
+            <div className="hidden flex-1 max-w-2xl lg:block">
+                <button
+                    id="mahita-global-search-trigger"
+                    onClick={() => setSearchOpen(true)}
+                    className="relative flex w-full items-center gap-3 rounded-xl border border-[#2A2E39] bg-[#131722] px-3 py-2 text-left text-sm text-gray-300 transition hover:border-[#3a4152] hover:bg-[#171b26]"
+                >
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <input
-                        type="text"
-                        placeholder="Search symbols..."
-                        autoFocus={isSearchOpen}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        onKeyDown={handleSearch}
-                        className="w-full bg-[#131722] text-white pl-10 pr-10 py-1.5 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                    {isSearchOpen && (
-                        <button
-                            className="absolute right-3 top-1/2 -translate-y-1/2 lg:hidden"
-                            onClick={() => setIsSearchOpen(false)}
-                        >
-                            <X className="w-4 h-4 text-gray-400" />
-                        </button>
-                    )}
-                </div>
+                    <span className="pl-7 text-gray-400">Search symbols, presets, strategies, docs...</span>
+                    <span className="ml-auto hidden items-center gap-1 rounded-lg border border-[#343847] bg-[#11131a] px-2 py-1 text-[11px] text-gray-500 md:flex">
+                        <Command className="h-3.5 w-3.5" />
+                        <span>K</span>
+                    </span>
+                </button>
             </div>
 
             {/* Right Actions */}
             <div className="flex items-center gap-1 sm:gap-3 ml-auto">
                 <button
                     className="p-2 lg:hidden hover:bg-[#2A2E39] rounded transition-colors"
-                    onClick={() => setIsSearchOpen(true)}
+                    onClick={() => setSearchOpen(true)}
                 >
                     <Search className="w-4 h-4 text-gray-400" />
                 </button>
@@ -130,6 +113,8 @@ export function TopBar({ onMenuClick }: TopBarProps) {
                     </div>
                 )}
             </div>
-        </div>
+            </div>
+            <GlobalSearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
+        </>
     )
 }

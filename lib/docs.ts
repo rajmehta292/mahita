@@ -57,6 +57,10 @@ const CURRENT_DOC_PATTERNS: Array<{
     defaults: { visibility: "signed-in", status: "Current", category: "guidebook", audience: "developers" },
   },
   {
+    pattern: /^internal\/generated\//,
+    defaults: { visibility: "signed-in", status: "Current", category: "guidebook", audience: "developers" },
+  },
+  {
     pattern: /^internal\/evidence\//,
     defaults: { visibility: "signed-in", status: "Current", category: "evidence", audience: "reviewers" },
   },

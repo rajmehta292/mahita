@@ -1,0 +1,108 @@
+{
+  "generatedAt": "2026-03-15",
+  "product": {
+    "label": "MahaCharts",
+    "route": "/superchart",
+    "model": "single-chart-first workspace"
+  },
+  "canonicalDocs": [
+    {
+      "title": "MahaCharts Start Here For AI Agents",
+      "path": "docs/internal/guidebook/mahacharts/README.md"
+    },
+    {
+      "title": "MahaCharts Overview",
+      "path": "docs/internal/guidebook/mahacharts/01-overview.md"
+    },
+    {
+      "title": "MahaCharts UI Map",
+      "path": "docs/internal/guidebook/mahacharts/02-ui-map.md"
+    },
+    {
+      "title": "MahaCharts State Model",
+      "path": "docs/internal/guidebook/mahacharts/03-state-model.md"
+    },
+    {
+      "title": "MahaCharts Strategy Lifecycle",
+      "path": "docs/internal/guidebook/mahacharts/04-strategy-lifecycle.md"
+    },
+    {
+      "title": "MahaCharts Verification Matrix",
+      "path": "docs/internal/guidebook/mahacharts/05-verification-matrix.md"
+    },
+    {
+      "title": "MahaCharts Change Rules",
+      "path": "docs/internal/guidebook/mahacharts/06-change-rules.md"
+    }
+  ],
+  "references": [
+    {
+      "path": "docs/internal/evidence/archive/tradingview-research"
+    },
+    {
+      "path": "fixtures/tradingview"
+    },
+    {
+      "path": "/Users/rmehta01/Sites/backtester/app",
+      "exists": true
+    }
+  ],
+  "code": {
+    "components": [
+      "/Users/rmehta01/Sites/mahita/app/components/SuperChart/SuperChartWorkspace.tsx",
+      "/Users/rmehta01/Sites/mahita/app/components/Chart.tsx",
+      "/Users/rmehta01/Sites/mahita/app/components/Backtest/MahitaCodeEditor.tsx"
+    ],
+    "libraries": [
+      "/Users/rmehta01/Sites/mahita/lib/indicator-catalog.ts",
+      "/Users/rmehta01/Sites/mahita/lib/strategy-library.ts",
+      "/Users/rmehta01/Sites/mahita/lib/strategy-deployments.ts",
+      "/Users/rmehta01/Sites/mahita/lib/script-drafts.ts",
+      "/Users/rmehta01/Sites/mahita/lib/user-preferences.ts",
+      "/Users/rmehta01/Sites/mahita/lib/docs.ts"
+    ],
+    "apiRoutes": [
+      "/Users/rmehta01/Sites/mahita/app/api/indicators/catalog/route.ts",
+      "/Users/rmehta01/Sites/mahita/app/api/strategies/route.ts",
+      "/Users/rmehta01/Sites/mahita/app/api/strategies/[id]/route.ts",
+      "/Users/rmehta01/Sites/mahita/app/api/strategies/[id]/versions/route.ts",
+      "/Users/rmehta01/Sites/mahita/app/api/strategies/[id]/versions/[versionId]/route.ts",
+      "/Users/rmehta01/Sites/mahita/app/api/strategies/[id]/versions/[versionId]/restore/route.ts",
+      "/Users/rmehta01/Sites/mahita/app/api/strategies/[id]/workspace/route.ts",
+      "/Users/rmehta01/Sites/mahita/app/api/trading/deployments/route.ts",
+      "/Users/rmehta01/Sites/mahita/app/api/trading/deployments/[id]/route.ts",
+      "/Users/rmehta01/Sites/mahita/app/api/trading/market-data/route.ts",
+      "/Users/rmehta01/Sites/mahita/app/api/tradingview/webhook/[secret]/route.ts",
+      "/Users/rmehta01/Sites/mahita/app/api/schwab/orders/route.ts"
+    ]
+  },
+  "stateEntities": [
+    "Strategy",
+    "StrategyVersion",
+    "StrategyWorkspaceSession",
+    "StrategyDeployment",
+    "UserPreference.indicatorFavorites"
+  ],
+  "verificationScripts": [
+    "npm run generate:mahacharts-context",
+    "npm run verify:mahacharts-context",
+    "npm run verify:mahacharts-doc-links",
+    "npm run verify:mahacharts-coverage",
+    "npm run test:mahacharts:deterministic",
+    "npm run test:mahacharts:e2e",
+    "npm run test:mahacharts:multiuser",
+    "npm run test:mahacharts:visual",
+    "npm run test:deployments",
+    "npm run audit:mahacharts"
+  ],
+  "criticalTests": [
+    "/Users/rmehta01/Sites/mahita/tests/mahacharts-workspace.dom.test.tsx",
+    "/Users/rmehta01/Sites/mahita/tests/strategies.route.test.ts",
+    "/Users/rmehta01/Sites/mahita/tests/indicators-catalog.route.test.ts",
+    "/Users/rmehta01/Sites/mahita/tests/trading-deployments.route.test.ts",
+    "/Users/rmehta01/Sites/mahita/tests/trading-market-data.route.test.ts",
+    "/Users/rmehta01/Sites/mahita/tests/tradingview-webhook.route.test.ts",
+    "/Users/rmehta01/Sites/mahita/e2e/mahacharts.spec.ts",
+    "/Users/rmehta01/Sites/mahita/e2e/mahacharts.multiuser.spec.ts"
+  ]
+}

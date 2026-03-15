@@ -39,6 +39,15 @@ Update documentation whenever any of the following changes:
 - evidence log entry
 - refreshed tests or test evidence if behavior changed
 
+## MahaCharts addition
+
+For MahaCharts work, the minimum output set is:
+
+1. code update
+2. MahaCharts guidebook update
+3. generated context packet refresh
+4. deterministic or browser evidence refresh
+
 ## Required update sequence
 
 Use this order:
