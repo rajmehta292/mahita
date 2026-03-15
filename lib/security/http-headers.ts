@@ -4,9 +4,14 @@ const DEFAULT_CONNECT_SOURCES = [
   "wss:",
 ]
 
-export function buildSecurityHeaders(options?: { isDevelopment?: boolean; isProduction?: boolean }) {
+export function buildSecurityHeaders(options?: {
+  isDevelopment?: boolean
+  isProduction?: boolean
+  crossOriginOpenerPolicy?: string
+}) {
   const isDevelopment = options?.isDevelopment ?? process.env.NODE_ENV !== "production"
   const isProduction = options?.isProduction ?? process.env.NODE_ENV === "production"
+  const crossOriginOpenerPolicy = options?.crossOriginOpenerPolicy ?? "same-origin"
 
   const connectSources = [...DEFAULT_CONNECT_SOURCES]
 
@@ -34,7 +39,7 @@ export function buildSecurityHeaders(options?: { isDevelopment?: boolean; isProd
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     { key: "X-Content-Type-Options", value: "nosniff" },
     { key: "X-Frame-Options", value: "DENY" },
-    { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+    { key: "Cross-Origin-Opener-Policy", value: crossOriginOpenerPolicy },
     { key: "Cross-Origin-Resource-Policy", value: "same-site" },
     {
       key: "Permissions-Policy",

@@ -85,11 +85,12 @@ npm run dev
 3. A popup window will open with Schwab's authorization page
 4. Log in to your Schwab account
 5. Authorize the application
-6. Mahita should return you to the connected Active Trader state on `https://mahita.ai`
+6. After Schwab returns to Mahita, the popup should close automatically and the parent Active Trader window should refresh into the connected state on `https://mahita.ai`
 
-Current known issue on the March 15, 2026 Windows/public baseline:
-- account linking succeeds, but the popup can remain open on `?schwab=connected`
-- if that happens, close the extra window manually; the brokerage connection itself is still valid
+Expected popup behavior on the March 15, 2026 Windows/public baseline:
+- popup-compatible routes use a scoped `Cross-Origin-Opener-Policy: same-origin-allow-popups` override
+- callback completion signals the parent through `postMessage`, `BroadcastChannel`, and a `localStorage` fallback
+- if the browser blocks automatic close after success, the callback stays on an explicit success screen with manual close and return-to-app actions instead of redirecting the popup to `?schwab=connected`
 
 ### Viewing Positions
 

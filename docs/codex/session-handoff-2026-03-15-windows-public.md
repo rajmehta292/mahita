@@ -4,6 +4,8 @@ Date: 2026-03-15
 Branch: `codex/post-presentation-stabilization`  
 Remote: `origin https://github.com/rajmehta292/mahita.git`
 
+Superseded for the Schwab popup lifecycle issue by `docs/codex/session-handoff-2026-03-15-schwab-popup-fix.md`.
+
 ## Windows/public baseline
 
 - Active workspace root: `C:\mahita\mahita`

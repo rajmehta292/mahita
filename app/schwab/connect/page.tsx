@@ -4,8 +4,15 @@ import { Suspense, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { ArrowRight, Loader2, TriangleAlert } from 'lucide-react'
 import { normalizeUnknownError } from '@/lib/app-errors'
+import { emitSchwabPopupSignal, markSchwabPopupFlow } from '@/lib/schwab-popup-channel'
 
 function postStage(stage: 'redirecting' | 'processing' | 'error', error?: string) {
+    emitSchwabPopupSignal({
+        type: 'schwab-auth-stage',
+        stage,
+        error,
+    })
+
     if (!window.opener) {
         return
     }
@@ -26,17 +33,27 @@ function postStage(stage: 'redirecting' | 'processing' | 'error', error?: string
 
 function SchwabConnectContent() {
     const searchParams = useSearchParams()
-    const [message, setMessage] = useState('Preparing your secure Schwab authorization window…')
-    const [error, setError] = useState<string | null>(null)
+    const [runtimeError, setRuntimeError] = useState<string | null>(null)
 
     const authUrl = useMemo(() => searchParams.get('authUrl'), [searchParams])
+    const popupFlow = useMemo(() => searchParams.get('popupFlow') === '1', [searchParams])
+    const missingAuthUrlError = useMemo(
+        () => (authUrl ? null : 'Mahita could not prepare the Schwab authorization URL. Return to the app and retry.'),
+        [authUrl]
+    )
+    const error = runtimeError ?? missingAuthUrlError
+    const message = error ?? 'Preparing your secure Schwab authorization window...'
 
     useEffect(() => {
-        if (!authUrl) {
-            const nextError = 'Mahita could not prepare the Schwab authorization URL. Return to the app and retry.'
-            setError(nextError)
-            setMessage(nextError)
-            postStage('error', nextError)
+        if (popupFlow) {
+            markSchwabPopupFlow()
+        }
+
+        if (missingAuthUrlError || !authUrl) {
+            postStage(
+                'error',
+                missingAuthUrlError ?? 'Mahita could not prepare the Schwab authorization URL. Return to the app and retry.'
+            )
             return
         }
 
@@ -49,8 +66,7 @@ function SchwabConnectContent() {
                     redirectError,
                     'Mahita could not open the Schwab authorization page.'
                 )
-                setError(normalized.message)
-                setMessage(normalized.message)
+                setRuntimeError(normalized.message)
                 postStage('error', normalized.message)
             }
         }, 180)
@@ -58,7 +74,7 @@ function SchwabConnectContent() {
         return () => {
             window.clearTimeout(timer)
         }
-    }, [authUrl])
+    }, [authUrl, missingAuthUrlError, popupFlow])
 
     return (
         <div className="min-h-screen bg-[#131722] text-white">
@@ -81,7 +97,7 @@ function SchwabConnectContent() {
                         {!error && (
                             <div className="mt-8 flex items-center gap-3 rounded-2xl border border-blue-400/20 bg-blue-400/10 px-4 py-3 text-sm text-blue-100/90">
                                 <ArrowRight className="h-4 w-4" />
-                                You’ll see Mahita’s completion screen again as soon as Schwab finishes.
+                                You&apos;ll see Mahita&apos;s completion screen again as soon as Schwab finishes.
                             </div>
                         )}
 

@@ -17,7 +17,7 @@
 - `/auth/error` recovery surface
 - first-time user -> signup
 - returning user -> resume or dashboard
-- Schwab popup completion success / retry / timeout
+- Schwab popup completion success / retry / timeout / auto-close fallback
 
 ## Debug Runbook
 
@@ -54,23 +54,25 @@ Check:
 ### Stale Schwab connect state
 Symptoms:
 - callback fails after popup completes
-- “authorization expired” or state mismatch
+- "authorization expired" or state mismatch
 
 Check:
 - user started connect from the same Mahita session
 - callback finished within the pending window
 - retry from Active Trader or Dashboard
 
-### Schwab popup orphan after successful callback
+### Schwab popup does not auto-close after successful callback
 Symptoms:
 - Schwab account linking succeeds
-- parent Mahita page shows connected state
-- popup survives on `/active-trader?schwab=connected` instead of closing
+- parent Mahita page may or may not reflect the connected state yet
+- popup stays open after the callback instead of closing or showing the explicit success screen
 
 Check:
 - callback originated from `https://mahita.ai/schwab/callback`
-- popup/opening route used the public Mahita origin
-- callback still had access to the initiating window relationship or an equivalent same-origin completion signal
+- popup-compatible routes are serving `Cross-Origin-Opener-Policy: same-origin-allow-popups`
+- the connect page set the popup-flow marker before leaving Mahita
+- the callback emitted a same-origin completion signal (`postMessage`, `BroadcastChannel`, or `localStorage`)
+- full-window fallback redirects only when the popup marker is absent
 
 ### Admin access failures
 Symptoms:

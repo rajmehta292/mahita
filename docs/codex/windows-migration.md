@@ -4,7 +4,7 @@ Status update (March 15, 2026):
 - the copied workspace is now running in place on Windows from `C:\mahita\mahita`
 - local dev serves on `http://localhost:6244`
 - the public origin `https://mahita.ai` is currently tunneled from this Windows machine
-- the remaining known brokerage UX issue is the Schwab OAuth orphan popup after a successful callback
+- the Schwab OAuth popup auto-close path is now fixed on the public Windows runtime with a scoped COOP override plus same-origin fallback signaling
 
 This project can move to Windows cleanly, but the safest target is Windows with either WSL2 or Git Bash available because several scripts still assume Unix shell behavior.
 

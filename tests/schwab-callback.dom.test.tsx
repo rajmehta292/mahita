@@ -9,10 +9,12 @@ vi.mock('next/navigation', () => ({
 
 describe('SchwabCallbackPage', () => {
     beforeEach(() => {
+        vi.restoreAllMocks()
         searchParams.delete('code')
         searchParams.delete('state')
         searchParams.delete('error')
         searchParams.delete('error_description')
+        window.sessionStorage.clear()
     })
 
     it('exchanges the code and notifies the opener on success', async () => {
@@ -141,6 +143,72 @@ describe('SchwabCallbackPage', () => {
             { type: 'schwab-auth-complete', success: true },
             window.location.origin
         )
+    })
+
+    it('closes popup-intended success even when the opener relationship is missing', async () => {
+        searchParams.set('code', 'popup-auth-code')
+        searchParams.set('state', 'popup-state-123')
+        window.sessionStorage.setItem('mahita.schwab.popup.flow', 'popup')
+
+        const close = vi.fn()
+
+        vi.stubGlobal('fetch', vi.fn(async () => ({
+            ok: true,
+            clone() {
+                return this
+            },
+            json: async () => ({ success: true }),
+        })))
+
+        Object.defineProperty(window, 'opener', {
+            value: null,
+            configurable: true,
+        })
+        Object.defineProperty(window, 'close', {
+            value: close,
+            configurable: true,
+        })
+
+        render(<SchwabCallbackPage />)
+
+        await waitFor(() =>
+            expect(screen.getByRole('heading', { name: /authorization complete/i })).toBeInTheDocument()
+        )
+
+        await waitFor(() => expect(close).toHaveBeenCalled(), { timeout: 1_500 })
+    })
+
+    it('does not try to close the window when the callback owns the full window', async () => {
+        searchParams.set('code', 'full-window-auth-code')
+        searchParams.set('state', 'full-window-state-123')
+
+        const close = vi.fn()
+
+        vi.stubGlobal('fetch', vi.fn(async () => ({
+            ok: true,
+            clone() {
+                return this
+            },
+            json: async () => ({ success: true }),
+        })))
+
+        Object.defineProperty(window, 'opener', {
+            value: null,
+            configurable: true,
+        })
+        Object.defineProperty(window, 'close', {
+            value: close,
+            configurable: true,
+        })
+
+        render(<SchwabCallbackPage />)
+
+        await waitFor(() =>
+            expect(screen.getByRole('heading', { name: /authorization complete/i })).toBeInTheDocument()
+        )
+
+        await new Promise((resolve) => window.setTimeout(resolve, 600))
+        expect(close).not.toHaveBeenCalled()
     })
 
     it('shows a stale-window recovery message when state is missing and no connection was completed', async () => {

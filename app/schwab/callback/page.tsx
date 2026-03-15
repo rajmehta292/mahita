@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AlertTriangle, CheckCircle2, Loader2, XCircle } from 'lucide-react'
 import { normalizeUnknownError, parseResponseError } from '@/lib/app-errors'
+import { emitSchwabPopupSignal, hasSchwabPopupFlowMarker } from '@/lib/schwab-popup-channel'
 
 type CallbackStatus = 'processing' | 'success' | 'error'
 
@@ -15,6 +16,11 @@ interface CallbackState {
 const CALLBACK_TIMEOUT_MS = 15000
 
 function postResultToOpener(payload: { success: boolean, error?: string }) {
+    emitSchwabPopupSignal({
+        type: 'schwab-auth-complete',
+        ...payload,
+    })
+
     if (!window.opener) {
         return
     }
@@ -33,6 +39,11 @@ function postResultToOpener(payload: { success: boolean, error?: string }) {
 }
 
 function postProcessingToOpener() {
+    emitSchwabPopupSignal({
+        type: 'schwab-auth-stage',
+        stage: 'processing',
+    })
+
     if (!window.opener) {
         return
     }
@@ -71,6 +82,7 @@ function SchwabCallbackContent() {
             errorDescription,
         }
     }, [searchParams])
+    const popupFlow = useMemo(() => hasSchwabPopupFlowMarker(), [])
 
     const completeAuthorization = useCallback(async () => {
         let active = true
@@ -115,7 +127,7 @@ function SchwabCallbackContent() {
             })
             postResultToOpener({ success: true })
 
-            if (window.opener) {
+            if (popupFlow) {
                 window.setTimeout(() => {
                     window.close()
                 }, 450)
@@ -170,7 +182,7 @@ function SchwabCallbackContent() {
                 return
             }
 
-            markSuccess('Schwab authorization complete. You can close this window and return to Mahita.')
+            markSuccess('Schwab authorization complete. Mahita will finish this flow automatically. If this window stays open, close it and return to the app.')
         } catch (error) {
             const normalized = normalizeUnknownError(error, 'Failed to complete Schwab authorization.')
 
@@ -186,7 +198,7 @@ function SchwabCallbackContent() {
                             return
                         }
 
-                        markSuccess('Schwab authorization already completed. You can close this window and return to Mahita.')
+                        markSuccess('Schwab authorization already completed. Mahita will finish this flow automatically. If this window stays open, close it and return to the app.')
                         return
                     }
                 } catch (statusError) {
@@ -213,7 +225,7 @@ function SchwabCallbackContent() {
                             return
                         }
 
-                        markSuccess('Schwab authorization finished on the server. You can close this window and return to Mahita.')
+                        markSuccess('Schwab authorization finished on the server. Mahita will finish this flow automatically. If this window stays open, close it and return to the app.')
                         return
                     }
                 } catch (statusError) {
@@ -236,7 +248,7 @@ function SchwabCallbackContent() {
             active = false
             window.clearTimeout(timeoutId)
         }
-    }, [callbackResult])
+    }, [callbackResult, popupFlow])
 
     useEffect(() => {
         let cancelled = false

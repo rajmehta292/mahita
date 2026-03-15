@@ -96,11 +96,12 @@ npm run dev
 4. A popup window will open
 5. Log in with your Schwab credentials
 6. Authorize the application
-7. You should see "Connected" status back on `https://mahita.ai`
+7. After Schwab returns to Mahita, the popup should close automatically and the parent `https://mahita.ai` window should show the connected state
 
-Current known issue on the March 15, 2026 Windows/public baseline:
-- account linking can finish successfully while the popup remains open on `?schwab=connected`
-- if that happens, close the extra window manually; the connection itself is still valid
+Expected popup behavior on the March 15, 2026 Windows/public baseline:
+- popup-compatible routes use a scoped `Cross-Origin-Opener-Policy: same-origin-allow-popups` override
+- callback completion signals the parent through `postMessage`, `BroadcastChannel`, and a `localStorage` fallback
+- if the browser blocks automatic close after success, the callback stays on an explicit success screen with manual close and return-to-app actions instead of redirecting the popup to `?schwab=connected`
 
 ## Troubleshooting
 

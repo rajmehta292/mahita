@@ -16,6 +16,9 @@ describe('SchwabGating', () => {
         push.mockReset()
         refresh.mockReset()
         vi.useRealTimers()
+        vi.restoreAllMocks()
+        window.localStorage.clear()
+        window.sessionStorage.clear()
     })
 
     it('finishes the connect flow when the callback window reports success', async () => {
@@ -226,4 +229,83 @@ describe('SchwabGating', () => {
         )
         expect(refresh).toHaveBeenCalled()
     }, 8_000)
+
+    it('finishes the connect flow from the same-origin fallback signal when postMessage is unavailable', async () => {
+        let configChecks = 0
+        vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+            const url = String(input)
+
+            if (url === '/api/user/schwab-config') {
+                configChecks += 1
+                return {
+                    ok: true,
+                    json: async () => ({
+                        success: true,
+                        config: {
+                            hasClientId: true,
+                            hasClientSecret: true,
+                            hasAccessToken: configChecks > 1,
+                            hasRefreshToken: configChecks > 1,
+                        },
+                    }),
+                }
+            }
+
+            if (url === '/api/schwab/auth?action=authorize') {
+                return {
+                    ok: true,
+                    json: async () => ({ authUrl: 'https://auth.schwab.test' }),
+                }
+            }
+
+            throw new Error(`Unexpected fetch: ${url}`)
+        }))
+
+        const popup = {
+            closed: false,
+            close: vi.fn(() => {
+                popup.closed = true
+            }),
+        }
+
+        Object.defineProperty(window, 'open', {
+            value: vi.fn(() => popup),
+            configurable: true,
+        })
+
+        render(
+            <SchwabGating requiredConfig={false}>
+                <div>Connected children</div>
+            </SchwabGating>
+        )
+
+        await waitFor(() =>
+            expect(screen.getByRole('button', { name: /connect schwab portal/i })).toBeInTheDocument()
+        )
+
+        fireEvent.click(screen.getByRole('button', { name: /connect schwab portal/i }))
+
+        await waitFor(() =>
+            expect(screen.getByRole('button', { name: /waiting for schwab authorization/i })).toBeDisabled()
+        )
+
+        await act(async () => {
+            window.dispatchEvent(new StorageEvent('storage', {
+                key: 'mahita.schwab.popup.signal',
+                newValue: JSON.stringify({
+                    type: 'schwab-auth-complete',
+                    success: true,
+                    timestamp: Date.now(),
+                    nonce: 'fallback-success',
+                }),
+            }))
+        })
+
+        await waitFor(() =>
+            expect(screen.getByText('Connected children')).toBeInTheDocument()
+        )
+
+        expect(popup.close).toHaveBeenCalled()
+        expect(refresh).toHaveBeenCalled()
+    })
 })

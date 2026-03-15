@@ -19,7 +19,7 @@ Mahita should only ever ask users to paste the first category into Settings.
 6. Schwab returns to `https://mahita.ai/schwab/callback`
 7. Mahita validates the pending state
 8. Mahita exchanges the code for tokens
-9. Tokens are attached to the user’s `BrokerageConnection`
+9. Tokens are attached to the user's `BrokerageConnection`
 
 ## Current Production/Windows Baseline
 - real-user Schwab brokerage authorization starts from `https://mahita.ai`
@@ -27,10 +27,18 @@ Mahita should only ever ask users to paste the first category into Settings.
 - the current public runtime is being served from the Windows workspace at `C:\mahita\mahita`
 - the Cloudflare tunnel credential path is machine-local and must not be committed as shared source-of-truth
 
-## Current Known Popup Issue
-- brokerage authorization itself completes successfully
-- the post-callback popup may remain open as an orphan window on `?schwab=connected`
-- this is a popup lifecycle defect, not a token-exchange or account-linking defect
+## Popup Completion Contract
+- the app keeps the global hardened COOP policy, but applies `Cross-Origin-Opener-Policy: same-origin-allow-popups` only on popup-compatible routes:
+  - `/active-trader`
+  - `/dashboard`
+  - `/history`
+  - `/portfolio`
+  - `/schwab/connect`
+  - `/schwab/callback`
+- the opener marks popup intent before leaving Mahita, so the callback can distinguish a popup flow from a full-window flow even if `window.opener` is lost
+- callback completion signals the parent through `postMessage`, `BroadcastChannel`, and a `localStorage` storage-event fallback
+- when the popup marker is present, the callback always attempts `window.close()` after success instead of redirecting the popup to `?schwab=connected`
+- if the browser still blocks closing, the callback stays on an explicit success screen with manual close and return-to-app actions
 
 ## Isolation Model
 - the callback URL identifies Mahita

@@ -22,6 +22,7 @@ Do not treat the Codex desktop app transcript as the source of truth. Raw chat h
 
 - [session-handoff-2026-03-14.md](/Users/rmehta01/Sites/mahita/docs/codex/session-handoff-2026-03-14.md)
 - [session-handoff-2026-03-15-windows-public.md](/Users/rmehta01/Sites/mahita/docs/codex/session-handoff-2026-03-15-windows-public.md)
+- [session-handoff-2026-03-15-schwab-popup-fix.md](/Users/rmehta01/Sites/mahita/docs/codex/session-handoff-2026-03-15-schwab-popup-fix.md)
 - [windows-migration.md](/Users/rmehta01/Sites/mahita/docs/codex/windows-migration.md)
 
 ## Canonical companion docs

@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
 import { buildSecurityHeaders } from "./lib/security/http-headers";
 
+const SCHWAB_POPUP_COMPATIBLE_ROUTES = [
+  "/active-trader",
+  "/dashboard",
+  "/history",
+  "/portfolio",
+  "/schwab/connect",
+  "/schwab/callback",
+];
+
 const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR || ".next",
   outputFileTracingRoot: process.cwd(),
@@ -25,6 +34,14 @@ const nextConfig: NextConfig = {
           isProduction: process.env.NODE_ENV === "production",
         }),
       },
+      ...SCHWAB_POPUP_COMPATIBLE_ROUTES.map((source) => ({
+        source,
+        headers: buildSecurityHeaders({
+          isDevelopment: process.env.NODE_ENV !== "production",
+          isProduction: process.env.NODE_ENV === "production",
+          crossOriginOpenerPolicy: "same-origin-allow-popups",
+        }),
+      })),
     ];
   },
 };

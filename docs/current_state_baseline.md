@@ -7,7 +7,7 @@ Windows/public bring-up update (March 15, 2026):
 - local dev serves on port `6244`
 - `https://mahita.ai` is currently being served from this Windows machine through the recovered Cloudflare tunnel
 - public auth health is returning the expected public-origin contract
-- the remaining known brokerage UX defect is an orphan Schwab OAuth popup after a successful callback
+- the public Schwab OAuth popup now auto-closes on success through a scoped COOP override plus same-origin fallback signaling, so successful callbacks no longer strand an extra `/active-trader?schwab=connected` window
 
 Documentation tranche update:
 - a site-visible documentation/wiki section now exists at `/docs`
@@ -75,6 +75,7 @@ Verified browser/system coverage on the current tree:
 - `/trending-indicators` renders a real unauthenticated recovery/sign-in surface
 - authenticated main-screen navigation and logout complete without route lockups
 - Settings can save Schwab credentials without surfacing raw Prisma/model errors to the user
+- the Schwab OAuth popup regression is covered by a dedicated browser test that strips `window.opener` on the callback and still requires the popup to close while the parent page reaches connected state
 - Admin tabs load independently instead of one failing endpoint blanking the entire control plane
 - `/backtest` loads a stable editor surface and no longer hard-fails the route when Monaco initialization fails
 

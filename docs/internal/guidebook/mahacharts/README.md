@@ -41,12 +41,12 @@ Any change that makes the chart less dominant than those five regions is a regre
 
 Read these in order:
 
-1. [MahaCharts Overview](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/mahacharts/01-overview.md)
-2. [MahaCharts UI Map](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/mahacharts/02-ui-map.md)
-3. [MahaCharts State Model](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/mahacharts/03-state-model.md)
-4. [MahaCharts Strategy Lifecycle](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/mahacharts/04-strategy-lifecycle.md)
-5. [MahaCharts Verification Matrix](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/mahacharts/05-verification-matrix.md)
-6. [MahaCharts Change Rules](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/mahacharts/06-change-rules.md)
+1. [MahaCharts Overview](01-overview.md)
+2. [MahaCharts UI Map](02-ui-map.md)
+3. [MahaCharts State Model](03-state-model.md)
+4. [MahaCharts Strategy Lifecycle](04-strategy-lifecycle.md)
+5. [MahaCharts Verification Matrix](05-verification-matrix.md)
+6. [MahaCharts Change Rules](06-change-rules.md)
 
 ## Generated context packet
 

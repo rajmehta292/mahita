@@ -64,8 +64,15 @@ describe('platform-security', () => {
     it('builds hardened security headers and only adds HSTS in production', () => {
         const devHeaders = buildSecurityHeaders({ isDevelopment: true, isProduction: false })
         const prodHeaders = buildSecurityHeaders({ isDevelopment: false, isProduction: true })
+        const popupHeaders = buildSecurityHeaders({
+            isDevelopment: false,
+            isProduction: true,
+            crossOriginOpenerPolicy: 'same-origin-allow-popups',
+        })
 
         expect(devHeaders.find((header) => header.key === 'Content-Security-Policy')?.value).toContain("'unsafe-eval'")
+        expect(devHeaders.find((header) => header.key === 'Cross-Origin-Opener-Policy')?.value).toBe('same-origin')
+        expect(popupHeaders.find((header) => header.key === 'Cross-Origin-Opener-Policy')?.value).toBe('same-origin-allow-popups')
         expect(devHeaders.find((header) => header.key === 'Strict-Transport-Security')).toBeUndefined()
         expect(prodHeaders.find((header) => header.key === 'Strict-Transport-Security')?.value).toContain('max-age=31536000')
     })

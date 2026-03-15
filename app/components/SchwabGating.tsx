@@ -4,6 +4,7 @@ import { useState, useEffect, ReactNode, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Zap, Link as LinkIcon, AlertCircle, Key, Settings } from 'lucide-react'
 import { normalizeUnknownError } from '@/lib/app-errors'
+import { subscribeToSchwabPopupSignals, type SchwabPopupSignal } from '@/lib/schwab-popup-channel'
 
 interface SchwabGatingProps {
     children: ReactNode
@@ -65,7 +66,7 @@ export function SchwabGating({ children, requiredConfig = true, onStateChange }:
             const { authUrl } = authData
 
             // Step 2: Open authorization window
-            const connectWindowUrl = `/schwab/connect?authUrl=${encodeURIComponent(authUrl)}`
+            const connectWindowUrl = `/schwab/connect?popupFlow=1&authUrl=${encodeURIComponent(authUrl)}`
             const authWindow = window.open(connectWindowUrl, 'Schwab Authorization', 'width=600,height=700')
             if (!authWindow) {
                 setConnectError('Mahita could not open the Schwab authorization window. Check your popup blocker and retry.')
@@ -78,9 +79,61 @@ export function SchwabGating({ children, requiredConfig = true, onStateChange }:
             let finalizeDeadline: number | null = null
             let pollTimer = 0
             let lastStatusError: string | null = null
+            let unsubscribeSignals: () => void = () => {}
+
+            const closeAuthWindow = () => {
+                try {
+                    authWindow.close()
+                } catch (closeError) {
+                    console.warn('Failed to close Schwab authorization popup:', closeError)
+                }
+            }
+
+            const handlePopupSignal = async (signal: SchwabPopupSignal) => {
+                if (signal.type === 'schwab-auth-stage') {
+                    if (signal.stage === 'redirecting') {
+                        setConnectionPhase('opening')
+                        setConnectError(null)
+                    }
+
+                    if (signal.stage === 'processing') {
+                        setConnectionPhase('finalizing')
+                        setConnectError(null)
+                    }
+
+                    if (signal.stage === 'error') {
+                        finishWithError(signal.error || 'Mahita could not continue the Schwab authorization flow.')
+                    }
+
+                    return
+                }
+
+                if (signal.type !== 'schwab-auth-complete') {
+                    return
+                }
+
+                closeAuthWindow()
+
+                if (signal.success) {
+                    setConnectionPhase('finalizing')
+                    await finishWithSuccess()
+                    return
+                }
+
+                finishWithError(signal.error || 'Failed to authenticate with Schwab.')
+            }
+
+            const handleCallbackMessage = (event: MessageEvent) => {
+                if (event.origin !== window.location.origin || !event.data?.type) {
+                    return
+                }
+
+                void handlePopupSignal(event.data as SchwabPopupSignal)
+            }
 
             const cleanup = () => {
-                window.removeEventListener('message', handleCallback)
+                window.removeEventListener('message', handleCallbackMessage)
+                unsubscribeSignals()
                 if (pollTimer) {
                     window.clearTimeout(pollTimer)
                 }
@@ -108,46 +161,11 @@ export function SchwabGating({ children, requiredConfig = true, onStateChange }:
                 cleanup()
             }
 
-            // Step 3: Listen for callback
-            const handleCallback = async (event: MessageEvent) => {
-                if (event.origin !== window.location.origin) {
-                    return
-                }
-
-                if (event.data?.type === 'schwab-auth-stage') {
-                    if (event.data.stage === 'redirecting') {
-                        setConnectionPhase('opening')
-                        setConnectError(null)
-                    }
-
-                    if (event.data.stage === 'processing') {
-                        setConnectionPhase('finalizing')
-                        setConnectError(null)
-                    }
-
-                    if (event.data.stage === 'error') {
-                        finishWithError(event.data.error || 'Mahita could not continue the Schwab authorization flow.')
-                    }
-
-                    return
-                }
-
-                if (event.data?.type !== 'schwab-auth-complete') {
-                    return
-                }
-
-                authWindow.close()
-
-                if (event.data.success) {
-                    setConnectionPhase('finalizing')
-                    await finishWithSuccess()
-                    return
-                }
-
-                finishWithError(event.data.error || 'Failed to authenticate with Schwab.')
-            }
-
-            window.addEventListener('message', handleCallback)
+            // Step 3: Listen for callback progress from both postMessage and same-origin fallbacks
+            window.addEventListener('message', handleCallbackMessage)
+            unsubscribeSignals = subscribeToSchwabPopupSignals((signal) => {
+                void handlePopupSignal(signal)
+            })
 
             const runStatusCheck = async () => {
                 if (finalized) {
