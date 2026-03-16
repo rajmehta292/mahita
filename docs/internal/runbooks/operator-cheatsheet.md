@@ -16,6 +16,8 @@ updatedAt: 2026-03-12
 ```bash
 npm run dev
 npm run dev:reset
+npm run build
+npm run start
 npm run bootstrap:demo
 npm run backup:platform-data
 npm run verify:platform-data
@@ -82,6 +84,7 @@ npm run bundle:demo
 
 - verify Cloudflare tunnel state
 - verify local app on `localhost:6244`
+- restart or re-run the `Mahita Web Supervisor.cmd` and `Mahita Tunnel Supervisor.cmd` Startup launchers
 - switch to demo-safe local mode if the public callback path is unavailable
 
 ## If live OAuth fails

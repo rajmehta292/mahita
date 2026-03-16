@@ -55,7 +55,12 @@ function ensureVaultDatabases() {
   ensureVaultDirectory()
 
   for (const vaultName of DEFAULT_VAULTS) {
-    const vaultUrl = toSqliteFileUrl(path.join(ROOT, 'data', 'vaults', `${vaultName}.db`))
+    const vaultPath = path.join(ROOT, 'data', 'vaults', `${vaultName}.db`)
+    if (!fs.existsSync(vaultPath)) {
+      fs.closeSync(fs.openSync(vaultPath, 'a'))
+    }
+
+    const vaultUrl = toSqliteFileUrl(vaultPath)
     runChecked('node', [PRISMA_CLI, 'db', 'push', '--skip-generate'], {
       cwd: ROOT,
       stdio: 'pipe',

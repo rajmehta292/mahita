@@ -20,6 +20,15 @@ npm run dev
 cloudflared tunnel --config cloudflared/config.yml run
 ```
 
+For the Windows operator machine, the stable public setup is production mode plus Startup launchers that start hidden supervisor processes:
+
+```powershell
+npm run build
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\Install-MahitaOperatorTasks.ps1 -StartNow
+```
+
+Runbook: [docs/internal/runbooks/windows-operator-autostart.md](docs/internal/runbooks/windows-operator-autostart.md)
+
 A professional-grade algorithmic trading platform inspired by TradingView, built with Next.js, React, and TypeScript.
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
