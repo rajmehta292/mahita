@@ -13,7 +13,7 @@ function normalizeLines(lines: string[]): string[] {
 }
 
 export async function getGlobalUniverse(): Promise<string[]> {
-    let extraAssets: string[] = []
+    const extraAssets: string[] = []
 
     try {
         const extraUniverse = await readFile(CUSTOM_UNIVERSE_PATH, 'utf8')

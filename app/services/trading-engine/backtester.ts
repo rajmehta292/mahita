@@ -1,5 +1,5 @@
 import { MarketDataStore } from '../market-data/store'
-import { Timeframe } from '../market-data/types'
+import { MarketDataPoint, Timeframe } from '../market-data/types'
 import { StrategyEvaluator } from './evaluator'
 import { compareCompletedTradesToFixture, detectFixtureWindowMismatch, groupFixtureTrades } from './parity'
 import { PaperBrokerProvider } from './paper-broker'
@@ -432,7 +432,7 @@ export class BacktestEngine {
         trades: BacktestResult['trades'],
         initial: number,
         equityCurve: EquityPoint[],
-        data: any[],
+        data: MarketDataPoint[],
         diagnostics?: BacktestEngineDiagnostics,
         parityComparison?: BacktestResult['parityComparison']
     ): BacktestResult {

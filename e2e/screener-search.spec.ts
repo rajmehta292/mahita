@@ -1,11 +1,10 @@
 import { expect, test } from '@playwright/test'
+import { installScreenerFixtures } from '@/e2e/support/runtime-fixtures'
+import { signInWithDevBypass } from '@/e2e/support/session'
 
 test('screener workspace loads and global search routes to chart results', async ({ page }) => {
-    await page.goto('/auth/signin')
-    await page.getByRole('button', { name: /sign in with dev bypass/i }).click()
-    await page.waitForURL((url) => !/\/auth\/(signin|post-signin)/.test(url.pathname), {
-        timeout: 15_000,
-    })
+    await installScreenerFixtures(page.context())
+    await signInWithDevBypass(page)
 
     await page.goto('/screener')
     await expect(page.getByRole('button', { name: /filters/i })).toBeVisible()

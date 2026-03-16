@@ -14,20 +14,20 @@ Do not treat the Codex desktop app transcript as the source of truth. Raw chat h
 ## What to update after a meaningful Codex session
 
 1. Add or refresh a dated session handoff note.
-2. Link the latest audit artifacts from [docs/internal/generated](/Users/rmehta01/Sites/mahita/docs/internal/generated).
+2. Link the latest audit artifacts from [docs/internal/generated](../internal/generated).
 3. Record any new environment or migration assumptions.
-4. If the work changed MahaCharts behavior, update the canonical guidebook under [docs/internal/guidebook/mahacharts](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/mahacharts).
+4. If the work changed MahaCharts behavior, update the canonical guidebook under [docs/internal/guidebook/mahacharts](../internal/guidebook/mahacharts).
 
 ## Current primary files
 
-- [session-handoff-2026-03-14.md](/Users/rmehta01/Sites/mahita/docs/codex/session-handoff-2026-03-14.md)
-- [session-handoff-2026-03-15-windows-public.md](/Users/rmehta01/Sites/mahita/docs/codex/session-handoff-2026-03-15-windows-public.md)
-- [session-handoff-2026-03-15-schwab-popup-fix.md](/Users/rmehta01/Sites/mahita/docs/codex/session-handoff-2026-03-15-schwab-popup-fix.md)
-- [windows-migration.md](/Users/rmehta01/Sites/mahita/docs/codex/windows-migration.md)
+- [session-handoff-2026-03-14.md](session-handoff-2026-03-14.md)
+- [session-handoff-2026-03-15-windows-public.md](session-handoff-2026-03-15-windows-public.md)
+- [session-handoff-2026-03-15-schwab-popup-fix.md](session-handoff-2026-03-15-schwab-popup-fix.md)
+- [windows-migration.md](windows-migration.md)
 
 ## Canonical companion docs
 
-- [docs/current_state_baseline.md](/Users/rmehta01/Sites/mahita/docs/current_state_baseline.md)
-- [docs/internal/guidebook/mahacharts/README.md](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/mahacharts/README.md)
-- [docs/internal/generated/mahacharts-handoff.md](/Users/rmehta01/Sites/mahita/docs/internal/generated/mahacharts-handoff.md)
-- [docs/internal/generated/mahacharts-audit-summary.md](/Users/rmehta01/Sites/mahita/docs/internal/generated/mahacharts-audit-summary.md)
+- [docs/current_state_baseline.md](../current_state_baseline.md)
+- [docs/internal/guidebook/mahacharts/README.md](../internal/guidebook/mahacharts/README.md)
+- [docs/internal/generated/mahacharts-handoff.md](../internal/generated/mahacharts-handoff.md)
+- [docs/internal/generated/mahacharts-audit-summary.md](../internal/generated/mahacharts-audit-summary.md)

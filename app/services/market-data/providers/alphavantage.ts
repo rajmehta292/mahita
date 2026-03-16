@@ -1,5 +1,15 @@
 import { IDataProvider, MarketDataPoint, Timeframe } from '../types'
 
+interface AlphaVantageSeriesRow {
+    [key: string]: string
+}
+
+interface AlphaVantageResponse {
+    Information?: string
+    Note?: string
+    [key: string]: unknown
+}
+
 const INTRADAY_INTERVALS: Partial<Record<Timeframe, '1min' | '5min' | '15min' | '30min' | '60min'>> = {
     '1m': '1min',
     '5m': '5min',
@@ -39,15 +49,15 @@ export class AlphaVantageProvider implements IDataProvider {
             }
 
             const timeSeriesKey = Object.keys(data).find((key) => key.includes('Time Series'))
-            if (!timeSeriesKey || !data[timeSeriesKey]) {
+            const series = timeSeriesKey ? data[timeSeriesKey] : null
+            if (!timeSeriesKey || !series || typeof series !== 'object') {
                 console.warn(`[AlphaVantageProvider] No data block found for ${symbol}`)
                 return []
             }
 
-            const series = data[timeSeriesKey]
             const points: MarketDataPoint[] = []
 
-            for (const [dateStr, ohlcv] of Object.entries(series) as [string, Record<string, string>][]) {
+            for (const [dateStr, ohlcv] of Object.entries(series as Record<string, AlphaVantageSeriesRow>)) {
                 const time = Math.floor(new Date(dateStr).getTime() / 1000)
                 if (time < startTime || time > endTime) {
                     continue
@@ -70,7 +80,7 @@ export class AlphaVantageProvider implements IDataProvider {
         }
     }
 
-    private async fetchSeries(symbol: string, timeframe: Timeframe): Promise<any | null> {
+    private async fetchSeries(symbol: string, timeframe: Timeframe): Promise<AlphaVantageResponse | null> {
         const isForex = isForexSymbol(symbol)
         const intradayInterval = INTRADAY_INTERVALS[timeframe]
         let url: string | null = null
@@ -119,7 +129,7 @@ export class AlphaVantageProvider implements IDataProvider {
         }
 
         const response = await fetch(url)
-        const data = await response.json()
+        const data = await response.json() as AlphaVantageResponse
 
         if (data.Information && `${data.Information}`.toLowerCase().includes('rate limit')) {
             console.warn(`[AlphaVantageProvider] Rate limited for ${symbol}`)

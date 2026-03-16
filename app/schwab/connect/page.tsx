@@ -37,6 +37,17 @@ function SchwabConnectContent() {
 
     const authUrl = useMemo(() => searchParams.get('authUrl'), [searchParams])
     const popupFlow = useMemo(() => searchParams.get('popupFlow') === '1', [searchParams])
+    const popupState = useMemo(() => {
+        if (!authUrl) {
+            return null
+        }
+
+        try {
+            return new URL(authUrl).searchParams.get('state')
+        } catch {
+            return null
+        }
+    }, [authUrl])
     const missingAuthUrlError = useMemo(
         () => (authUrl ? null : 'Mahita could not prepare the Schwab authorization URL. Return to the app and retry.'),
         [authUrl]
@@ -46,7 +57,7 @@ function SchwabConnectContent() {
 
     useEffect(() => {
         if (popupFlow) {
-            markSchwabPopupFlow()
+            markSchwabPopupFlow(popupState)
         }
 
         if (missingAuthUrlError || !authUrl) {
@@ -74,7 +85,7 @@ function SchwabConnectContent() {
         return () => {
             window.clearTimeout(timer)
         }
-    }, [authUrl, missingAuthUrlError, popupFlow])
+    }, [authUrl, missingAuthUrlError, popupFlow, popupState])
 
     return (
         <div className="min-h-screen bg-[#131722] text-white">

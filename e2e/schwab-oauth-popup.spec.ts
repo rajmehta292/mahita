@@ -33,8 +33,17 @@ test('successful Schwab OAuth closes the popup even when window.opener is missin
             status: 200,
             contentType: 'application/json',
             body: JSON.stringify({
-                authUrl: 'https://auth.schwab.test/authorize',
+                authUrl: 'https://auth.schwab.test/authorize?state=popup-state-123',
+                state: 'popup-state-123',
             }),
+        })
+    })
+
+    await context.route('https://auth.schwab.test/**', async (route) => {
+        await route.fulfill({
+            status: 200,
+            contentType: 'text/html',
+            body: '<html><body>Mock Schwab authorization page</body></html>',
         })
     })
 
@@ -135,6 +144,7 @@ test('successful Schwab OAuth closes the popup even when window.opener is missin
 
     await popup.waitForURL(/\/schwab\/connect/)
     await expect(popup.getByRole('heading', { name: /redirecting to schwab/i })).toBeVisible()
+    await popup.waitForURL(/https:\/\/auth\.schwab\.test\/authorize/)
 
     await popup.addInitScript(() => {
         Object.defineProperty(window, 'opener', {
@@ -143,9 +153,18 @@ test('successful Schwab OAuth closes the popup even when window.opener is missin
         })
     })
 
-    await popup.goto('/schwab/callback?code=demo-auth-code&state=popup-state-123')
+    try {
+        await popup.goto('/schwab/callback?code=demo-auth-code&state=popup-state-123')
+    } catch (error) {
+        if (!(error instanceof Error) || !error.message.includes('ERR_ABORTED')) {
+            throw error
+        }
+    }
 
-    await expect.poll(async () => popup.isClosed(), { timeout: 5_000 }).toBe(true)
     await expect(page.getByRole('button', { name: /connect schwab portal/i })).toHaveCount(0)
     await expect(page).not.toHaveURL(/schwab=connected/)
+    if (!popup.isClosed()) {
+        await popup.waitForEvent('close', { timeout: 10_000 })
+    }
+    expect(popup.isClosed()).toBe(true)
 })

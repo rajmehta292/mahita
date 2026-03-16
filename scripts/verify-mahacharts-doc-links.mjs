@@ -3,7 +3,7 @@ import path from 'path'
 import { CANONICAL_DOCS, SOURCE_PATHS } from './lib/mahacharts-context.mjs'
 
 const ROOT = process.cwd()
-const absolutePathPattern = /\[[^\]]+\]\((\/Users\/rmehta01\/Sites\/mahita\/[^)]+)\)/g
+const markdownLinkPattern = /\[[^\]]+\]\(([^)]+)\)/g
 
 async function assertExists(targetPath, label) {
   try {
@@ -19,8 +19,20 @@ for (const relativePath of CANONICAL_DOCS) {
   await assertExists(absolutePath, 'Canonical MahaCharts doc')
 
   const content = await fs.readFile(absolutePath, 'utf8')
-  for (const match of content.matchAll(absolutePathPattern)) {
-    await assertExists(match[1], 'Linked MahaCharts file')
+  for (const match of content.matchAll(markdownLinkPattern)) {
+    const href = match[1]
+
+    if (
+      href.startsWith('http://') ||
+      href.startsWith('https://') ||
+      href.startsWith('mailto:') ||
+      href.startsWith('#')
+    ) {
+      continue
+    }
+
+    const [target] = href.split('#')
+    await assertExists(path.resolve(path.dirname(absolutePath), target), 'Linked MahaCharts file')
   }
 }
 

@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import YahooFinance from 'yahoo-finance2'
 
+interface YahooQuoteResponse {
+    shortName?: string
+    longName?: string
+    regularMarketPrice?: number
+    regularMarketChange?: number
+    regularMarketChangePercent?: number
+}
+
+const YahooFinanceClient = YahooFinance as unknown as {
+    new (): {
+        quote(symbol: string): Promise<YahooQuoteResponse>
+    }
+}
+
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const symbolsParam = searchParams.get('symbols')
@@ -15,7 +29,7 @@ export async function GET(request: NextRequest) {
         const quotes = await Promise.all(
             symbols.map(async (sym) => {
                 try {
-                    const yahooFinance = new (YahooFinance as any)()
+                    const yahooFinance = new YahooFinanceClient()
                     const result = await yahooFinance.quote(sym)
                     return {
                         symbol: sym,
@@ -38,8 +52,10 @@ export async function GET(request: NextRequest) {
             quotes: validQuotes
         })
 
-    } catch (error: any) {
+    } catch (error) {
         console.error('[QuotesRoute] Error fetching quotes:', error)
-        return NextResponse.json({ error: error.message || 'Failed to fetch quotes' }, { status: 500 })
+        return NextResponse.json({
+            error: error instanceof Error ? error.message : 'Failed to fetch quotes',
+        }, { status: 500 })
     }
 }

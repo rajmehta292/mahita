@@ -1,6 +1,6 @@
 # Mahita Terminal - Quick Reference Guide
 
-Status: Historical quick reference. For the current auth/origin/brokerage model, use [docs/guidebook/auth/README.md](/Users/rmehta01/Sites/mahita/docs/guidebook/auth/README.md).
+Status: Historical quick reference. For the current auth/origin/brokerage model, use [docs/guidebook/auth/README.md](guidebook/auth/README.md).
 
 ## 🚀 Quick Start
 

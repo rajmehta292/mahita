@@ -22,13 +22,19 @@ const barSchema = new parquet.ParquetSchema({
     volume: { type: 'DOUBLE' }
 })
 
-export class ParquetStorageService {
-    private readonly basePath = path.join(process.cwd(), 'data', 'lake')
+const LAKE_ROOT = path.resolve(process.cwd(), 'data', 'lake')
 
+function ensureDirectory(targetPath: string) {
+    if (!fs.existsSync(targetPath)) {
+        fs.mkdirSync(targetPath, { recursive: true })
+    }
+
+    return targetPath
+}
+
+export class ParquetStorageService {
     constructor() {
-        if (!fs.existsSync(this.basePath)) {
-            fs.mkdirSync(this.basePath, { recursive: true })
-        }
+        ensureDirectory(LAKE_ROOT)
     }
 
     /**
@@ -41,18 +47,18 @@ export class ParquetStorageService {
         timeframe: Timeframe,
         partitionDate: Date
     ): string {
+        const normalizedAssetClass = assetClass.replace(/[\\/]+/g, '_').toLowerCase()
+        const normalizedSymbol = symbol.replace(/[\\/]+/g, '_').toUpperCase()
         const year = partitionDate.getUTCFullYear().toString()
         const month = String(partitionDate.getUTCMonth() + 1).padStart(2, '0')
         const day = String(partitionDate.getUTCDate()).padStart(2, '0')
+        const instrumentPath = `${normalizedAssetClass}/${normalizedSymbol}/${timeframe}`
+        const partitionPath = `${year}/${month}/${day}`
 
         return path.join(
-            this.basePath,
-            assetClass,
-            symbol.replace('/', '_').toUpperCase(),
-            timeframe,
-            year,
-            month,
-            day,
+            LAKE_ROOT,
+            instrumentPath,
+            partitionPath,
             'bars.parquet'
         )
     }
@@ -65,21 +71,19 @@ export class ParquetStorageService {
         if (bars.length === 0) return
 
         const dir = path.dirname(filePath)
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true })
-        }
+        ensureDirectory(dir)
 
         // Write to a temporary file first to prevent corruption during crash
         const tempPath = `${filePath}.tmp`
 
         try {
-            const writer = await parquet.ParquetWriter.openFile(barSchema, tempPath)
+            const writer = await parquet.ParquetWriter.openFile<ParquetBar>(barSchema, tempPath)
 
             // Sort to ensure sequential layout on disk 
             bars.sort((a, b) => a.time - b.time)
 
             for (const bar of bars) {
-                await writer.appendRow(bar as any) // ParquetJS lite type bridging
+                await writer.appendRow(bar)
             }
 
             await writer.close()
@@ -106,8 +110,8 @@ export class ParquetStorageService {
         const bars: ParquetBar[] = []
         try {
             const reader = await parquet.ParquetReader.openFile(filePath)
-            const cursor = reader.getCursor()
-            let record = null
+            const cursor = reader.getCursor<ParquetBar>()
+            let record: ParquetBar | null = null
 
             while (record = await cursor.next()) {
                 bars.push({

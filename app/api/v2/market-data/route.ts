@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/lib/auth"
-import { parquetStore } from "@/app/services/market-data/parquet-store"
 import { Timeframe } from "@/app/services/market-data/timeframe-math"
 
 /**
@@ -14,6 +13,7 @@ function isValidTimeframe(tf: string): tf is Timeframe {
 
 export async function GET(request: NextRequest) {
     try {
+        const { parquetStore } = await import('@/app/services/market-data/parquet-store')
         const session = await getServerSession(authOptions)
         if (!session) {
             return new NextResponse("Unauthorized", { status: 401 })

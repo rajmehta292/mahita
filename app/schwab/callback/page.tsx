@@ -4,7 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { AlertTriangle, CheckCircle2, Loader2, XCircle } from 'lucide-react'
 import { normalizeUnknownError, parseResponseError } from '@/lib/app-errors'
-import { emitSchwabPopupSignal, hasSchwabPopupFlowMarker } from '@/lib/schwab-popup-channel'
+import { clearSchwabPopupFlow, emitSchwabPopupSignal, hasSchwabPopupFlowMarker } from '@/lib/schwab-popup-channel'
 
 type CallbackStatus = 'processing' | 'success' | 'error'
 
@@ -82,7 +82,7 @@ function SchwabCallbackContent() {
             errorDescription,
         }
     }, [searchParams])
-    const popupFlow = useMemo(() => hasSchwabPopupFlowMarker(), [])
+    const popupFlow = useMemo(() => hasSchwabPopupFlowMarker(callbackResult.state), [callbackResult.state])
 
     const completeAuthorization = useCallback(async () => {
         let active = true
@@ -125,6 +125,7 @@ function SchwabCallbackContent() {
                 status: 'success',
                 message,
             })
+            clearSchwabPopupFlow(callbackResult.state)
             postResultToOpener({ success: true })
 
             if (popupFlow) {

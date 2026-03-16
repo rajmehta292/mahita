@@ -25,7 +25,7 @@ interface ProviderEntry {
 interface FetchOptions {
     forceRefresh?: boolean
     providerOverride?: string
-    providerClient?: any
+    providerClient?: unknown
 }
 
 export class MarketDataStore {
@@ -192,7 +192,7 @@ export class MarketDataStore {
         providerOverride?: string,
         forceRefresh = false,
         vaultName = 'schwab',
-        providerClient?: any
+        providerClient?: unknown
     ): Promise<ChunkIngestionReport> {
         const warnings: string[] = []
         const providers = this.getProviders(providerOverride)
@@ -283,7 +283,7 @@ export class MarketDataStore {
         timeframe: Timeframe,
         startTime: number,
         endTime: number,
-        providerClient?: any
+        providerClient?: unknown
     ): Promise<MarketDataPoint[]> {
         const startedAt = Date.now()
 

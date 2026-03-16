@@ -60,8 +60,8 @@ async function runWorkerDaemon() {
         console.log(`[Worker] Successfully wrote ${writtenBars} bars to the Parquet Data Lake.`)
         console.log(`[Worker] Job Complete! Sleeping...`)
 
-    } catch (e: any) {
-        console.error(`[Worker] Fatal Job Error:`, e)
+    } catch (error: unknown) {
+        console.error(`[Worker] Fatal Job Error:`, error)
     }
 }
 

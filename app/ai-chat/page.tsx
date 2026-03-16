@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { MainLayout } from '@/app/components/Layout/MainLayout'
 import { Send, Terminal, Loader2, Bot, User } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
+import ReactMarkdown, { Components } from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -11,6 +11,33 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 interface Message {
     role: 'user' | 'assistant'
     content: string
+}
+
+const markdownComponents: Components = {
+    code({ className, children }) {
+        const match = /language-(\w+)/.exec(className || '')
+        const inline = !match
+
+        return !inline && match ? (
+            <div className="my-4 overflow-hidden rounded-xl border border-[#2A2E39]">
+                <div className="flex justify-between border-b border-[#2A2E39] bg-[#131722] px-4 py-2 text-xs font-mono text-gray-400">
+                    {match[1]}
+                </div>
+                <SyntaxHighlighter
+                    style={vscDarkPlus}
+                    language={match[1]}
+                    PreTag="div"
+                    customStyle={{ margin: 0, padding: '1rem', background: '#1E222D' }}
+                >
+                    {String(children).replace(/\n$/, '')}
+                </SyntaxHighlighter>
+            </div>
+        ) : (
+            <code className={className}>
+                {children}
+            </code>
+        )
+    },
 }
 
 export default function AIChatPage() {
@@ -130,11 +157,12 @@ export default function AIChatPage() {
                     }
                 }
             }
-        } catch (error: any) {
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Failed to reach Ollama AI backend."
             console.error(error)
             setMessages(prev => [...prev, {
                 role: 'assistant',
-                content: `> **Connection Error:** \n> ${error.message || "Failed to reach Ollama AI backend."}`
+                content: `> **Connection Error:** \n> ${errorMessage}`
             }])
         } finally {
             setIsStreaming(false)
@@ -206,31 +234,7 @@ export default function AIChatPage() {
                                     <div className="prose prose-invert max-w-none text-sm leading-relaxed prose-p:leading-relaxed prose-pre:p-0 prose-pre:bg-transparent prose-a:text-blue-400 prose-code:text-blue-300 prose-code:bg-blue-500/10 prose-code:px-1 prose-code:py-0.5 prose-code:rounded">
                                         <ReactMarkdown
                                             remarkPlugins={[remarkGfm]}
-                                            components={{
-                                                code({ node, inline, className, children, ...props }: any) {
-                                                    const match = /language-(\w+)/.exec(className || '')
-                                                    return !inline && match ? (
-                                                        <div className="my-4 rounded-xl overflow-hidden border border-[#2A2E39]">
-                                                            <div className="bg-[#131722] px-4 py-2 text-xs font-mono text-gray-400 flex justify-between border-b border-[#2A2E39]">
-                                                                {match[1]}
-                                                            </div>
-                                                            <SyntaxHighlighter
-                                                                {...props}
-                                                                style={vscDarkPlus}
-                                                                language={match[1]}
-                                                                PreTag="div"
-                                                                customStyle={{ margin: 0, padding: '1rem', background: '#1E222D' }}
-                                                            >
-                                                                {String(children).replace(/\n$/, '')}
-                                                            </SyntaxHighlighter>
-                                                        </div>
-                                                    ) : (
-                                                        <code {...props} className={className}>
-                                                            {children}
-                                                        </code>
-                                                    )
-                                                }
-                                            }}
+                                            components={markdownComponents}
                                         >
                                             {msg.content}
                                         </ReactMarkdown>

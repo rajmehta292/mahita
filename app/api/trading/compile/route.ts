@@ -39,11 +39,11 @@ export async function POST(req: NextRequest) {
                     ),
                 },
             })
-        } catch (e: any) {
+        } catch (e) {
             return NextResponse.json({
                 success: false,
-                error: e.message || "Compilation failed",
-                details: e.stack
+                error: e instanceof Error ? e.message : "Compilation failed",
+                details: e instanceof Error ? e.stack : undefined
             }, { status: 422 })
         }
     } catch (error) {

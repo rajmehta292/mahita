@@ -15,6 +15,14 @@ export type SchwabPopupSignal =
 const SCHWAB_POPUP_CHANNEL_NAME = 'mahita.schwab.popup'
 const SCHWAB_POPUP_SIGNAL_STORAGE_KEY = 'mahita.schwab.popup.signal'
 const SCHWAB_POPUP_FLOW_STORAGE_KEY = 'mahita.schwab.popup.flow'
+const SCHWAB_POPUP_INTENT_STORAGE_KEY = 'mahita.schwab.popup.intent'
+const SCHWAB_POPUP_INTENT_TTL_MS = 15 * 60 * 1000
+
+type SchwabPopupIntent = {
+  flow: 'popup'
+  state: string | null
+  timestamp: number
+}
 
 type BroadcastChannelLike = {
   close?: () => void
@@ -37,25 +45,101 @@ function createBroadcastChannel(): BroadcastChannelLike | null {
   }
 }
 
-export function markSchwabPopupFlow() {
+function readSchwabPopupIntent() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  try {
+    const raw = window.localStorage.getItem(SCHWAB_POPUP_INTENT_STORAGE_KEY)
+    if (!raw) {
+      return null
+    }
+
+    const payload = JSON.parse(raw) as Partial<SchwabPopupIntent>
+    if (
+      payload?.flow !== 'popup' ||
+      typeof payload.timestamp !== 'number' ||
+      Date.now() - payload.timestamp > SCHWAB_POPUP_INTENT_TTL_MS
+    ) {
+      window.localStorage.removeItem(SCHWAB_POPUP_INTENT_STORAGE_KEY)
+      return null
+    }
+
+    return {
+      flow: 'popup',
+      state: typeof payload.state === 'string' ? payload.state : null,
+      timestamp: payload.timestamp,
+    } satisfies SchwabPopupIntent
+  } catch (error) {
+    console.warn('Failed to read Schwab popup flow intent:', error)
+    return null
+  }
+}
+
+export function markSchwabPopupFlow(state?: string | null) {
   if (typeof window === 'undefined') {
     return
   }
 
   try {
     window.sessionStorage.setItem(SCHWAB_POPUP_FLOW_STORAGE_KEY, 'popup')
+    window.localStorage.setItem(
+      SCHWAB_POPUP_INTENT_STORAGE_KEY,
+      JSON.stringify({
+        flow: 'popup',
+        state: typeof state === 'string' ? state : null,
+        timestamp: Date.now(),
+      } satisfies SchwabPopupIntent)
+    )
   } catch (error) {
     console.warn('Failed to mark Schwab popup flow:', error)
   }
 }
 
-export function hasSchwabPopupFlowMarker() {
+export function clearSchwabPopupFlow(state?: string | null) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  try {
+    window.sessionStorage.removeItem(SCHWAB_POPUP_FLOW_STORAGE_KEY)
+
+    const intent = readSchwabPopupIntent()
+    const shouldClearIntent =
+      !intent ||
+      typeof state !== 'string' ||
+      !intent.state ||
+      intent.state === state
+
+    if (shouldClearIntent) {
+      window.localStorage.removeItem(SCHWAB_POPUP_INTENT_STORAGE_KEY)
+    }
+  } catch (error) {
+    console.warn('Failed to clear Schwab popup flow:', error)
+  }
+}
+
+export function hasSchwabPopupFlowMarker(expectedState?: string | null) {
   if (typeof window === 'undefined') {
     return false
   }
 
   try {
-    return window.sessionStorage.getItem(SCHWAB_POPUP_FLOW_STORAGE_KEY) === 'popup'
+    if (window.sessionStorage.getItem(SCHWAB_POPUP_FLOW_STORAGE_KEY) === 'popup') {
+      return true
+    }
+
+    const intent = readSchwabPopupIntent()
+    if (!intent) {
+      return false
+    }
+
+    if (typeof expectedState === 'string' && expectedState.length > 0) {
+      return intent.state === expectedState
+    }
+
+    return true
   } catch {
     return false
   }

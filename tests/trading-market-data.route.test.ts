@@ -4,10 +4,12 @@ import type { NextRequest } from "next/server"
 const {
   getServerSessionMock,
   getHistoricalDataWithReportMock,
+  getInventoryProvenanceMock,
   listDistinctVaultSourcesMock,
 } = vi.hoisted(() => ({
   getServerSessionMock: vi.fn(),
   getHistoricalDataWithReportMock: vi.fn(),
+  getInventoryProvenanceMock: vi.fn(),
   listDistinctVaultSourcesMock: vi.fn(),
 }))
 
@@ -31,6 +33,7 @@ vi.mock("@/app/services/market-data/read-service", async () => {
   )
   return {
     ...actual,
+    getInventoryProvenance: getInventoryProvenanceMock,
     listDistinctVaultSources: listDistinctVaultSourcesMock,
   }
 })
@@ -59,6 +62,13 @@ describe("/api/trading/market-data", () => {
       },
     })
     listDistinctVaultSourcesMock.mockResolvedValue(["schwab"])
+    getInventoryProvenanceMock.mockResolvedValue({
+      verificationStatus: "single-source-unverified",
+      verificationMethod: null,
+      lastVerifiedAt: null,
+      canonicalInterval: "1m",
+      storageClass: "derived",
+    })
   })
 
   it("returns vault-backed provenance metadata", async () => {

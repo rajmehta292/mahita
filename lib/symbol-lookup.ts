@@ -10,6 +10,21 @@ interface SymbolLookupResult {
     source: 'catalog' | 'watchlist' | 'quote-fallback'
 }
 
+interface YahooQuoteLookupResponse {
+    symbol?: string
+    shortName?: string | null
+    longName?: string | null
+    fullExchangeName?: string | null
+    exchange?: string | null
+    quoteType?: string | null
+}
+
+const YahooFinanceClient = YahooFinance as unknown as {
+    new (options?: { suppressNotices?: string[] }): {
+        quote(symbol: string): Promise<YahooQuoteLookupResponse>
+    }
+}
+
 function scoreResult(query: string, symbol: string, name: string) {
     const normalized = query.trim().toUpperCase()
     const normalizedName = name.toUpperCase()
@@ -70,7 +85,7 @@ export async function lookupSymbols(userId: string, query: string, limit = 12) {
 
     if (!deduped.has(normalized) && /^[A-Z.\-]{1,10}$/.test(normalized)) {
         try {
-            const yahoo = new (YahooFinance as any)()
+            const yahoo = new YahooFinanceClient({ suppressNotices: ['yahooSurvey'] })
             const quote = await yahoo.quote(normalized)
             if (quote?.symbol || quote?.shortName || quote?.longName) {
                 const fallback: SymbolLookupResult = {

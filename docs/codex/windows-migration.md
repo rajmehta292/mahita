@@ -22,7 +22,7 @@ This project can move to Windows cleanly, but the safest target is Windows with 
 
 Codex-specific local state on the current Mac:
 
-- Codex home: `/Users/rmehta01/.codex`
+- Codex home: `$CODEX_HOME`
 
 If you want to preserve local Codex skills, automations, and other app-local state, copy that directory separately in addition to the repo.
 
@@ -98,8 +98,8 @@ These are the main portability gaps still present:
   - `validate:provider-matrix`
   - `check:platform-consistency`
 - local filesystem assumptions in some market-data services
-  - [app/services/market-data/vault-manager.ts](/Users/rmehta01/Sites/mahita/app/services/market-data/vault-manager.ts)
-  - [app/services/market-data/parquet-store.ts](/Users/rmehta01/Sites/mahita/app/services/market-data/parquet-store.ts)
+  - [app/services/market-data/vault-manager.ts](../../app/services/market-data/vault-manager.ts)
+  - [app/services/market-data/parquet-store.ts](../../app/services/market-data/parquet-store.ts)
 
 Practical recommendation:
 
@@ -111,9 +111,9 @@ Practical recommendation:
 
 Portable context for this project now lives in:
 
-- [docs/codex/README.md](/Users/rmehta01/Sites/mahita/docs/codex/README.md)
-- [docs/codex/session-handoff-2026-03-14.md](/Users/rmehta01/Sites/mahita/docs/codex/session-handoff-2026-03-14.md)
-- [docs/internal/generated/mahacharts-handoff.md](/Users/rmehta01/Sites/mahita/docs/internal/generated/mahacharts-handoff.md)
-- [docs/internal/generated/mahacharts-audit-summary.md](/Users/rmehta01/Sites/mahita/docs/internal/generated/mahacharts-audit-summary.md)
+- [docs/codex/README.md](README.md)
+- [docs/codex/session-handoff-2026-03-14.md](session-handoff-2026-03-14.md)
+- [docs/internal/generated/mahacharts-handoff.md](../internal/generated/mahacharts-handoff.md)
+- [docs/internal/generated/mahacharts-audit-summary.md](../internal/generated/mahacharts-audit-summary.md)
 
 That is the material to trust when you resume on Windows, not the local app transcript alone.

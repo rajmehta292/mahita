@@ -1,6 +1,6 @@
 # 02 - Authentication and Security Blueprint
 
-Status: Historical blueprint. Superseded in practice by [docs/current_state_baseline.md](/Users/rmehta01/Sites/mahita/docs/current_state_baseline.md), [docs/execution/mahita_recovery_program.md](/Users/rmehta01/Sites/mahita/docs/execution/mahita_recovery_program.md), and [docs/security/enterprise_security_program.md](/Users/rmehta01/Sites/mahita/docs/security/enterprise_security_program.md).
+Status: Historical blueprint. Superseded in practice by [docs/current_state_baseline.md](../current_state_baseline.md), [docs/execution/mahita_recovery_program.md](../execution/mahita_recovery_program.md), and [docs/security/enterprise_security_program.md](../security/enterprise_security_program.md).
 
 ## Executive Summary
 This document details the critical security implementations for safeguarding brokerage access and the application backend since it operates via a public DNS address.

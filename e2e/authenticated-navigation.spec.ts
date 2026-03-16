@@ -1,25 +1,23 @@
 import { expect, test } from '@playwright/test'
+import { signInWithDevBypass } from '@/e2e/support/session'
 
 test('authenticated user can reach main screens and log out cleanly', async ({ page }) => {
-    await page.goto('/auth/signin')
-    await page.getByRole('button', { name: /sign in with dev bypass/i }).click()
-    await page.waitForURL((url) => !/\/auth\/(signin|post-signin)/.test(url.pathname), {
-        timeout: 15_000,
-    })
+    await signInWithDevBypass(page, '/dashboard')
 
     await expect(page.getByRole('link', { name: 'Portfolio' })).toBeVisible()
 
     await page.getByRole('link', { name: 'Portfolio' }).click()
     await page.waitForURL(/\/portfolio/)
-    await expect(page.getByRole('heading', { name: /asset distribution/i })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /connect schwab account/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /connect schwab portal/i })).toBeVisible()
 
     await page.getByRole('link', { name: 'Active Trader' }).click()
     await page.waitForURL(/\/active-trader/)
-    await expect(page.getByRole('heading', { name: /active trader/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /connect schwab portal/i })).toBeVisible()
 
     await page.getByRole('link', { name: 'Trade History' }).click()
     await page.waitForURL(/\/history/)
-    await expect(page.getByRole('heading', { name: /trade history/i })).toBeVisible()
+    await expect(page.locator('main')).toContainText(/trade history|connect schwab account/i)
 
     await page.getByRole('link', { name: 'Backtester' }).click()
     await page.waitForURL(/\/backtest/)

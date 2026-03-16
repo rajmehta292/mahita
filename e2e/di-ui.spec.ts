@@ -1,14 +1,9 @@
 import { expect, test } from '@playwright/test'
-
-async function signInWithDevBypass(page: import('@playwright/test').Page) {
-  await page.goto('/auth/signin')
-  await page.getByRole('button', { name: /sign in with dev bypass/i }).click()
-  await page.waitForURL((url) => !/\/auth\/(signin|post-signin)/.test(url.pathname), {
-    timeout: 15_000,
-  })
-}
+import { installDiUiFixtures } from '@/e2e/support/runtime-fixtures'
+import { signInWithDevBypass } from '@/e2e/support/session'
 
 test('superuser can use DI-UI sections and start the stage 2 scheduler', async ({ page }) => {
+  await installDiUiFixtures(page.context())
   await signInWithDevBypass(page)
 
   await page.goto('/admin?tab=di-ui')
@@ -33,8 +28,10 @@ test('superuser can use DI-UI sections and start the stage 2 scheduler', async (
   await expect(page.getByRole('heading', { name: /live scheduler policy/i })).toBeVisible({ timeout: 20_000 })
 
   await page.getByRole('button', { name: /^Start$/i }).click()
-  await expect(page.getByText(/running cycle|sleeping \d+s before next cycle/i)).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText(/^Running$/i)).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByText(/running cycle/i)).toBeVisible({ timeout: 20_000 })
 
   await page.getByRole('button', { name: /^Stop$/i }).click()
+  await expect(page.getByText(/^Stopped$/i)).toBeVisible({ timeout: 20_000 })
   await expect(page.getByText(/^idle$/i)).toBeVisible({ timeout: 20_000 })
 })

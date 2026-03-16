@@ -1,12 +1,5 @@
 import { expect, test } from '@playwright/test'
-
-async function signInWithDevBypass(page: import('@playwright/test').Page) {
-    await page.goto('/auth/signin')
-    await page.getByRole('button', { name: /sign in with dev bypass/i }).click()
-    await page.waitForURL((url) => !/\/auth\/(signin|post-signin)/.test(url.pathname), {
-        timeout: 15_000,
-    })
-}
+import { signInWithDevBypass } from '@/e2e/support/session'
 
 test('signed-in user can save Schwab credentials and a superuser can load admin tabs', async ({ page }) => {
     await signInWithDevBypass(page)

@@ -3,6 +3,7 @@ import { marketDataStore } from "./store"
 import { vaultManager } from "./vault-manager"
 import { DataHealthManager } from "./health"
 import { getRuntimeSchwabClientWithOptions } from "@/app/services/schwab/runtime"
+import { Timeframe } from "./types"
 
 const DEFAULT_POLICY = {
   sameSourcePriceToleranceBps: 5,
@@ -270,6 +271,7 @@ export async function runVerificationJobNow(verificationJobId: string) {
 
   try {
     const availability = await getVerificationProviderAvailability()
+    const timeframe = job.timeframe as Timeframe
     const windowBars = getVerificationWindowBars(job.timeframe)
     const intervalSeconds = timeframeSeconds(job.timeframe)
     let primaryProvider = job.sourceProvider || "schwab"
@@ -301,17 +303,17 @@ export async function runVerificationJobNow(verificationJobId: string) {
     }
 
     const sourceVaultName = getVaultNameForProvider(primaryProvider)
-    const health = await DataHealthManager.getHealth(job.symbol, job.timeframe as any, sourceVaultName)
+    const health = await DataHealthManager.getHealth(job.symbol, timeframe, sourceVaultName)
     const rangeEnd = health.endIndex ? Math.floor(health.endIndex.getTime() / 1000) : Math.floor(Date.now() / 1000)
     const rangeStart = Math.max(0, rangeEnd - windowBars * intervalSeconds)
     const storedBars = await getStoredBars(job.symbol, job.timeframe, rangeStart, rangeEnd, sourceVaultName)
     const policy = await getVerificationPolicy(job.profileId, job.timeframe)
 
-    const primaryFetched = await marketDataStore.fetchProviderBars(primaryProvider, job.symbol, job.timeframe as any, rangeStart, rangeEnd)
+    const primaryFetched = await marketDataStore.fetchProviderBars(primaryProvider, job.symbol, timeframe, rangeStart, rangeEnd)
     const secondaryFetched = actualMode === "SAME_SOURCE"
       ? primaryFetched
       : comparisonProvider
-        ? await marketDataStore.fetchProviderBars(comparisonProvider, job.symbol, job.timeframe as any, rangeStart, rangeEnd)
+        ? await marketDataStore.fetchProviderBars(comparisonProvider, job.symbol, timeframe, rangeStart, rangeEnd)
         : []
 
     const storedMap = new Map(storedBars.map((bar) => [bar.time, bar]))

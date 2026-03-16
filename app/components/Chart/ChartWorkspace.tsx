@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useSession } from 'next-auth/react'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
@@ -27,29 +27,22 @@ interface ChartMarketDataResponse {
     }
 }
 
+const TIMEFRAME_ORDER = ['1m', '3m', '5m', '10m', '15m', '30m', '45m', '1h', '2h', '3h', '4h', '1d', '1w', '1M']
+
 export function ChartWorkspace() {
     const { data: session, status } = useSession()
     const router = useRouter()
     const pathname = usePathname()
     const searchParams = useSearchParams()
     const { preferences } = useUserPreferences()
-    const routeSymbol = searchParams.get('symbol')?.trim().toUpperCase() || 'AAPL'
-    const routeTimeframe = searchParams.get('timeframe')?.trim() || '1d'
+    const selectedSymbol = searchParams.get('symbol')?.trim().toUpperCase() || 'AAPL'
+    const selectedTimeframe = searchParams.get('timeframe')?.trim() || '1d'
     const [data, setData] = useState<MarketDataPoint[]>([])
     const [catalog, setCatalog] = useState<Array<{ symbol: string; timeframes: string[] }>>([])
     const [dataMessage, setDataMessage] = useState('Loading market data...')
-    const [selectedSymbol, setSelectedSymbol] = useState(routeSymbol)
-    const [selectedTimeframe, setSelectedTimeframe] = useState(routeTimeframe)
     const requestIdRef = useRef(0)
     const chartType: 'Standard' | 'HeikinAshi' = 'Standard'
     const activeIndicators = ['Volume']
-
-    useEffect(() => {
-        setSelectedSymbol(routeSymbol)
-        setSelectedTimeframe(routeTimeframe)
-        setData([])
-        setDataMessage('Loading market data...')
-    }, [routeSymbol, routeTimeframe])
 
     useViewDemand({
         enabled: status === 'authenticated' && !!selectedSymbol,
@@ -78,17 +71,39 @@ export function ChartWorkspace() {
         }
     }, [])
 
+    const replaceRoute = useCallback((nextSymbol: string, nextTimeframe: string) => {
+        const params = new URLSearchParams(searchParams.toString())
+        params.set('symbol', nextSymbol)
+        params.set('timeframe', nextTimeframe)
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    }, [pathname, router, searchParams])
+
+    const updateRoute = useCallback((nextSymbol: string, nextTimeframe: string) => {
+        setData([])
+        setDataMessage('Loading market data...')
+        replaceRoute(nextSymbol, nextTimeframe)
+    }, [replaceRoute])
+
     useEffect(() => {
-        if (status !== 'authenticated') return
+        if (status !== 'authenticated') {
+            return
+        }
+
         const fetchInventory = async () => {
             const json = await safeFetchJson<ChartCatalogResponse>('/api/platform/chart-catalog')
-            if (json?.catalog) setCatalog(json.catalog)
+            if (json?.catalog) {
+                setCatalog(json.catalog)
+            }
         }
+
         void fetchInventory()
     }, [status, safeFetchJson])
 
     useEffect(() => {
-        if (status !== 'authenticated' || !selectedSymbol) return
+        if (status !== 'authenticated' || !selectedSymbol) {
+            return
+        }
+
         const requestId = ++requestIdRef.current
         const controller = new AbortController()
 
@@ -96,7 +111,7 @@ export function ChartWorkspace() {
             setDataMessage('Loading market data...')
             const json = await safeFetchJson<ChartMarketDataResponse>(
                 `/api/trading/market-data?symbol=${selectedSymbol}&timeframe=${selectedTimeframe}`,
-                { signal: controller.signal }
+                { signal: controller.signal },
             )
 
             if (controller.signal.aborted || requestId !== requestIdRef.current) {
@@ -114,10 +129,12 @@ export function ChartWorkspace() {
                 } else {
                     setDataMessage('')
                 }
-            } else {
-                setData([])
-                setDataMessage('Provider fetch failed or returned a non-JSON response.')
+
+                return
             }
+
+            setData([])
+            setDataMessage('Provider fetch failed or returned a non-JSON response.')
         }
 
         void fetchMarketData()
@@ -125,46 +142,28 @@ export function ChartWorkspace() {
         return () => {
             controller.abort()
         }
-    }, [selectedSymbol, selectedTimeframe, status, safeFetchJson])
+    }, [safeFetchJson, selectedSymbol, selectedTimeframe, status])
 
-    useEffect(() => {
-        if (routeSymbol === selectedSymbol && routeTimeframe === selectedTimeframe) {
-            return
-        }
+    const availableSymbols = useMemo(() => {
+        return Array.from(new Set([selectedSymbol, ...catalog.map((item) => item.symbol)])).sort()
+    }, [catalog, selectedSymbol])
 
-        const params = new URLSearchParams(searchParams.toString())
-        params.set('symbol', selectedSymbol)
-        params.set('timeframe', selectedTimeframe)
-        router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-    }, [
-        pathname,
-        routeSymbol,
-        routeTimeframe,
-        router,
-        searchParams,
-        selectedSymbol,
-        selectedTimeframe,
-    ])
-
-    const availableSymbols = Array.from(
-        new Set([selectedSymbol, ...catalog.map((item) => item.symbol)])
-    ).sort()
-
-    const availableTimeframes = [...(catalog.find((item) => item.symbol === selectedSymbol)?.timeframes ?? [])].sort((left, right) => {
-        const order = ['1m', '3m', '5m', '10m', '15m', '30m', '45m', '1h', '2h', '3h', '4h', '1d', '1w', '1M']
-        return order.indexOf(left) - order.indexOf(right)
-    })
+    const availableTimeframes = useMemo(() => {
+        return [...(catalog.find((item) => item.symbol === selectedSymbol)?.timeframes ?? [])].sort((left, right) => {
+            return TIMEFRAME_ORDER.indexOf(left) - TIMEFRAME_ORDER.indexOf(right)
+        })
+    }, [catalog, selectedSymbol])
 
     useEffect(() => {
         if (availableTimeframes.length > 0 && !availableTimeframes.includes(selectedTimeframe)) {
-            setSelectedTimeframe(availableTimeframes[0])
+            replaceRoute(selectedSymbol, availableTimeframes[0])
         }
-    }, [availableTimeframes, selectedTimeframe])
+    }, [availableTimeframes, replaceRoute, selectedSymbol, selectedTimeframe])
 
     if (status === 'loading') {
         return (
             <MainLayout showBottomPanel={false}>
-                <div className="flex items-center justify-center h-full">
+                <div className="flex h-full items-center justify-center">
                     <div className="text-white">Loading...</div>
                 </div>
             </MainLayout>
@@ -174,8 +173,8 @@ export function ChartWorkspace() {
     if (!session) {
         return (
             <MainLayout showBottomPanel={false}>
-                <div className="flex items-center justify-center h-full">
-                    <AuthEntryCta className="bg-blue-500 hover:bg-blue-600 text-white" />
+                <div className="flex h-full items-center justify-center">
+                    <AuthEntryCta className="bg-blue-500 text-white hover:bg-blue-600" />
                 </div>
             </MainLayout>
         )
@@ -183,7 +182,8 @@ export function ChartWorkspace() {
 
     const latestPoint = data.length > 0 ? data[data.length - 1] : null
     const change = data.length > 1 ? data[data.length - 1].close - data[data.length - 2].close : 0
-    const changePercent = data.length > 1 ? ((data[data.length - 1].close - data[data.length - 2].close) / data[data.length - 2].close) * 100 : 0
+    const previousClose = data.length > 1 ? data[data.length - 2].close : 0
+    const changePercent = previousClose > 0 ? (change / previousClose) * 100 : 0
     const statusTone = data.length > 0 ? 'text-emerald-300' : 'text-amber-300'
     const statusLabel = data.length > 0 ? `${data.length} bars loaded` : dataMessage || 'No cached bars loaded'
     const classicChartHref = `/superchart?symbol=${encodeURIComponent(selectedSymbol)}&timeframe=${encodeURIComponent(selectedTimeframe)}`
@@ -193,7 +193,7 @@ export function ChartWorkspace() {
 
     return (
         <MainLayout showBottomPanel={false}>
-            <div className="flex flex-col h-full bg-[#131722] overflow-hidden">
+            <div className="flex h-full flex-col overflow-hidden bg-[#131722]">
                 <div className="flex-shrink-0">
                     <SymbolHeader
                         symbol={selectedSymbol}
@@ -203,8 +203,8 @@ export function ChartWorkspace() {
                         changePercent={changePercent}
                         availableSymbols={availableSymbols}
                         availableTimeframes={availableTimeframes.length > 0 ? availableTimeframes : undefined}
-                        onSymbolChange={setSelectedSymbol}
-                        onTimeframeChange={setSelectedTimeframe}
+                        onSymbolChange={(nextSymbol) => updateRoute(nextSymbol, selectedTimeframe)}
+                        onTimeframeChange={(nextTimeframe) => updateRoute(selectedSymbol, nextTimeframe)}
                     />
                     <div className="border-b border-[#2A2E39] bg-[#161B26] px-4 py-3">
                         <div className="flex flex-wrap items-center gap-3">
@@ -258,7 +258,7 @@ export function ChartWorkspace() {
                     </div>
                 </div>
                 <div className="flex flex-1 overflow-hidden bg-[#131722]">
-                    <div className="flex flex-1 flex-col min-h-0">
+                    <div className="flex min-h-0 flex-1 flex-col">
                         <div className="grid gap-4 border-b border-[#2A2E39] bg-[#131722] px-4 py-4 lg:grid-cols-[minmax(0,1fr)_320px]">
                             <div className="grid gap-3 sm:grid-cols-3">
                                 <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
@@ -282,7 +282,7 @@ export function ChartWorkspace() {
                                 </div>
                                 <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3">
                                     <div className="text-[11px] uppercase tracking-[0.2em] text-slate-500">Route State</div>
-                                    <div className="mt-2 text-sm font-semibold text-white">{selectedSymbol} • {selectedTimeframe}</div>
+                                    <div className="mt-2 text-sm font-semibold text-white">{selectedSymbol} - {selectedTimeframe}</div>
                                     <div className="mt-1 text-sm text-slate-400">URL-driven state stays in sync with the focused chart.</div>
                                 </div>
                             </div>
@@ -305,7 +305,7 @@ export function ChartWorkspace() {
                             </div>
                         </div>
                         {data.length > 0 ? (
-                            <div className="flex-1 min-h-0">
+                            <div className="min-h-0 flex-1">
                                 <Chart
                                     key={`${selectedSymbol}:${selectedTimeframe}`}
                                     data={data}

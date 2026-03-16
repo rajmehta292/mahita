@@ -1,7 +1,26 @@
 import prisma from '../lib/prisma'
 import YahooFinance from 'yahoo-finance2'
 
-const yahooFinance = new YahooFinance()
+interface YahooHistoricalRow {
+    date: Date
+    open?: number | null
+    high?: number | null
+    low?: number | null
+    close?: number | null
+    volume?: number | null
+}
+
+const YahooFinanceClient = YahooFinance as unknown as {
+    new (options?: { suppressNotices?: string[] }): {
+        historical(symbol: string, options: {
+            period1: string
+            period2: string
+            interval: '1d'
+        }): Promise<YahooHistoricalRow[]>
+    }
+}
+
+const yahooFinance = new YahooFinanceClient({ suppressNotices: ['yahooSurvey'] })
 
 const DOW_30 = [
     'AAPL', 'AMGN', 'AXP', 'BA', 'CAT', 'CRM', 'CVX', 'DIS', 'DOW', 'GS',
@@ -16,7 +35,7 @@ async function seedSymbol(symbol: string) {
         const queryOptions = {
             period1: '2020-01-01',
             period2: today.toISOString().split('T')[0],
-            interval: '1d' as any
+            interval: '1d' as const
         };
         const results = await yahooFinance.historical(symbol, queryOptions);
 
@@ -26,10 +45,10 @@ async function seedSymbol(symbol: string) {
             symbol,
             timeframe: '1d',
             time: new Date(row.date),
-            open: row.open,
-            high: row.high,
-            low: row.low,
-            close: row.close,
+            open: Number(row.open ?? 0),
+            high: Number(row.high ?? 0),
+            low: Number(row.low ?? 0),
+            close: Number(row.close ?? 0),
             volume: row.volume || 0,
         }))
 

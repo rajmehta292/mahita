@@ -45,7 +45,10 @@ describe('SchwabGating', () => {
             if (url === '/api/schwab/auth?action=authorize') {
                 return {
                     ok: true,
-                    json: async () => ({ authUrl: 'https://auth.schwab.test' }),
+                    json: async () => ({
+                        authUrl: 'https://auth.schwab.test?state=pending-state-123',
+                        state: 'pending-state-123',
+                    }),
                 }
             }
 
@@ -81,6 +84,7 @@ describe('SchwabGating', () => {
         await waitFor(() =>
             expect(screen.getByRole('button', { name: /waiting for schwab authorization/i })).toBeDisabled()
         )
+        expect(window.localStorage.getItem('mahita.schwab.popup.intent')).toContain('pending-state-123')
 
         await act(async () => {
             window.dispatchEvent(new MessageEvent('message', {

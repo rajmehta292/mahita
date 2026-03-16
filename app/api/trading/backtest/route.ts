@@ -84,8 +84,10 @@ export async function POST(req: Request) {
         }
 
         return NextResponse.json(results)
-    } catch (error: any) {
+    } catch (error) {
         console.error('Backtest error:', error)
-        return NextResponse.json({ error: error?.message || 'Internal Server Error' }, { status: 500 })
+        return NextResponse.json({
+            error: error instanceof Error ? error.message : 'Internal Server Error',
+        }, { status: 500 })
     }
 }

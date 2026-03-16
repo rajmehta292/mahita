@@ -275,7 +275,7 @@ export class DataHealthManager {
         timeframe: Timeframe,
         providerOverride?: string,
         vaultName = 'schwab',
-        providerClient?: any
+        providerClient?: unknown
     ): Promise<{ gapsFixed: number, barsAdded: number }> {
         const report = await this.getHealth(symbol, timeframe, vaultName)
         let gapsFixed = 0

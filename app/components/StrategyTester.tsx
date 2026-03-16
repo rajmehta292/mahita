@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react'
-import { createChart, ColorType, LineSeries } from 'lightweight-charts'
-import { BacktestResult, CompletedTrade } from '@/app/services/trading-engine/types'
+import { createChart, ColorType, LineSeries, Time } from 'lightweight-charts'
+import { BacktestResult } from '@/app/services/trading-engine/types'
 import { clsx } from 'clsx'
 
 interface StrategyTesterProps {
@@ -9,7 +9,7 @@ interface StrategyTesterProps {
 
 export default function StrategyTester({ results }: StrategyTesterProps) {
     const chartContainerRef = useRef<HTMLDivElement>(null)
-    const chartRef = useRef<any>(null)
+    const chartRef = useRef<ReturnType<typeof createChart> | null>(null)
 
     useEffect(() => {
         if (!chartContainerRef.current || !results?.equityCurve) return
@@ -41,7 +41,12 @@ export default function StrategyTester({ results }: StrategyTesterProps) {
             lineWidth: 2,
         })
 
-        lineSeries.setData(results.equityCurve as any)
+        lineSeries.setData(
+            results.equityCurve.map((point) => ({
+                time: point.time as Time,
+                value: point.value,
+            })),
+        )
         chart.timeScale().fitContent()
         chartRef.current = chart
 
@@ -167,12 +172,24 @@ export default function StrategyTester({ results }: StrategyTesterProps) {
     )
 }
 
-function MetricCard({ label, value, subValue, accent }: any) {
-    const colors: any = {
+type MetricAccent = 'blue' | 'emerald' | 'orange' | 'rose'
+
+function MetricCard({
+    label,
+    value,
+    subValue,
+    accent,
+}: {
+    label: string
+    value: string
+    subValue: string
+    accent: MetricAccent
+}) {
+    const colors: Record<MetricAccent, string> = {
         blue: 'text-blue-500',
         emerald: 'text-emerald-500',
         orange: 'text-orange-500',
-        rose: 'text-rose-500'
+        rose: 'text-rose-500',
     }
 
     return (

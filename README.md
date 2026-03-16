@@ -74,22 +74,22 @@ A professional-grade algorithmic trading platform inspired by TradingView, built
 
 If you need to understand the project quickly, start here:
 
-- Project current state: [docs/current_state_baseline.md](/Users/rmehta01/Sites/mahita/docs/current_state_baseline.md)
-- MahaCharts AI start-here guide: [docs/internal/guidebook/mahacharts/README.md](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/mahacharts/README.md)
-- MahaCharts generated handoff: [docs/internal/generated/mahacharts-handoff.md](/Users/rmehta01/Sites/mahita/docs/internal/generated/mahacharts-handoff.md)
-- Codex handoff folder: [docs/codex/README.md](/Users/rmehta01/Sites/mahita/docs/codex/README.md)
-- Windows migration checklist: [docs/codex/windows-migration.md](/Users/rmehta01/Sites/mahita/docs/codex/windows-migration.md)
-- Website-visible documentation portal: [docs/public/project-overview/how-to-use-this-documentation.md](/Users/rmehta01/Sites/mahita/docs/public/project-overview/how-to-use-this-documentation.md)
-- Senior project report draft: [docs/public/senior-project/report-draft.md](/Users/rmehta01/Sites/mahita/docs/public/senior-project/report-draft.md)
-- Presentation outline: [docs/public/senior-project/presentation-outline.md](/Users/rmehta01/Sites/mahita/docs/public/senior-project/presentation-outline.md)
-- Fast reviewer guide: [docs/public/project-overview/presentation-for-reviewers.md](/Users/rmehta01/Sites/mahita/docs/public/project-overview/presentation-for-reviewers.md)
-- Architecture/codebase map: [docs/internal/guidebook/architecture-map.md](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/architecture-map.md)
-- Auth guidebook: [docs/guidebook/auth/README.md](/Users/rmehta01/Sites/mahita/docs/guidebook/auth/README.md)
-- Platform data summary: [docs/public/project-overview/platform-data-summary.md](/Users/rmehta01/Sites/mahita/docs/public/project-overview/platform-data-summary.md)
-- Platform data audit: [docs/internal/guidebook/platform-data-architecture-audit.md](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/platform-data-architecture-audit.md)
-- Local/demo bootstrap: [docs/internal/runbooks/local-bootstrap.md](/Users/rmehta01/Sites/mahita/docs/internal/runbooks/local-bootstrap.md)
-- Presentation-day recovery: [docs/internal/runbooks/presentation-day-recovery.md](/Users/rmehta01/Sites/mahita/docs/internal/runbooks/presentation-day-recovery.md)
-- Post-presentation engineering roadmap: [docs/public/project-overview/post-presentation-recovery-roadmap.md](/Users/rmehta01/Sites/mahita/docs/public/project-overview/post-presentation-recovery-roadmap.md)
+- Project current state: [docs/current_state_baseline.md](docs/current_state_baseline.md)
+- MahaCharts AI start-here guide: [docs/internal/guidebook/mahacharts/README.md](docs/internal/guidebook/mahacharts/README.md)
+- MahaCharts generated handoff: [docs/internal/generated/mahacharts-handoff.md](docs/internal/generated/mahacharts-handoff.md)
+- Codex handoff folder: [docs/codex/README.md](docs/codex/README.md)
+- Windows migration checklist: [docs/codex/windows-migration.md](docs/codex/windows-migration.md)
+- Website-visible documentation portal: [docs/public/project-overview/how-to-use-this-documentation.md](docs/public/project-overview/how-to-use-this-documentation.md)
+- Senior project report draft: [docs/public/senior-project/report-draft.md](docs/public/senior-project/report-draft.md)
+- Presentation outline: [docs/public/senior-project/presentation-outline.md](docs/public/senior-project/presentation-outline.md)
+- Fast reviewer guide: [docs/public/project-overview/presentation-for-reviewers.md](docs/public/project-overview/presentation-for-reviewers.md)
+- Architecture/codebase map: [docs/internal/guidebook/architecture-map.md](docs/internal/guidebook/architecture-map.md)
+- Auth guidebook: [docs/guidebook/auth/README.md](docs/guidebook/auth/README.md)
+- Platform data summary: [docs/public/project-overview/platform-data-summary.md](docs/public/project-overview/platform-data-summary.md)
+- Platform data audit: [docs/internal/guidebook/platform-data-architecture-audit.md](docs/internal/guidebook/platform-data-architecture-audit.md)
+- Local/demo bootstrap: [docs/internal/runbooks/local-bootstrap.md](docs/internal/runbooks/local-bootstrap.md)
+- Presentation-day recovery: [docs/internal/runbooks/presentation-day-recovery.md](docs/internal/runbooks/presentation-day-recovery.md)
+- Post-presentation engineering roadmap: [docs/public/project-overview/post-presentation-recovery-roadmap.md](docs/public/project-overview/post-presentation-recovery-roadmap.md)
 
 ## 📁 Repository Layout
 
@@ -167,7 +167,7 @@ To keep the project understandable and portable:
   - provider traffic logs
   - transient test output
   - local scratch files in `tmp/`
-- historical notes and reference captures live under [docs/internal/evidence/archive](/Users/rmehta01/Sites/mahita/docs/internal/evidence/archive/README.md)
+- historical notes and reference captures live under [docs/internal/evidence/archive](docs/internal/evidence/archive/README.md)
 - ad hoc diagnostics scripts live under `scripts/diagnostics/`
 
 If you add a new research note, one-off diagnostic, or external reference capture, put it in one of those folders instead of the repo root.

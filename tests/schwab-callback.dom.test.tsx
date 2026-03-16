@@ -14,6 +14,7 @@ describe('SchwabCallbackPage', () => {
         searchParams.delete('state')
         searchParams.delete('error')
         searchParams.delete('error_description')
+        window.localStorage.clear()
         window.sessionStorage.clear()
     })
 
@@ -178,9 +179,84 @@ describe('SchwabCallbackPage', () => {
         await waitFor(() => expect(close).toHaveBeenCalled(), { timeout: 1_500 })
     })
 
+    it('closes popup-intended success when the opener pre-marked the flow in shared storage', async () => {
+        searchParams.set('code', 'popup-auth-code')
+        searchParams.set('state', 'popup-state-456')
+        window.localStorage.setItem('mahita.schwab.popup.intent', JSON.stringify({
+            flow: 'popup',
+            state: 'popup-state-456',
+            timestamp: Date.now(),
+        }))
+
+        const close = vi.fn()
+
+        vi.stubGlobal('fetch', vi.fn(async () => ({
+            ok: true,
+            clone() {
+                return this
+            },
+            json: async () => ({ success: true }),
+        })))
+
+        Object.defineProperty(window, 'opener', {
+            value: null,
+            configurable: true,
+        })
+        Object.defineProperty(window, 'close', {
+            value: close,
+            configurable: true,
+        })
+
+        render(<SchwabCallbackPage />)
+
+        await waitFor(() =>
+            expect(screen.getByRole('heading', { name: /authorization complete/i })).toBeInTheDocument()
+        )
+
+        await waitFor(() => expect(close).toHaveBeenCalled(), { timeout: 1_500 })
+    })
+
     it('does not try to close the window when the callback owns the full window', async () => {
         searchParams.set('code', 'full-window-auth-code')
         searchParams.set('state', 'full-window-state-123')
+
+        const close = vi.fn()
+
+        vi.stubGlobal('fetch', vi.fn(async () => ({
+            ok: true,
+            clone() {
+                return this
+            },
+            json: async () => ({ success: true }),
+        })))
+
+        Object.defineProperty(window, 'opener', {
+            value: null,
+            configurable: true,
+        })
+        Object.defineProperty(window, 'close', {
+            value: close,
+            configurable: true,
+        })
+
+        render(<SchwabCallbackPage />)
+
+        await waitFor(() =>
+            expect(screen.getByRole('heading', { name: /authorization complete/i })).toBeInTheDocument()
+        )
+
+        await new Promise((resolve) => window.setTimeout(resolve, 600))
+        expect(close).not.toHaveBeenCalled()
+    })
+
+    it('ignores stale popup intent from a different authorization state', async () => {
+        searchParams.set('code', 'full-window-auth-code')
+        searchParams.set('state', 'full-window-state-999')
+        window.localStorage.setItem('mahita.schwab.popup.intent', JSON.stringify({
+            flow: 'popup',
+            state: 'different-state-123',
+            timestamp: Date.now(),
+        }))
 
         const close = vi.fn()
 

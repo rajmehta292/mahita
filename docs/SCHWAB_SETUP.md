@@ -1,6 +1,6 @@
 # Schwab API Setup Guide
 
-Status: Active operational setup guide. For the canonical auth/brokerage architecture and callback rules, see [docs/guidebook/auth/README.md](/Users/rmehta01/Sites/mahita/docs/guidebook/auth/README.md) and [docs/onboarding/schwab_setup_faq.md](/Users/rmehta01/Sites/mahita/docs/onboarding/schwab_setup_faq.md).
+Status: Active operational setup guide. For the canonical auth/brokerage architecture and callback rules, see [docs/guidebook/auth/README.md](guidebook/auth/README.md) and [docs/onboarding/schwab_setup_faq.md](onboarding/schwab_setup_faq.md).
 
 ## Quick Start
 

@@ -37,43 +37,41 @@
   ],
   "references": [
     {
-      "path": "docs/internal/evidence/archive/tradingview-research"
+      "path": "docs/internal/evidence/archive/tradingview-research",
+      "exists": true
     },
     {
-      "path": "fixtures/tradingview"
-    },
-    {
-      "path": "/Users/rmehta01/Sites/backtester/app",
+      "path": "fixtures/tradingview",
       "exists": true
     }
   ],
   "code": {
     "components": [
-      "/Users/rmehta01/Sites/mahita/app/components/SuperChart/SuperChartWorkspace.tsx",
-      "/Users/rmehta01/Sites/mahita/app/components/Chart.tsx",
-      "/Users/rmehta01/Sites/mahita/app/components/Backtest/MahitaCodeEditor.tsx"
+      "app/components/SuperChart/SuperChartWorkspace.tsx",
+      "app/components/Chart.tsx",
+      "app/components/Backtest/MahitaCodeEditor.tsx"
     ],
     "libraries": [
-      "/Users/rmehta01/Sites/mahita/lib/indicator-catalog.ts",
-      "/Users/rmehta01/Sites/mahita/lib/strategy-library.ts",
-      "/Users/rmehta01/Sites/mahita/lib/strategy-deployments.ts",
-      "/Users/rmehta01/Sites/mahita/lib/script-drafts.ts",
-      "/Users/rmehta01/Sites/mahita/lib/user-preferences.ts",
-      "/Users/rmehta01/Sites/mahita/lib/docs.ts"
+      "lib/indicator-catalog.ts",
+      "lib/strategy-library.ts",
+      "lib/strategy-deployments.ts",
+      "lib/script-drafts.ts",
+      "lib/user-preferences.ts",
+      "lib/docs.ts"
     ],
     "apiRoutes": [
-      "/Users/rmehta01/Sites/mahita/app/api/indicators/catalog/route.ts",
-      "/Users/rmehta01/Sites/mahita/app/api/strategies/route.ts",
-      "/Users/rmehta01/Sites/mahita/app/api/strategies/[id]/route.ts",
-      "/Users/rmehta01/Sites/mahita/app/api/strategies/[id]/versions/route.ts",
-      "/Users/rmehta01/Sites/mahita/app/api/strategies/[id]/versions/[versionId]/route.ts",
-      "/Users/rmehta01/Sites/mahita/app/api/strategies/[id]/versions/[versionId]/restore/route.ts",
-      "/Users/rmehta01/Sites/mahita/app/api/strategies/[id]/workspace/route.ts",
-      "/Users/rmehta01/Sites/mahita/app/api/trading/deployments/route.ts",
-      "/Users/rmehta01/Sites/mahita/app/api/trading/deployments/[id]/route.ts",
-      "/Users/rmehta01/Sites/mahita/app/api/trading/market-data/route.ts",
-      "/Users/rmehta01/Sites/mahita/app/api/tradingview/webhook/[secret]/route.ts",
-      "/Users/rmehta01/Sites/mahita/app/api/schwab/orders/route.ts"
+      "app/api/indicators/catalog/route.ts",
+      "app/api/strategies/route.ts",
+      "app/api/strategies/[id]/route.ts",
+      "app/api/strategies/[id]/versions/route.ts",
+      "app/api/strategies/[id]/versions/[versionId]/route.ts",
+      "app/api/strategies/[id]/versions/[versionId]/restore/route.ts",
+      "app/api/strategies/[id]/workspace/route.ts",
+      "app/api/trading/deployments/route.ts",
+      "app/api/trading/deployments/[id]/route.ts",
+      "app/api/trading/market-data/route.ts",
+      "app/api/tradingview/webhook/[secret]/route.ts",
+      "app/api/schwab/orders/route.ts"
     ]
   },
   "stateEntities": [
@@ -96,13 +94,13 @@
     "npm run audit:mahacharts"
   ],
   "criticalTests": [
-    "/Users/rmehta01/Sites/mahita/tests/mahacharts-workspace.dom.test.tsx",
-    "/Users/rmehta01/Sites/mahita/tests/strategies.route.test.ts",
-    "/Users/rmehta01/Sites/mahita/tests/indicators-catalog.route.test.ts",
-    "/Users/rmehta01/Sites/mahita/tests/trading-deployments.route.test.ts",
-    "/Users/rmehta01/Sites/mahita/tests/trading-market-data.route.test.ts",
-    "/Users/rmehta01/Sites/mahita/tests/tradingview-webhook.route.test.ts",
-    "/Users/rmehta01/Sites/mahita/e2e/mahacharts.spec.ts",
-    "/Users/rmehta01/Sites/mahita/e2e/mahacharts.multiuser.spec.ts"
+    "tests/mahacharts-workspace.dom.test.tsx",
+    "tests/strategies.route.test.ts",
+    "tests/indicators-catalog.route.test.ts",
+    "tests/trading-deployments.route.test.ts",
+    "tests/trading-market-data.route.test.ts",
+    "tests/tradingview-webhook.route.test.ts",
+    "e2e/mahacharts.spec.ts",
+    "e2e/mahacharts.multiuser.spec.ts"
   ]
 }

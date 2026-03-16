@@ -7,10 +7,18 @@ import {
     Code, 
     Play,
     CheckCircle,
-    ChevronRight,
     Copy,
-    ExternalLink
 } from 'lucide-react'
+
+interface LearnSectionProps {
+    copyCode: (code: string, id: string) => void
+    copiedCode: string | null
+}
+
+interface CodeBlockProps extends LearnSectionProps {
+    code: string
+    id: string
+}
 
 export default function LearnPage() {
     const [activeSection, setActiveSection] = useState('basics')
@@ -75,7 +83,7 @@ export default function LearnPage() {
     )
 }
 
-function BasicsSection({ copyCode, copiedCode }: any) {
+function BasicsSection({ copyCode, copiedCode }: LearnSectionProps) {
     return (
         <div className="space-y-8">
             <div>
@@ -177,7 +185,7 @@ if (close < open) {
     )
 }
 
-function IndicatorsSection({ copyCode, copiedCode }: any) {
+function IndicatorsSection({ copyCode, copiedCode }: LearnSectionProps) {
     return (
         <div className="space-y-8">
             <div>
@@ -260,7 +268,7 @@ const mfi = ta.mfi(14)`}
     )
 }
 
-function StrategySection({ copyCode, copiedCode }: any) {
+function StrategySection({ copyCode, copiedCode }: LearnSectionProps) {
     return (
         <div className="space-y-8">
             <div>
@@ -341,7 +349,7 @@ if (ema_fast < ema_slow) {
     )
 }
 
-function ExamplesSection({ copyCode, copiedCode }: any) {
+function ExamplesSection({ copyCode, copiedCode }: LearnSectionProps) {
     return (
         <div className="space-y-8">
             <div>
@@ -466,7 +474,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
     )
 }
 
-function CodeBlock({ code, id, copyCode, copiedCode }: any) {
+function CodeBlock({ code, id, copyCode, copiedCode }: CodeBlockProps) {
     return (
         <div className="relative">
             <pre className="bg-[#0d0e12] border border-[#2A2E39] rounded-lg p-4 overflow-x-auto">

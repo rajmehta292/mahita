@@ -15,7 +15,13 @@ interface DiffSample {
     volumeDiff: number
 }
 
-function compareBars(primaryBars: any[], secondaryBars: any[]) {
+interface BarLike {
+    time: number
+    close: number
+    volume: number
+}
+
+function compareBars(primaryBars: BarLike[], secondaryBars: BarLike[]) {
     const primaryMap = new Map(primaryBars.map((bar) => [bar.time, bar]))
     const secondaryMap = new Map(secondaryBars.map((bar) => [bar.time, bar]))
     const allTimes = [...new Set([...primaryMap.keys(), ...secondaryMap.keys()])].sort((a, b) => a - b)

@@ -69,7 +69,7 @@ Bring Mahita from a partially implemented prototype with documentation drift int
   - route-specific error boundaries exist for app/admin/backtest
   - Monaco fallback behavior is browser-tested
   - signed-in Settings save flow and Admin tab loading are browser-tested
-- The auth guidebook now exists under [docs/guidebook/auth/README.md](/Users/rmehta01/Sites/mahita/docs/guidebook/auth/README.md) and is the canonical architecture reference for auth/session/brokerage/operator access behavior.
+- The auth guidebook now exists under [docs/guidebook/auth/README.md](../guidebook/auth/README.md) and is the canonical architecture reference for auth/session/brokerage/operator access behavior.
 
 ### Phase 0. Baseline Recovery
 Owner responsibilities:

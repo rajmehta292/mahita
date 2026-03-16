@@ -1,11 +1,35 @@
 import YahooFinance from 'yahoo-finance2'
 import { IDataProvider, MarketDataPoint, Timeframe } from '../types'
 
+interface YahooChartQuote {
+    date: Date
+    open?: number | null
+    high?: number | null
+    low?: number | null
+    close?: number | null
+    volume?: number | null
+}
+
+interface YahooChartResponse {
+    quotes?: YahooChartQuote[]
+}
+
+const YahooFinanceClient = YahooFinance as unknown as {
+    new (options: { suppressNotices: string[] }): {
+        chart(symbol: string, options: {
+            period1: Date
+            period2: Date
+            interval: '1m' | '5m' | '15m' | '30m' | '1h' | '1d' | '1wk' | '1mo'
+            return: 'array'
+        }): Promise<YahooChartResponse>
+    }
+}
+
 export class YahooProvider implements IDataProvider {
-    private yahoo: any
+    private yahoo: InstanceType<typeof YahooFinanceClient>
 
     constructor() {
-        this.yahoo = new (YahooFinance as any)({ suppressNotices: ['ripHistorical'] })
+        this.yahoo = new YahooFinanceClient({ suppressNotices: ['ripHistorical'] })
     }
 
     private normalizeSymbol(symbol: string): string {
@@ -45,7 +69,7 @@ export class YahooProvider implements IDataProvider {
             const result = Array.isArray(rawResult?.quotes) ? rawResult.quotes : []
 
             return result
-                .map((quote: any) => ({
+                .map((quote) => ({
                     time: Math.floor(quote.date.getTime() / 1000),
                     open: Number(quote.open || 0),
                     high: Number(quote.high || 0),

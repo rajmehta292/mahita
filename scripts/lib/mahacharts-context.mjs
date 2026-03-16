@@ -18,7 +18,6 @@ export const CANONICAL_DOCS = [
 export const REFERENCE_ARTIFACTS = [
   'docs/internal/evidence/archive/tradingview-research',
   'fixtures/tradingview',
-  '/Users/rmehta01/Sites/backtester/app',
 ]
 
 export const SOURCE_PATHS = {
@@ -88,10 +87,8 @@ export const CRITICAL_TEST_IDS = [
   'mahacharts-deployment-form',
 ]
 
-function toAbsolute(relativeOrAbsolutePath) {
-  return path.isAbsolute(relativeOrAbsolutePath)
-    ? relativeOrAbsolutePath
-    : path.join(ROOT, relativeOrAbsolutePath)
+function toAbsolute(relativePath) {
+  return path.join(ROOT, relativePath)
 }
 
 async function readFile(relativeOrAbsolutePath) {
@@ -201,14 +198,16 @@ export async function buildMahaChartsArtifacts() {
       model: 'single-chart-first workspace',
     },
     canonicalDocs,
-    references: REFERENCE_ARTIFACTS.map((entry) => ({
-      path: entry,
-      exists: path.isAbsolute(entry) ? true : undefined,
-    })),
+    references: await Promise.all(
+      REFERENCE_ARTIFACTS.map(async (entry) => ({
+        path: entry,
+        exists: await fileExists(entry),
+      })),
+    ),
     code: {
-      components: SOURCE_PATHS.components.map(toAbsolute),
-      libraries: SOURCE_PATHS.libraries.map(toAbsolute),
-      apiRoutes: SOURCE_PATHS.apiRoutes.map(toAbsolute),
+      components: SOURCE_PATHS.components,
+      libraries: SOURCE_PATHS.libraries,
+      apiRoutes: SOURCE_PATHS.apiRoutes,
     },
     stateEntities: [
       'Strategy',
@@ -229,7 +228,7 @@ export async function buildMahaChartsArtifacts() {
       'npm run test:deployments',
       'npm run audit:mahacharts',
     ],
-    criticalTests: SOURCE_PATHS.tests.map(toAbsolute),
+    criticalTests: SOURCE_PATHS.tests,
   }
 
   const uiMap = {

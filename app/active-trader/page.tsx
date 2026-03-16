@@ -89,10 +89,50 @@ interface SavedStrategy {
     timeframe?: string
 }
 
+interface ScriptDraftSummary {
+    id: string
+    name: string
+    symbol: string
+    description?: string
+    timeframe?: string
+}
+
+interface DeploymentSummary {
+    id: string
+    name: string
+    symbol: string
+    status: 'active' | 'paused' | 'error' | string
+    executionIntents?: unknown[]
+    webhookUrl?: string | null
+}
+
 const EMPTY_ORDER_DRAFT = createOrderDraft({
     symbol: '',
     side: 'BUY',
 })
+
+function mapSavedStrategies(drafts: ScriptDraftSummary[]): SavedStrategy[] {
+    return drafts.map((draft) => ({
+        id: draft.id,
+        name: draft.name,
+        symbol: draft.symbol,
+        description: draft.description,
+        timeframe: draft.timeframe,
+    }))
+}
+
+function mapLiveStrategies(deployments: DeploymentSummary[]): LiveStrategy[] {
+    return deployments.map((deployment) => ({
+        id: deployment.id,
+        name: deployment.name,
+        symbol: deployment.symbol,
+        status: deployment.status === 'active' ? 'running' : deployment.status === 'paused' ? 'stopped' : 'error',
+        pnl: 0,
+        trades: Array.isArray(deployment.executionIntents) ? deployment.executionIntents.length : 0,
+        winRate: 0,
+        webhookUrl: deployment.webhookUrl || null,
+    }))
+}
 
 export default function ActiveTraderPage() {
     return (
@@ -167,24 +207,8 @@ function ActiveTraderPageContent() {
                     return
                 }
 
-                setSavedStrategies(((draftJson.drafts ?? []) as Array<any>).map((draft) => ({
-                    id: draft.id,
-                    name: draft.name,
-                    symbol: draft.symbol,
-                    description: draft.description,
-                    timeframe: draft.timeframe,
-                })))
-
-                setLiveStrategies(((deploymentJson.deployments ?? []) as Array<any>).map((deployment) => ({
-                    id: deployment.id,
-                    name: deployment.name,
-                    symbol: deployment.symbol,
-                    status: deployment.status === 'active' ? 'running' : deployment.status === 'paused' ? 'stopped' : 'error',
-                    pnl: 0,
-                    trades: Array.isArray(deployment.executionIntents) ? deployment.executionIntents.length : 0,
-                    winRate: 0,
-                    webhookUrl: deployment.webhookUrl || null,
-                })))
+                setSavedStrategies(mapSavedStrategies((draftJson.drafts ?? []) as ScriptDraftSummary[]))
+                setLiveStrategies(mapLiveStrategies((deploymentJson.deployments ?? []) as DeploymentSummary[]))
             } catch (strategyError) {
                 console.warn('Failed to load strategy control plane:', strategyError)
             }
@@ -201,16 +225,7 @@ function ActiveTraderPageContent() {
         try {
             const deploymentResponse = await fetch('/api/trading/deployments', { cache: 'no-store' })
             const deploymentJson = await deploymentResponse.json()
-            setLiveStrategies(((deploymentJson.deployments ?? []) as Array<any>).map((deployment) => ({
-                id: deployment.id,
-                name: deployment.name,
-                symbol: deployment.symbol,
-                status: deployment.status === 'active' ? 'running' : deployment.status === 'paused' ? 'stopped' : 'error',
-                pnl: 0,
-                trades: Array.isArray(deployment.executionIntents) ? deployment.executionIntents.length : 0,
-                winRate: 0,
-                webhookUrl: deployment.webhookUrl || null,
-            })))
+            setLiveStrategies(mapLiveStrategies((deploymentJson.deployments ?? []) as DeploymentSummary[]))
         } catch (refreshError) {
             console.warn('Failed to refresh deployments:', refreshError)
         }

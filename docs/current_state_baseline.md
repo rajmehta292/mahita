@@ -19,6 +19,25 @@ Documentation tranche update:
 - Stage 2 provider/request validation is now documented and Stage 3 has been explicitly deferred pending stronger scheduler evidence
 - MahaCharts now has a dedicated signed-in guidebook cluster plus generated AI context artifacts for future chart, strategy, and deployment work
 
+## Generated Repo Audit Snapshot
+
+<!-- REPO_AUDIT:START -->
+Generated from `docs/internal/generated/repo-audit-report.json` on 2026-03-16T00:47:07.694Z.
+
+- typecheck: pass
+- lint-source: pass
+- lint-noise: pass
+- repo-hygiene: pass
+- docs-portability: pass
+- unit: pass
+- e2e: pass
+- visual: pass
+- build: pass
+- live-smoke: manual
+
+- blocking findings: none
+<!-- REPO_AUDIT:END -->
+
 ## Verified Release Gate Status
 
 ### `npx tsc --noEmit`
@@ -33,8 +52,8 @@ Verified on the current tree:
 Passes.
 
 Verified current warning:
-- Turbopack warns that [app/services/market-data/parquet-store.ts](/Users/rmehta01/Sites/mahita/app/services/market-data/parquet-store.ts) uses an overly broad dynamic file pattern that matches a very large number of files.
-- The `middleware` deprecation warning is resolved by migrating route protection to [proxy.ts](/Users/rmehta01/Sites/mahita/proxy.ts).
+- Turbopack warns that [app/services/market-data/parquet-store.ts](../app/services/market-data/parquet-store.ts) uses an overly broad dynamic file pattern that matches a very large number of files.
+- The `middleware` deprecation warning is resolved by migrating route protection to [proxy.ts](../proxy.ts).
 
 ### `npm run lint`
 Not a release gate in its current form. It currently reports thousands of warnings and hundreds of errors across the repo, including generated/extracted/vendor-like files and broad legacy debt. A scoped lint gate is required before release claims are credible.
@@ -96,26 +115,26 @@ Current state:
 
 ### Auth and roles
 Current state:
-- Prisma-backed roles now exist in [prisma/schema.prisma](/Users/rmehta01/Sites/mahita/prisma/schema.prisma).
-- A first-pass user brokerage plane now exists in [prisma/schema.prisma](/Users/rmehta01/Sites/mahita/prisma/schema.prisma) through `BrokerageConnection` and `BrokerageAccount`.
-- `raj.dmehta292@gmail.com` resolves to `SUPERUSER` in [lib/auth.ts](/Users/rmehta01/Sites/mahita/lib/auth.ts).
-- Session typing now includes `session.user.id` and `session.user.role` via [types/next-auth.d.ts](/Users/rmehta01/Sites/mahita/types/next-auth.d.ts).
-- Shared server-side session helpers now live in [lib/server-session.ts](/Users/rmehta01/Sites/mahita/lib/server-session.ts).
+- Prisma-backed roles now exist in [prisma/schema.prisma](../prisma/schema.prisma).
+- A first-pass user brokerage plane now exists in [prisma/schema.prisma](../prisma/schema.prisma) through `BrokerageConnection` and `BrokerageAccount`.
+- `raj.dmehta292@gmail.com` resolves to `SUPERUSER` in [lib/auth.ts](../lib/auth.ts).
+- Session typing now includes `session.user.id` and `session.user.role` via [types/next-auth.d.ts](../types/next-auth.d.ts).
+- Shared server-side session helpers now live in [lib/server-session.ts](../lib/server-session.ts).
 - Development bypass is now gated behind `ENABLE_DEV_AUTH_BYPASS === "true"` instead of plain `NODE_ENV === "development"`.
-- Local auth origin is normalized through [lib/auth-environment.ts](/Users/rmehta01/Sites/mahita/lib/auth-environment.ts), so a local run no longer inherits `https://mahita.ai` as the callback origin by default.
-- `/auth/error` now exists in [app/auth/error/page.tsx](/Users/rmehta01/Sites/mahita/app/auth/error/page.tsx) and the auth surface exposes a health contract at [app/api/health/auth/route.ts](/Users/rmehta01/Sites/mahita/app/api/health/auth/route.ts).
-- Role handling no longer depends on runtime Prisma enum objects in browser-sensitive surfaces. App-owned role utilities now live in [lib/roles.ts](/Users/rmehta01/Sites/mahita/lib/roles.ts).
+- Local auth origin is normalized through [lib/auth-environment.ts](../lib/auth-environment.ts), so a local run no longer inherits `https://mahita.ai` as the callback origin by default.
+- `/auth/error` now exists in [app/auth/error/page.tsx](../app/auth/error/page.tsx) and the auth surface exposes a health contract at [app/api/health/auth/route.ts](../app/api/health/auth/route.ts).
+- Role handling no longer depends on runtime Prisma enum objects in browser-sensitive surfaces. App-owned role utilities now live in [lib/roles.ts](../lib/roles.ts).
 - The landing/sign-in flow is now server-routed:
   - signed-out users on `/` see the landing page
   - signed-in users on `/` are redirected to the most recent authenticated page when the current sign-in is still fresh, otherwise `/dashboard`
-  - sign-in completion resolves through [app/auth/post-signin/page.tsx](/Users/rmehta01/Sites/mahita/app/auth/post-signin/page.tsx)
+  - sign-in completion resolves through [app/auth/post-signin/page.tsx](../app/auth/post-signin/page.tsx)
 - Session navigation state is now persisted in `UserPreference`:
   - `lastVisitedPath`
   - `lastVisitedAt`
   - `lastSignInAt`
   - `previousSignInAt`
-- Main authenticated app navigation now records the most recent page through [app/api/user/session-activity/route.ts](/Users/rmehta01/Sites/mahita/app/api/user/session-activity/route.ts) and [app/components/Auth/SessionActivityTracker.tsx](/Users/rmehta01/Sites/mahita/app/components/Auth/SessionActivityTracker.tsx).
-- Unused Google OAuth provider tokens are now scrubbed from the NextAuth `Account` table after sign-in via [lib/auth.ts](/Users/rmehta01/Sites/mahita/lib/auth.ts) and [lib/security/platform-security.ts](/Users/rmehta01/Sites/mahita/lib/security/platform-security.ts).
+- Main authenticated app navigation now records the most recent page through [app/api/user/session-activity/route.ts](../app/api/user/session-activity/route.ts) and [app/components/Auth/SessionActivityTracker.tsx](../app/components/Auth/SessionActivityTracker.tsx).
+- Unused Google OAuth provider tokens are now scrubbed from the NextAuth `Account` table after sign-in via [lib/auth.ts](../lib/auth.ts) and [lib/security/platform-security.ts](../lib/security/platform-security.ts).
 - Google now uses same-email account linking for Mahita's existing user records, so a pre-existing Mahita `User` row without a linked NextAuth `Account` row no longer traps real users in `OAuthAccountNotLinked`.
 - Demo/bootstrap auth seeding now uses synthetic demo emails instead of pre-creating real presentation/operator emails.
 
@@ -129,7 +148,7 @@ Implication:
   - `https://mahita.ai` as the authorized JavaScript origin
   - `https://mahita.ai/api/auth/callback/google` as the authorized redirect URI
 - Local development should use the Mahita dev-bypass flow by default instead of a shared Google OAuth client. If staging-style Google login is ever needed outside production, it should use a separate public staging domain and a separate OAuth client.
-- A first-pass admin control plane now exists at [app/admin/page.tsx](/Users/rmehta01/Sites/mahita/app/admin/page.tsx), including provider-pool management, data-command operations, user visibility, audit browsing, and a superuser-only break-glass reveal flow for provider credentials.
+- A first-pass admin control plane now exists at [app/admin/page.tsx](../app/admin/page.tsx), including provider-pool management, data-command operations, user visibility, audit browsing, and a superuser-only break-glass reveal flow for provider credentials.
 - Break-glass credential reveal now requires:
   - superuser role
   - explicit reason
@@ -141,18 +160,18 @@ Implication:
 ### MahaCharts workspace and strategy library
 Current state:
 - `/superchart` is now framed as a five-region MahaCharts workspace instead of a dashboard card layout.
-- The workspace shell is owned by [app/components/SuperChart/SuperChartWorkspace.tsx](/Users/rmehta01/Sites/mahita/app/components/SuperChart/SuperChartWorkspace.tsx).
-- The chart renderer is owned by [app/components/Chart.tsx](/Users/rmehta01/Sites/mahita/app/components/Chart.tsx) and now supports built-in overlay indicators plus stacked oscillator panes.
+- The workspace shell is owned by [app/components/SuperChart/SuperChartWorkspace.tsx](../app/components/SuperChart/SuperChartWorkspace.tsx).
+- The chart renderer is owned by [app/components/Chart.tsx](../app/components/Chart.tsx) and now supports built-in overlay indicators plus stacked oscillator panes.
 - The Pine editing surface now lives as a resizable overlay over the workspace rather than as a permanent bottom-dock slab, so the chart remains primary until editing is explicitly opened.
 - The right side now targets a permanent utility strip plus contextual overlays rather than a width-taking rail, matching the TradingView-style screenshot geometry used for current UI acceptance.
-- A first-pass indicator catalog now exists in [lib/indicator-catalog.ts](/Users/rmehta01/Sites/mahita/lib/indicator-catalog.ts) and is exposed through [app/api/indicators/catalog/route.ts](/Users/rmehta01/Sites/mahita/app/api/indicators/catalog/route.ts).
-- Script drafts now flow through a strategy library model in [lib/strategy-library.ts](/Users/rmehta01/Sites/mahita/lib/strategy-library.ts):
+- A first-pass indicator catalog now exists in [lib/indicator-catalog.ts](../lib/indicator-catalog.ts) and is exposed through [app/api/indicators/catalog/route.ts](../app/api/indicators/catalog/route.ts).
+- Script drafts now flow through a strategy library model in [lib/strategy-library.ts](../lib/strategy-library.ts):
   - `Strategy`
   - `StrategyVersion`
   - `StrategyWorkspaceSession`
-- Existing `ScriptDraft` behavior is currently shimmed for compatibility in [lib/script-drafts.ts](/Users/rmehta01/Sites/mahita/lib/script-drafts.ts), but the intended long-term product model is strategy-first, not draft-first.
+- Existing `ScriptDraft` behavior is currently shimmed for compatibility in [lib/script-drafts.ts](../lib/script-drafts.ts), but the intended long-term product model is strategy-first, not draft-first.
 - Deployment records now carry `strategyId` and `strategyVersionId` in addition to the legacy linked-draft path.
-- A dedicated MahaCharts guidebook cluster now exists under [docs/internal/guidebook/mahacharts/README.md](/Users/rmehta01/Sites/mahita/docs/internal/guidebook/mahacharts/README.md).
+- A dedicated MahaCharts guidebook cluster now exists under [docs/internal/guidebook/mahacharts/README.md](internal/guidebook/mahacharts/README.md).
 - Generated AI-facing context artifacts now exist under `docs/internal/generated/`.
 
 Implication:
@@ -187,16 +206,16 @@ Intentionally deferred:
 
 ### Runtime health and typed failures
 Current state:
-- Runtime health now has a first-pass typed contract at [app/api/health/runtime/route.ts](/Users/rmehta01/Sites/mahita/app/api/health/runtime/route.ts).
-- Shared runtime/schema checks now live in [lib/runtime-health.ts](/Users/rmehta01/Sites/mahita/lib/runtime-health.ts).
-- Shared error normalization now lives in [lib/app-errors.ts](/Users/rmehta01/Sites/mahita/lib/app-errors.ts) and [lib/route-errors.ts](/Users/rmehta01/Sites/mahita/lib/route-errors.ts).
+- Runtime health now has a first-pass typed contract at [app/api/health/runtime/route.ts](../app/api/health/runtime/route.ts).
+- Shared runtime/schema checks now live in [lib/runtime-health.ts](../lib/runtime-health.ts).
+- Shared error normalization now lives in [lib/app-errors.ts](../lib/app-errors.ts) and [lib/route-errors.ts](../lib/route-errors.ts).
 - Brokerage/provider services now explicitly assert required generated Prisma models before attempting writes, so stale Prisma client states return typed runtime errors instead of opaque `undefined.upsert` crashes.
 - Settings now normalizes credential-save failures into recoverable user-visible messages and can surface runtime-schema mismatch hints instead of raw exception strings.
 - Global and route-local error boundaries now exist for:
-  - [app/error.tsx](/Users/rmehta01/Sites/mahita/app/error.tsx)
-  - [app/global-error.tsx](/Users/rmehta01/Sites/mahita/app/global-error.tsx)
-  - [app/admin/error.tsx](/Users/rmehta01/Sites/mahita/app/admin/error.tsx)
-  - [app/backtest/error.tsx](/Users/rmehta01/Sites/mahita/app/backtest/error.tsx)
+  - [app/error.tsx](../app/error.tsx)
+  - [app/global-error.tsx](../app/global-error.tsx)
+  - [app/admin/error.tsx](../app/admin/error.tsx)
+  - [app/backtest/error.tsx](../app/backtest/error.tsx)
 
 Implication:
 - Schema/client drift in development is now diagnosable from the app instead of surfacing as raw browser crashes.
@@ -210,7 +229,7 @@ Current state:
   - `Processor`
   - `Verification`
   - `Storage`
-- Stage 2 scheduler and verification models now exist in [prisma/schema.prisma](/Users/rmehta01/Sites/mahita/prisma/schema.prisma):
+- Stage 2 scheduler and verification models now exist in [prisma/schema.prisma](../prisma/schema.prisma):
   - `IngestionProfile`
   - `IngestionLane`
   - `IngestionTarget`
@@ -261,35 +280,35 @@ Stage decision:
 ### Tenant isolation and Schwab runtime
 Current state:
 - User preference and Schwab configuration routes are now user-scoped by typed session identity.
-- Customer brokerage routes now resolve through [lib/brokerage-connections.ts](/Users/rmehta01/Sites/mahita/lib/brokerage-connections.ts) instead of treating raw `SchwabConfig` as the customer-facing domain model.
+- Customer brokerage routes now resolve through [lib/brokerage-connections.ts](../lib/brokerage-connections.ts) instead of treating raw `SchwabConfig` as the customer-facing domain model.
 - Schwab account/auth/order routes now share the same gated session helper instead of ad hoc development bypass.
 - Customer Schwab account fetches now sync real account metadata into `BrokerageAccount`, and admin visibility now reports brokerage-connection state instead of plain `SchwabConfig` presence.
-- Schwab client secrets, access tokens, and refresh tokens now encrypt at rest through [lib/secrets.ts](/Users/rmehta01/Sites/mahita/lib/secrets.ts) and [lib/schwab-config.ts](/Users/rmehta01/Sites/mahita/lib/schwab-config.ts), with plaintext compatibility reads kept only as a migration bridge.
-- [app/api/user/schwab-tokens/route.ts](/Users/rmehta01/Sites/mahita/app/api/user/schwab-tokens/route.ts) no longer returns raw tokens or client secrets to the browser.
+- Schwab client secrets, access tokens, and refresh tokens now encrypt at rest through [lib/secrets.ts](../lib/secrets.ts) and [lib/schwab-config.ts](../lib/schwab-config.ts), with plaintext compatibility reads kept only as a migration bridge.
+- [app/api/user/schwab-tokens/route.ts](../app/api/user/schwab-tokens/route.ts) no longer returns raw tokens or client secrets to the browser.
 - Operational routes including provider health, continuous ingest, inventory, data reset, and vault listing now require a `SUPERUSER` session.
 - Operator telemetry and data-inspection endpoints are now also superuser-only:
-  - [app/api/trading/provider-stream/route.ts](/Users/rmehta01/Sites/mahita/app/api/trading/provider-stream/route.ts)
-  - [app/api/trading/provider-traffic/route.ts](/Users/rmehta01/Sites/mahita/app/api/trading/provider-traffic/route.ts)
-  - [app/api/trading/data-inspect/route.ts](/Users/rmehta01/Sites/mahita/app/api/trading/data-inspect/route.ts)
-  - [app/api/trading/data-health/route.ts](/Users/rmehta01/Sites/mahita/app/api/trading/data-health/route.ts)
-  - [app/api/trading/data-health/refresh/route.ts](/Users/rmehta01/Sites/mahita/app/api/trading/data-health/refresh/route.ts)
-  - [app/api/trading/data-health/sync-gaps/route.ts](/Users/rmehta01/Sites/mahita/app/api/trading/data-health/sync-gaps/route.ts)
-- Shared runtime selection in [app/services/schwab/runtime.ts](/Users/rmehta01/Sites/mahita/app/services/schwab/runtime.ts) now fails closed by default instead of silently borrowing a random customer brokerage token for platform jobs.
+  - [app/api/trading/provider-stream/route.ts](../app/api/trading/provider-stream/route.ts)
+  - [app/api/trading/provider-traffic/route.ts](../app/api/trading/provider-traffic/route.ts)
+  - [app/api/trading/data-inspect/route.ts](../app/api/trading/data-inspect/route.ts)
+  - [app/api/trading/data-health/route.ts](../app/api/trading/data-health/route.ts)
+  - [app/api/trading/data-health/refresh/route.ts](../app/api/trading/data-health/refresh/route.ts)
+  - [app/api/trading/data-health/sync-gaps/route.ts](../app/api/trading/data-health/sync-gaps/route.ts)
+- Shared runtime selection in [app/services/schwab/runtime.ts](../app/services/schwab/runtime.ts) now fails closed by default instead of silently borrowing a random customer brokerage token for platform jobs.
 - A temporary insecure local-development fallback still exists behind `MAHITA_ALLOW_INSECURE_USER_BROKERAGE_PLATFORM_FALLBACK=true`.
 - A first-pass provider-pool schema/runtime now exists through:
 - A first-pass user brokerage bridge/runtime now exists through:
-  - [lib/brokerage-connections.ts](/Users/rmehta01/Sites/mahita/lib/brokerage-connections.ts)
-  - [app/api/schwab/accounts/route.ts](/Users/rmehta01/Sites/mahita/app/api/schwab/accounts/route.ts)
-  - [app/api/schwab/auth/route.ts](/Users/rmehta01/Sites/mahita/app/api/schwab/auth/route.ts)
-  - [app/api/schwab/orders/route.ts](/Users/rmehta01/Sites/mahita/app/api/schwab/orders/route.ts)
-  - [app/api/schwab/positions/route.ts](/Users/rmehta01/Sites/mahita/app/api/schwab/positions/route.ts)
-  - [app/api/user/schwab-config/route.ts](/Users/rmehta01/Sites/mahita/app/api/user/schwab-config/route.ts)
-  - [app/api/user/schwab-tokens/route.ts](/Users/rmehta01/Sites/mahita/app/api/user/schwab-tokens/route.ts)
+  - [lib/brokerage-connections.ts](../lib/brokerage-connections.ts)
+  - [app/api/schwab/accounts/route.ts](../app/api/schwab/accounts/route.ts)
+  - [app/api/schwab/auth/route.ts](../app/api/schwab/auth/route.ts)
+  - [app/api/schwab/orders/route.ts](../app/api/schwab/orders/route.ts)
+  - [app/api/schwab/positions/route.ts](../app/api/schwab/positions/route.ts)
+  - [app/api/user/schwab-config/route.ts](../app/api/user/schwab-config/route.ts)
+  - [app/api/user/schwab-tokens/route.ts](../app/api/user/schwab-tokens/route.ts)
 - A first-pass provider-pool schema/runtime now exists through:
-  - [lib/provider-credentials.ts](/Users/rmehta01/Sites/mahita/lib/provider-credentials.ts)
-  - [app/api/admin/provider-pool/route.ts](/Users/rmehta01/Sites/mahita/app/api/admin/provider-pool/route.ts)
-  - [app/services/schwab/runtime.ts](/Users/rmehta01/Sites/mahita/app/services/schwab/runtime.ts)
-- When platform fallback is explicitly enabled for local development, shared runtime no longer selects an arbitrary Schwab config. It now resolves only through an explicit superuser brokerage bridge in [lib/brokerage-connections.ts](/Users/rmehta01/Sites/mahita/lib/brokerage-connections.ts).
+  - [lib/provider-credentials.ts](../lib/provider-credentials.ts)
+  - [app/api/admin/provider-pool/route.ts](../app/api/admin/provider-pool/route.ts)
+  - [app/services/schwab/runtime.ts](../app/services/schwab/runtime.ts)
+- When platform fallback is explicitly enabled for local development, shared runtime no longer selects an arbitrary Schwab config. It now resolves only through an explicit superuser brokerage bridge in [lib/brokerage-connections.ts](../lib/brokerage-connections.ts).
 - The current temporary operating model still allows a superuser to explicitly promote a user-owned Schwab config into the market-data provider pool. That is a controlled bridge and an improvement over the old implicit fallback, but it is still not the final dedicated platform-credential model.
 
 Implication:
@@ -328,14 +347,14 @@ Implication:
 
 ### Admin control plane and Data Command
 Current state:
-- The admin control plane at [app/admin/page.tsx](/Users/rmehta01/Sites/mahita/app/admin/page.tsx) now loads lazily by tab instead of fetching all control-plane data at once.
-- [app/components/Admin/AdminControlPlane.tsx](/Users/rmehta01/Sites/mahita/app/components/Admin/AdminControlPlane.tsx) now:
+- The admin control plane at [app/admin/page.tsx](../app/admin/page.tsx) now loads lazily by tab instead of fetching all control-plane data at once.
+- [app/components/Admin/AdminControlPlane.tsx](../app/components/Admin/AdminControlPlane.tsx) now:
   - loads `Overview` first
   - loads `Provider Pool`, `Data Command`, `Users`, and `Audit Log` on demand
   - keeps partial tab failures local instead of blanking the whole page
 - `Data Command` now exposes operator-focused runtime summaries, ingest status, provider status, and explicit audited actions through:
-  - [app/api/admin/data-command/route.ts](/Users/rmehta01/Sites/mahita/app/api/admin/data-command/route.ts)
-  - [app/api/admin/data-command/action/route.ts](/Users/rmehta01/Sites/mahita/app/api/admin/data-command/action/route.ts)
+  - [app/api/admin/data-command/route.ts](../app/api/admin/data-command/route.ts)
+  - [app/api/admin/data-command/action/route.ts](../app/api/admin/data-command/action/route.ts)
 - Break-glass reveal now returns reveal-grant metadata and correlates to persisted audit state instead of being a one-shot opaque response.
 
 Implication:
@@ -344,8 +363,8 @@ Implication:
 
 ### Alpha Insights
 Current state:
-- Alpha uses a brittle internal fetch pattern in [app/api/ai/alpha-insights/route.ts](/Users/rmehta01/Sites/mahita/app/api/ai/alpha-insights/route.ts).
-- The service in [lib/ai/rag/alpha-insights-service.ts](/Users/rmehta01/Sites/mahita/lib/ai/rag/alpha-insights-service.ts) hardcodes the model ID `llama3.2:latest`.
+- Alpha uses a brittle internal fetch pattern in [app/api/ai/alpha-insights/route.ts](../app/api/ai/alpha-insights/route.ts).
+- The service in [lib/ai/rag/alpha-insights-service.ts](../lib/ai/rag/alpha-insights-service.ts) hardcodes the model ID `llama3.2:latest`.
 - Knowledge retrieval is a small static keyword system, not a versioned money-manager knowledge base.
 - `InvestorProfile` now exists in Prisma, but the UI and Alpha pipeline do not yet use it.
 - No action proposal, preview, confirm, or cooldown workflow exists.
@@ -383,7 +402,7 @@ Intentionally deferred:
 
 ### Schwab Data Center
 Current state:
-- First-pass surface implemented at [app/schwab-data/page.tsx](/Users/rmehta01/Sites/mahita/app/schwab-data/page.tsx) with:
+- First-pass surface implemented at [app/schwab-data/page.tsx](../app/schwab-data/page.tsx) with:
   - sidebar navigation entry
   - request builder UI
   - live API preview
@@ -393,7 +412,7 @@ Current state:
 ### Backtester and editor shell
 Current state:
 - `/backtest` still uses the legacy prototype engine/runtime path and is not yet deploy-parity capable.
-- The editor surface is now wrapped by [app/components/Backtest/MahitaCodeEditor.tsx](/Users/rmehta01/Sites/mahita/app/components/Backtest/MahitaCodeEditor.tsx) instead of using direct Monaco mounting from the page shell.
+- The editor surface is now wrapped by [app/components/Backtest/MahitaCodeEditor.tsx](../app/components/Backtest/MahitaCodeEditor.tsx) instead of using direct Monaco mounting from the page shell.
 - The editor wrapper now:
   - uses Pine/plain-text safe language setup
   - performs explicit Monaco loader initialization
@@ -412,9 +431,9 @@ Current state:
 - Dashboard no longer reads the superuser-only continuous-ingest control route for basic status.
 - Chart no longer reads the superuser-only inventory route for symbol/timeframe discovery.
 - Customer-safe read models now exist in:
-  - [app/api/platform/runtime-status/route.ts](/Users/rmehta01/Sites/mahita/app/api/platform/runtime-status/route.ts)
-  - [app/api/platform/chart-catalog/route.ts](/Users/rmehta01/Sites/mahita/app/api/platform/chart-catalog/route.ts)
-- The read-model shaping logic is isolated in [lib/platform/customer-read-models.ts](/Users/rmehta01/Sites/mahita/lib/platform/customer-read-models.ts).
+  - [app/api/platform/runtime-status/route.ts](../app/api/platform/runtime-status/route.ts)
+  - [app/api/platform/chart-catalog/route.ts](../app/api/platform/chart-catalog/route.ts)
+- The read-model shaping logic is isolated in [lib/platform/customer-read-models.ts](../lib/platform/customer-read-models.ts).
 
 Implication:
 - Normal customer pages are no longer structurally coupled to newly hardened operator-only endpoints for basic runtime/catalog visibility.
@@ -422,9 +441,9 @@ Implication:
 
 ### Trending Indicators
 Current state:
-- A first real strategy-state page now exists at [app/trending-indicators/page.tsx](/Users/rmehta01/Sites/mahita/app/trending-indicators/page.tsx).
-- It uses a real server scan contract in [app/api/trending-indicators/scan/route.ts](/Users/rmehta01/Sites/mahita/app/api/trending-indicators/scan/route.ts), not a frontend-only toy view.
-- The current evaluator kernel lives in [lib/trending-indicators.ts](/Users/rmehta01/Sites/mahita/lib/trending-indicators.ts).
+- A first real strategy-state page now exists at [app/trending-indicators/page.tsx](../app/trending-indicators/page.tsx).
+- It uses a real server scan contract in [app/api/trending-indicators/scan/route.ts](../app/api/trending-indicators/scan/route.ts), not a frontend-only toy view.
+- The current evaluator kernel lives in [lib/trending-indicators.ts](../lib/trending-indicators.ts).
 - The page supports:
   - saved strategy visibility selection
   - watchlist-driven multi-symbol scans
@@ -453,9 +472,9 @@ Current state:
 ## Documentation Accuracy Gaps
 
 The following document currently overstates completion and should not be treated as source of truth:
-- [docs/PLATFORM_COMPLETE.md](/Users/rmehta01/Sites/mahita/docs/PLATFORM_COMPLETE.md)
-- [docs/blueprint/02_Authentication_and_Security.md](/Users/rmehta01/Sites/mahita/docs/blueprint/02_Authentication_and_Security.md) still references `middleware.ts` and does not reflect the current `proxy.ts` security boundary.
-- [docs/blueprint/06_AI_Implementation_Guide.md](/Users/rmehta01/Sites/mahita/docs/blueprint/06_AI_Implementation_Guide.md) still references `middleware.ts`.
+- [docs/PLATFORM_COMPLETE.md](PLATFORM_COMPLETE.md)
+- [docs/blueprint/02_Authentication_and_Security.md](blueprint/02_Authentication_and_Security.md) still references `middleware.ts` and does not reflect the current `proxy.ts` security boundary.
+- [docs/blueprint/06_AI_Implementation_Guide.md](blueprint/06_AI_Implementation_Guide.md) still references `middleware.ts`.
 
 This baseline audit, the recovery program, and the QA verification matrix are now the source-of-truth documents for execution and release readiness.
 

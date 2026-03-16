@@ -15,7 +15,7 @@ async function test() {
         const data = await provider.getHistoricalData(symbol, timeframe, start, end);
 
         console.log(`Fetched ${data.length} bars from Yahoo:`);
-        data.forEach((d: any) => {
+        data.forEach((d) => {
             console.log(`  ${new Date(d.time * 1000).toISOString()}: O:${d.open} H:${d.high} L:${d.low} C:${d.close}`);
         });
 

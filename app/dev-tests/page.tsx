@@ -14,6 +14,14 @@ export interface DiagnosticTest {
     defaultParams?: Record<string, string>
 }
 
+interface SchwabAccountSummary {
+    securitiesAccount?: {
+        hashValue?: string
+        accountId?: string
+        accountNumber?: string
+    }
+}
+
 // Configured categories
 const CATEGORIES = ['Auth & Accounts', 'Trading & Orders', 'Market Data', 'Ingestion & Health']
 
@@ -195,11 +203,11 @@ export default function DevTestsPage() {
             .then(res => res.json())
             .then(data => {
                 if (data.success && Array.isArray(data.accounts)) {
-                    const mapped = data.accounts
-                        .filter((a: any) => a.securitiesAccount?.hashValue)
-                        .map((a: any) => ({
-                            id: a.securitiesAccount.hashValue,
-                            label: `Account ${a.securitiesAccount.accountId || a.securitiesAccount.accountNumber || 'Unknown'}`
+                    const mapped = (data.accounts as SchwabAccountSummary[])
+                        .filter((account) => account.securitiesAccount?.hashValue)
+                        .map((account) => ({
+                            id: account.securitiesAccount?.hashValue ?? '',
+                            label: `Account ${account.securitiesAccount?.accountId || account.securitiesAccount?.accountNumber || 'Unknown'}`
                         }))
                     setAccounts(mapped)
                 }
@@ -373,10 +381,10 @@ function TestCard({ test, accounts }: { test: DiagnosticTest, accounts: Array<{ 
                 setStatus(res.ok ? 'success' : 'error')
             }
 
-        } catch (error: any) {
+        } catch (error) {
             setDuration(Date.now() - startTime)
             setStatus('error')
-            setOutput(error.message || 'Network request failed completely.')
+            setOutput(error instanceof Error ? error.message : 'Network request failed completely.')
         }
     }
 

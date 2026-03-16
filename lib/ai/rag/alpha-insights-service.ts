@@ -23,7 +23,7 @@ export class AlphaInsightsService {
         this.inference = new InferenceService()
     }
 
-    async generateAssessment(userId: string, positions: Position[], balance: any): Promise<PortfolioAssessment> {
+    async generateAssessment(userId: string, positions: Position[], balance: unknown): Promise<PortfolioAssessment> {
         // 1. Summarize Portfolio for LLM
         const portfolioStr = positions.map(p =>
             `${p.symbol}: ${p.quantity} shares @ $${p.averagePrice.toFixed(2)} (Current: $${p.currentPrice.toFixed(2)}, MV: $${p.marketValue.toLocaleString()})`
@@ -72,6 +72,7 @@ export class AlphaInsightsService {
             }
             Only return the JSON. No conversational filler.
         `
+        void balance
 
         try {
             const stream = await InferenceService.chat(userId, {
@@ -82,6 +83,9 @@ export class AlphaInsightsService {
                 ],
                 stream: true
             })
+            if (!stream) {
+                throw new Error('Inference stream was not available.')
+            }
 
             // Consume stream for internal processing
             const reader = stream.getReader()

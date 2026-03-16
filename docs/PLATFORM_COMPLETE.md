@@ -3,9 +3,9 @@
 Status: Superseded. Do not use this document as the current platform status source of truth.
 
 Current source-of-truth documents:
-- [Current State Baseline](/Users/rmehta01/Sites/mahita/docs/current_state_baseline.md)
-- [Mahita Recovery Program](/Users/rmehta01/Sites/mahita/docs/execution/mahita_recovery_program.md)
-- [Verification Matrix](/Users/rmehta01/Sites/mahita/docs/qa/verification_matrix.md)
+- [Current State Baseline](current_state_baseline.md)
+- [Mahita Recovery Program](execution/mahita_recovery_program.md)
+- [Verification Matrix](qa/verification_matrix.md)
 
 This document reflects an older aspirational state and currently overstates implementation and release readiness.
 

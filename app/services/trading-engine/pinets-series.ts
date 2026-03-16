@@ -5,6 +5,10 @@ import type { MarketDataPoint } from '../market-data/types'
 export type PinetsSeriesMap = Record<string, number[]>
 const PREPARED_SERIES_CACHE = new Map<string, PinetsSeriesMap>()
 
+interface PinetsPlotEntry {
+    data?: Array<{ time: number; value: number }>
+}
+
 function toPinetsCandles(data: MarketDataPoint[], timeframe: string) {
     const tfSeconds = timeframe === '1m'
         ? 60
@@ -137,7 +141,7 @@ export async function preparePinetsSeries(
     const plots = context.plots ?? {}
     const series: PinetsSeriesMap = {}
 
-    for (const [title, plot] of Object.entries<any>(plots)) {
+    for (const [title, plot] of Object.entries(plots as Record<string, PinetsPlotEntry>)) {
         if (!plot?.data) {
             continue
         }

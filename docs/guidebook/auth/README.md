@@ -1,6 +1,6 @@
 # Mahita Auth Guidebook
 
-Status: Canonical guidebook for Mahita authentication, authorization, brokerage OAuth, and operator access. This guide complements the release-status documents in [docs/current_state_baseline.md](/Users/rmehta01/Sites/mahita/docs/current_state_baseline.md) and [docs/execution/mahita_recovery_program.md](/Users/rmehta01/Sites/mahita/docs/execution/mahita_recovery_program.md).
+Status: Canonical guidebook for Mahita authentication, authorization, brokerage OAuth, and operator access. This guide complements the release-status documents in [docs/current_state_baseline.md](../../current_state_baseline.md) and [docs/execution/mahita_recovery_program.md](../../execution/mahita_recovery_program.md).
 
 Read in order:
 

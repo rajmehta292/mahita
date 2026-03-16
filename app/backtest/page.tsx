@@ -48,6 +48,21 @@ interface Strategy {
     updatedAt: string
 }
 
+interface StrategyDraftDocument {
+    id: string
+    name: string
+    description?: string | null
+    source: string
+    symbol: string
+    timeframe: string
+    engineMode?: string | null
+    lastParityStatus?: string | null
+    linkedFixtureId?: string | null
+    runSettings?: StrategyRunSettings | null
+    createdAt: string
+    updatedAt: string
+}
+
 interface ParityFixtureDocument {
     id: string
     fixtureKey: string
@@ -203,7 +218,7 @@ export default function BacktestPage() {
             }
 
             const json = await response.json()
-            const savedStrategies: Strategy[] = (json.drafts ?? []).map((draft: any) => ({
+            const savedStrategies: Strategy[] = ((json.drafts ?? []) as StrategyDraftDocument[]).map((draft) => ({
                 id: draft.id,
                 name: draft.name,
                 description: draft.description ?? '',

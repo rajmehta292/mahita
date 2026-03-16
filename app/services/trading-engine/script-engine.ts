@@ -1,12 +1,16 @@
 import { createHash } from 'crypto'
+import type { MarketDataPoint } from '../market-data/types'
 import type { StrategyRunSettings } from './types'
+
+type ScriptVariableMap = Record<string, unknown>
+type ScriptSeriesHistory = Record<string, unknown[]>
 
 export interface ScriptContext {
     index: number
-    data: any[]
+    data: MarketDataPoint[]
     indicators: Record<string, number[]>
-    vars: Record<string, any>
-    seriesHistory?: Record<string, any[]>
+    vars: ScriptVariableMap
+    seriesHistory?: ScriptSeriesHistory
     strategy: {
         entry: (id: string, direction: 'long' | 'short', params?: Record<string, unknown>) => void
         close: (id: string, params?: Record<string, unknown>) => void
@@ -14,6 +18,63 @@ export interface ScriptContext {
         readonly openTrades?: number
         readonly positionSize?: number
         readonly positionAvgPrice?: number
+    }
+}
+
+interface ExecutionScope extends Record<string, unknown> {
+    history: (seriesName: string, offset: number) => unknown
+    __series: (seriesName: string) => number | undefined
+    __seriesTuple: (...seriesNames: string[]) => Array<number | undefined>
+    plot: () => undefined
+    plotshape: () => undefined
+    label: {
+        new: () => undefined
+        delete: () => undefined
+        style_label_left: string
+    }
+    barstate: {
+        islast: boolean
+    }
+    shape: {
+        triangleup: string
+        triangledown: string
+    }
+    location: {
+        belowbar: string
+        abovebar: string
+    }
+    format: {
+        mintick: string
+    }
+    color: {
+        green: string
+        red: string
+        gray: string
+        black: string
+        white: string
+        new: (base: unknown) => unknown
+    }
+    math: Math
+    str: {
+        tostring: (value: unknown) => string
+    }
+    nz: (value: unknown, fallback?: unknown) => unknown
+    isNa: (value: unknown) => boolean
+    ta: {
+        crossover: (leftKey: string, currentLeft: number, rightKey: string, currentRight: number) => boolean
+        crossunder: (leftKey: string, currentLeft: number, rightKey: string, currentRight: number) => boolean
+    }
+    strategy: {
+        long: 'long'
+        short: 'short'
+        cash: 'cash'
+        fixed: 'fixed'
+        readonly opentrades: number
+        readonly position_size: number
+        readonly position_avg_price: number
+        entry: ScriptContext['strategy']['entry']
+        close: ScriptContext['strategy']['close']
+        close_all: () => void
     }
 }
 
@@ -71,10 +132,10 @@ export class ScriptCompiler {
 
     static compileDetailed(script: string): CompiledScriptArtifact {
         const normalizedScriptSource = this.transpile(script)
-        let executor: (scope: Record<string, any>) => void
+        let executor: (scope: ExecutionScope) => void
 
         try {
-            executor = new Function('scope', `with (scope) {\n${normalizedScriptSource}\n}`) as (scope: Record<string, any>) => void
+            executor = new Function('scope', `with (scope) {\n${normalizedScriptSource}\n}`) as (scope: ExecutionScope) => void
         } catch (error) {
             console.error('Compilation Error:', error)
             throw new Error('Failed to compile Pine source for the PineTS-backed Mahita runtime. Check syntax or unsupported Pine features.')
@@ -148,7 +209,7 @@ export class ScriptCompiler {
         }
     }
 
-    static prepareIndicators(data: any[], script: string): Record<string, number[]> {
+    static prepareIndicators(data: MarketDataPoint[], script: string): Record<string, number[]> {
         const indicators: Record<string, number[]> = {}
         const generatedAssignments = Array.from(script.matchAll(/^\s*([A-Za-z_]\w*)\s*=\s*ta\.[^(]+\(.+\)\s*$/gm)).map((match) => match[1])
 
@@ -326,7 +387,7 @@ export class ScriptCompiler {
 
     private static createExecutionScope(context: ScriptContext) {
         const currentBar = context.data[context.index] ?? {}
-        const scope: Record<string, any> = {
+        const scope = {
             ...context.vars,
             open: currentBar.open,
             high: currentBar.high,
@@ -335,7 +396,7 @@ export class ScriptCompiler {
             volume: currentBar.volume,
             time: currentBar.time,
             bar_index: context.index,
-        }
+        } as unknown as ExecutionScope
 
         scope.history = (seriesName: string, offset: number) => {
             const normalizedOffset = Number.isFinite(offset) ? Math.max(0, Math.floor(offset)) : 0
@@ -434,7 +495,7 @@ export class ScriptCompiler {
         return scope
     }
 
-    private static persistScopeValues(context: ScriptContext, scope: Record<string, any>) {
+    private static persistScopeValues(context: ScriptContext, scope: ExecutionScope) {
         const seriesHistory = context.seriesHistory ?? {}
         context.seriesHistory = seriesHistory
 

@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Status: Historical quick start. Operationally useful, but auth and callback guidance is superseded by [docs/guidebook/auth/README.md](/Users/rmehta01/Sites/mahita/docs/guidebook/auth/README.md) and [docs/current_state_baseline.md](/Users/rmehta01/Sites/mahita/docs/current_state_baseline.md).
+Status: Historical quick start. Operationally useful, but auth and callback guidance is superseded by [docs/guidebook/auth/README.md](guidebook/auth/README.md) and [docs/current_state_baseline.md](current_state_baseline.md).
 
 Get up and running with Mahita Terminal in 5 minutes!
 

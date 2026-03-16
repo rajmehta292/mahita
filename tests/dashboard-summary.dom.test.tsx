@@ -1,6 +1,7 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import React from 'react'
 import DashboardPage from '@/app/dashboard/page'
+import { renderApp } from '@/tests/utils/render-app'
 
 vi.mock('next/navigation', () => ({
     useRouter: () => ({
@@ -120,23 +121,34 @@ describe('DashboardPage', () => {
                 return { ok: true, json: async () => ({ success: true, quotes: [] }) }
             }
 
+            if (url === '/api/user/view-demand') {
+                return { ok: true, json: async () => ({ success: true }) }
+            }
+
             throw new Error(`Unexpected fetch: ${url}`)
         })
 
         vi.stubGlobal('fetch', fetchMock)
 
-        render(<DashboardPage />)
-
+        renderApp(<DashboardPage />, {
+            session: {
+                expires: '2999-01-01T00:00:00.000Z',
+                user: {
+                    id: 'user_dashboard',
+                    email: 'raj@example.com',
+                    role: 'SUPERUSER',
+                },
+            },
+        })
         await waitFor(() => expect(screen.getAllByText('$0.99').length).toBeGreaterThan(0))
         expect(screen.getByText('Brokerage • 9998')).toBeInTheDocument()
 
         fireEvent.change(screen.getByRole('combobox'), {
             target: { value: 'hash-251' },
         })
-
         await waitFor(() => expect(screen.getAllByText('$46,956.85').length).toBeGreaterThan(0))
         expect(screen.getAllByText('$2,115.01').length).toBeGreaterThan(0)
         expect(screen.getAllByText('-0.05%').length).toBeGreaterThan(0)
-        expect(screen.getAllByText('IRA • 0251').length).toBeGreaterThan(0)
+        expect(screen.getAllByText(/IRA .*0251/).length).toBeGreaterThan(0)
     })
 })

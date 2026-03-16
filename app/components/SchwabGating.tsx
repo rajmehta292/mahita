@@ -4,7 +4,12 @@ import { useState, useEffect, ReactNode, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Zap, Link as LinkIcon, AlertCircle, Key, Settings } from 'lucide-react'
 import { normalizeUnknownError } from '@/lib/app-errors'
-import { subscribeToSchwabPopupSignals, type SchwabPopupSignal } from '@/lib/schwab-popup-channel'
+import {
+    clearSchwabPopupFlow,
+    markSchwabPopupFlow,
+    subscribeToSchwabPopupSignals,
+    type SchwabPopupSignal,
+} from '@/lib/schwab-popup-channel'
 
 interface SchwabGatingProps {
     children: ReactNode
@@ -23,7 +28,7 @@ export function SchwabGating({ children, requiredConfig = true, onStateChange }:
 
     const checkSchwabConfig = useCallback(async () => {
         try {
-            const response = await fetch('/api/user/schwab-config')
+            const response = await fetch('/api/user/schwab-config', { cache: 'no-store' })
             const data = await response.json()
 
             if (data.success && data.config) {
@@ -43,6 +48,18 @@ export function SchwabGating({ children, requiredConfig = true, onStateChange }:
         }
     }, [onStateChange])
 
+    const readAuthorizationState = (authUrl: string, fallbackState?: string) => {
+        if (fallbackState) {
+            return fallbackState
+        }
+
+        try {
+            return new URL(authUrl).searchParams.get('state') ?? undefined
+        } catch {
+            return undefined
+        }
+    }
+
     useEffect(() => {
         checkSchwabConfig()
     }, [checkSchwabConfig])
@@ -53,7 +70,7 @@ export function SchwabGating({ children, requiredConfig = true, onStateChange }:
         setConnectError(null)
         try {
             // Step 1: Get authorization URL
-            const authResponse = await fetch('/api/schwab/auth?action=authorize')
+            const authResponse = await fetch('/api/schwab/auth?action=authorize', { cache: 'no-store' })
             const authData = await authResponse.json()
 
             if (!authResponse.ok) {
@@ -63,12 +80,15 @@ export function SchwabGating({ children, requiredConfig = true, onStateChange }:
                 return
             }
 
-            const { authUrl } = authData
+            const { authUrl, state } = authData
+            const popupFlowState = readAuthorizationState(authUrl, typeof state === 'string' ? state : undefined)
+            markSchwabPopupFlow(popupFlowState)
 
             // Step 2: Open authorization window
             const connectWindowUrl = `/schwab/connect?popupFlow=1&authUrl=${encodeURIComponent(authUrl)}`
             const authWindow = window.open(connectWindowUrl, 'Schwab Authorization', 'width=600,height=700')
             if (!authWindow) {
+                clearSchwabPopupFlow(popupFlowState)
                 setConnectError('Mahita could not open the Schwab authorization window. Check your popup blocker and retry.')
                 setConnecting(false)
                 setConnectionPhase('idle')
@@ -173,7 +193,7 @@ export function SchwabGating({ children, requiredConfig = true, onStateChange }:
                 }
 
                 try {
-                    const statusResponse = await fetch('/api/schwab/auth?action=status')
+                    const statusResponse = await fetch('/api/schwab/auth?action=status', { cache: 'no-store' })
                     const statusData = await statusResponse.json()
 
                     if (statusResponse.ok && statusData?.isConnected) {

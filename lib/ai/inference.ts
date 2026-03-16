@@ -7,7 +7,7 @@ import { decrypt } from './encryption'
 import prisma from '@/lib/prisma'
 
 export class InferenceService {
-    static async chat(userId: string, request: ChatRequest) {
+    static async chat(userId: string, request: ChatRequest): Promise<ReadableStream<Uint8Array> | null> {
         const model = getModel(request.modelId)
         if (!model) throw new Error(`Model ${request.modelId} not found`)
 
@@ -37,7 +37,7 @@ export class InferenceService {
         }
 
         // 2. Route to Adapter
-        let stream: any
+        let stream: ReadableStream<Uint8Array> | null
         if (model.provider === 'ollama') {
             const adapter = new OllamaAdapter()
             stream = await adapter.chat(request)

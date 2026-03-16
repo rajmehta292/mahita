@@ -51,6 +51,123 @@ export interface AccountBalance {
   netChange: number
 }
 
+interface SchwabApiErrorPayload {
+  message?: string
+  error?: string
+  [key: string]: unknown
+}
+
+interface SchwabRequestResponse<T> {
+  data: T | null
+  headers?: {
+    location: string | null
+  }
+}
+
+interface SchwabPositionPayload {
+  instrument?: {
+    symbol?: string | null
+  } | null
+  longQuantity?: number | null
+  shortQuantity?: number | null
+  averagePrice?: number | null
+  marketValue?: number | null
+  currentDayProfitLoss?: number | null
+  currentDayProfitLossPercentage?: number | null
+}
+
+interface SchwabBalanceSnapshot {
+  cashBalance?: number | null
+  availableFunds?: number | null
+  cashAvailableForTrading?: number | null
+  moneyMarketFund?: number | null
+  cashAvailableForWithdrawal?: number | null
+  longMarketValue?: number | null
+  marketValue?: number | null
+  shortMarketValue?: number | null
+  equity?: number | null
+  accountValue?: number | null
+  netLiquidationValue?: number | null
+  liquidationValue?: number | null
+  netChange?: number | null
+  todayNetChange?: number | null
+  buyingPower?: number | null
+  dayTradingBuyingPower?: number | null
+  maintenanceRequirement?: number | null
+}
+
+interface SchwabAccountPayload {
+  hashValue?: string
+  securitiesAccount?: {
+    accountId?: string
+    hashValue?: string
+    type?: string
+    positions?: SchwabPositionPayload[]
+    currentBalances?: SchwabBalanceSnapshot
+    initialBalances?: SchwabBalanceSnapshot
+    projectedBalances?: SchwabBalanceSnapshot
+  }
+}
+
+interface OrderQueryParams {
+  maxResults?: number
+  fromEnteredTime?: string
+  toEnteredTime?: string
+  status?: string
+}
+
+interface PriceHistoryParams {
+  periodType?: 'day' | 'month' | 'year' | 'ytd'
+  period?: number
+  frequencyType?: 'minute' | 'daily' | 'weekly' | 'monthly'
+  frequency?: number
+  startDate?: number
+  endDate?: number
+}
+
+type SchwabQueryParams = Record<string, string | number | boolean | undefined>
+
+interface QuoteSnapshot {
+  symbol: string
+  lastPrice: number
+  netChange: number
+  totalVolume: number
+}
+
+interface SchwabOrderPayload {
+  orderType: OrderRequest['orderType']
+  session: OrderRequest['session']
+  duration: OrderRequest['duration']
+  orderStrategyType: 'SINGLE'
+  orderLegCollection: Array<{
+    instruction: OrderRequest['instruction']
+    quantity: number
+    instrument: {
+      symbol: string
+      assetType: 'EQUITY'
+    }
+  }>
+  price?: number
+  stopPrice?: number
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null
+}
+
+function toSearchParams(params: SchwabQueryParams) {
+  const searchParams = new URLSearchParams()
+
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined) {
+      continue
+    }
+    searchParams.set(key, String(value))
+  }
+
+  return searchParams.toString()
+}
+
 function toNumericValue(...values: unknown[]) {
   for (const value of values) {
     if (typeof value === 'number' && Number.isFinite(value)) {
@@ -70,18 +187,16 @@ export class SchwabClient {
     this.config = config
   }
 
-  private async request(url: string, options: RequestInit = {}) {
+  private async request<T = unknown>(url: string, options: RequestInit = {}): Promise<SchwabRequestResponse<T>> {
     if (!this.config.accessToken) {
       throw new Error('Access token is missing. Please authenticate first.')
     }
     // Set standard headers - ONLY Authorization. Schwab V1 API crashes with 500 errors if arbitrary headers are present.
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${this.config.accessToken}`,
-      ...(options.headers as Record<string, string> || {})
-    }
+    const headers = new Headers(options.headers)
+    headers.set('Authorization', `Bearer ${this.config.accessToken}`)
 
     if (options.method === 'POST' || options.method === 'PUT') {
-      headers['Content-Type'] = 'application/json'
+      headers.set('Content-Type', 'application/json')
     }
 
     console.log(`[Schwab API] ${options.method || 'GET'} ${url}`)
@@ -89,16 +204,24 @@ export class SchwabClient {
 
     if (!response.ok) {
       const errorText = await response.text()
-      let errorData: any = { message: errorText }
+      let errorData: SchwabApiErrorPayload = { message: errorText }
       try {
-        errorData = JSON.parse(errorText)
-      } catch (e) {
+        const parsed = JSON.parse(errorText) as unknown
+        if (isRecord(parsed)) {
+          errorData = parsed
+        }
+      } catch {
         // Keep as text if not JSON
       }
 
       const errorMsg = errorData?.message || errorData?.error || response.statusText
-      const error = new Error(`Schwab API Error ${response.status}: ${errorMsg}`)
-        ; (error as any).response = { status: response.status, data: errorData }
+      const error = new Error(`Schwab API Error ${response.status}: ${errorMsg}`) as Error & {
+        response?: {
+          status: number
+          data: SchwabApiErrorPayload
+        }
+      }
+      error.response = { status: response.status, data: errorData }
       throw error
     }
 
@@ -204,14 +327,14 @@ export class SchwabClient {
    * Get account information
    */
   async getAccount(accountId: string) {
-    return await this.request(`${this.traderUrl}/accounts/${accountId}`)
+    return await this.request<SchwabAccountPayload>(`${this.traderUrl}/accounts/${accountId}`)
   }
 
   /**
    * Get all accounts
    */
   async getAccounts() {
-    return await this.request(`${this.traderUrl}/accounts`)
+    return await this.request<SchwabAccountPayload[]>(`${this.traderUrl}/accounts`)
   }
 
   /**
@@ -225,25 +348,29 @@ export class SchwabClient {
    * Get account positions
    */
   async getPositions(accountId: string): Promise<Position[]> {
-    const response = await this.request(`${this.traderUrl}/accounts/${accountId}?fields=positions`)
+    const response = await this.request<SchwabAccountPayload>(`${this.traderUrl}/accounts/${accountId}?fields=positions`)
     const positions = response.data?.securitiesAccount?.positions || []
 
-    return positions.map((pos: any) => ({
-      symbol: pos.instrument?.symbol || '',
-      quantity: pos.longQuantity || pos.shortQuantity || 0,
-      averagePrice: pos.averagePrice || 0,
-      currentPrice: pos.marketValue / (pos.longQuantity || pos.shortQuantity || 1),
-      marketValue: pos.marketValue || 0,
-      unrealizedPL: pos.currentDayProfitLoss || 0,
-      unrealizedPLPercent: pos.currentDayProfitLossPercentage || 0,
-    }))
+    return positions.map((pos) => {
+      const quantity = pos.longQuantity || pos.shortQuantity || 0
+      const marketValue = pos.marketValue || 0
+      return {
+        symbol: pos.instrument?.symbol || '',
+        quantity,
+        averagePrice: pos.averagePrice || 0,
+        currentPrice: marketValue / (quantity || 1),
+        marketValue,
+        unrealizedPL: pos.currentDayProfitLoss || 0,
+        unrealizedPLPercent: pos.currentDayProfitLossPercentage || 0,
+      }
+    })
   }
 
   /**
    * Get account balance
    */
   async getBalance(accountId: string): Promise<AccountBalance> {
-    const response = await this.request(`${this.traderUrl}/accounts/${accountId}`)
+    const response = await this.request<SchwabAccountPayload>(`${this.traderUrl}/accounts/${accountId}`)
     const balances = response.data?.securitiesAccount?.currentBalances || {}
     const initialBalances = response.data?.securitiesAccount?.initialBalances || {}
     const projectedBalances = response.data?.securitiesAccount?.projectedBalances || {}
@@ -323,7 +450,7 @@ export class SchwabClient {
     toEnteredTime?: string
     status?: string
   }) {
-    const query = params ? `?${new URLSearchParams(params as any).toString()}` : ''
+    const query = params ? `?${toSearchParams(params)}` : ''
     return await this.request(`${this.traderUrl}/accounts/${accountId}/orders${query}`)
   }
 
@@ -378,9 +505,9 @@ export class SchwabClient {
   /**
    * Get option chain
    */
-  async getOptionChain(symbol: string, params?: any) {
+  async getOptionChain(symbol: string, params?: SchwabQueryParams) {
     const queryParams = { symbol, ...params }
-    const query = `?${new URLSearchParams(queryParams).toString()}`
+    const query = `?${toSearchParams(queryParams)}`
     return await this.request(`${this.marketDataUrl}/chains${query}`)
   }
 
@@ -393,11 +520,11 @@ export class SchwabClient {
       quantity: order.quantity,
       instrument: {
         symbol: order.symbol,
-        assetType: 'EQUITY'
+        assetType: 'EQUITY' as const
       }
     }
 
-    const payload: any = {
+    const payload: SchwabOrderPayload = {
       orderType: order.orderType,
       session: order.session,
       duration: order.duration,
@@ -541,7 +668,8 @@ export class MockSchwabClient extends SchwabClient {
     return { data: { success: true } }
   }
 
-  async getOrders(accountId: string, params?: any) {
+  async getOrders(accountId: string, params?: OrderQueryParams) {
+    void params
     return {
       data: [
         {
@@ -575,7 +703,7 @@ export class MockSchwabClient extends SchwabClient {
   }
 
   async getQuotes(symbols: string[]) {
-    const quotes: any = {}
+    const quotes: Record<string, QuoteSnapshot> = {}
     for (const sym of symbols) {
       quotes[sym] = {
         symbol: sym,
@@ -587,19 +715,19 @@ export class MockSchwabClient extends SchwabClient {
     return { data: quotes }
   }
 
-  async getPriceHistory(symbol: string, params?: any) {
+  async getPriceHistory(symbol: string, params?: PriceHistoryParams) {
     console.log(`[MOCK] Generating synthetic price history for ${symbol}`)
     const candles = []
 
     // Determine number of candles (e.g., mock 100 candles if dates not specified carefully)
-    let numCandles = 100
+    const numCandles = 100
     let intervalMs = 60000 // 1 minute default
 
     if (params?.frequencyType === 'daily') {
       intervalMs = 86400000
     }
 
-    let startTime = params?.startDate || (Date.now() - (numCandles * intervalMs))
+    const startTime = params?.startDate || (Date.now() - (numCandles * intervalMs))
     let currentPrice = 150.0
 
     for (let i = 0; i < numCandles; i++) {
@@ -628,7 +756,8 @@ export class MockSchwabClient extends SchwabClient {
     }
   }
 
-  async getOptionChain(symbol: string, params?: any) {
+  async getOptionChain(symbol: string, params?: SchwabQueryParams) {
+    void params
     return {
       data: {
         symbol,

@@ -6,6 +6,7 @@ import {
     classifyPlatformDataProvenance,
     getInventoryProvenance,
     listDistinctVaultSources,
+    PlatformDataVerificationStatus,
 } from '@/app/services/market-data/read-service'
 import { getBaseRequirement } from '@/app/services/market-data/timeframe-math'
 import { Timeframe } from '@/app/services/market-data/types'
@@ -29,6 +30,15 @@ const DEFAULT_LOOKBACKS: Record<Timeframe, number> = {
     '1d': 5 * 31536000,
     '1w': 10 * 31536000,
     '1M': 15 * 31536000
+}
+
+function isPlatformDataVerificationStatus(value: string | null | undefined): value is PlatformDataVerificationStatus {
+    return value === 'single-source-unverified'
+        || value === 'same-source-verified'
+        || value === 'cross-source-verified'
+        || value === 'derived-from-verified-base'
+        || value === 'disputed'
+        || value === 'stale'
 }
 
 export async function GET(req: NextRequest) {
@@ -84,7 +94,9 @@ export async function GET(req: NextRequest) {
             requestedTimeframe: timeframe,
             vaultName: targetVault,
             sources,
-            verificationStatus: inventoryProvenance?.verificationStatus as any,
+            verificationStatus: isPlatformDataVerificationStatus(inventoryProvenance?.verificationStatus)
+                ? inventoryProvenance.verificationStatus
+                : null,
             verificationMethod: inventoryProvenance?.verificationMethod ?? null,
             lastVerifiedAt: inventoryProvenance?.lastVerifiedAt?.toISOString() ?? null,
         })

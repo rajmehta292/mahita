@@ -2,7 +2,26 @@ import YahooFinance from 'yahoo-finance2'
 import { IHistoricalProvider, ProviderCapability, HistoricalBar } from './registry'
 import { Timeframe } from '../timeframe-math'
 
-const yahooFinance = new (YahooFinance as any)();
+interface YahooHistoricalRow {
+    date: Date
+    open?: number | null
+    high?: number | null
+    low?: number | null
+    close?: number | null
+    volume?: number | null
+}
+
+const YahooFinanceClient = YahooFinance as unknown as {
+    new (): {
+        historical(symbol: string, options: {
+            period1: number
+            period2: number
+            interval: '1m' | '5m' | '15m' | '30m' | '1h' | '1d' | '1wk' | '1mo'
+        }): Promise<YahooHistoricalRow[]>
+    }
+}
+
+const yahooFinance = new YahooFinanceClient()
 
 export class YahooV2Provider implements IHistoricalProvider {
     name = 'yahoo'
@@ -34,13 +53,11 @@ export class YahooV2Provider implements IHistoricalProvider {
         const normSymbol = this.normalizeSymbol(symbol, assetClass)
 
         try {
-            const rawResult = await yahooFinance.historical(normSymbol, {
+            const result = await yahooFinance.historical(normSymbol, {
                 period1: startUnix,
                 period2: endUnix,
                 interval
             })
-
-            const result = rawResult as any[]
 
             return result.map(quote => ({
                 time: Math.floor(quote.date.getTime() / 1000),
@@ -50,8 +67,9 @@ export class YahooV2Provider implements IHistoricalProvider {
                 close: quote.close || 0,
                 volume: quote.volume || 0
             }))
-        } catch (error: any) {
-            console.warn(`[YahooV2Provider] Error fetching ${normSymbol}: ${error.message}`)
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+            console.warn(`[YahooV2Provider] Error fetching ${normSymbol}: ${errorMessage}`)
             return []
         }
     }

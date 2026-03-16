@@ -3,8 +3,10 @@ import path from 'path'
 import fs from 'fs'
 import { execSync } from 'child_process'
 import prisma from '@/lib/prisma'
+import { ensureDirectory, getDataRoot, getVaultsRoot } from '@/lib/server-paths'
 
-const VAULTS_DIR = path.join(process.cwd(), 'data', 'vaults')
+const DATA_DIR = getDataRoot()
+const VAULTS_DIR = getVaultsRoot()
 
 export interface VaultInfo {
     id: string
@@ -18,9 +20,24 @@ class VaultManager {
     private clientInit: Map<string, Promise<void>> = new Map()
 
     constructor() {
-        if (!fs.existsSync(VAULTS_DIR)) {
-            fs.mkdirSync(VAULTS_DIR, { recursive: true })
+        ensureDirectory(VAULTS_DIR)
+    }
+
+    private resolveVaultDbPath(dbFile: string): string {
+        if (path.isAbsolute(dbFile)) {
+            return dbFile
         }
+
+        const normalized = dbFile.replace(/\\/g, '/')
+        if (normalized.startsWith('data/')) {
+            return path.join(DATA_DIR, normalized.slice('data/'.length))
+        }
+
+        if (normalized.startsWith('vaults/')) {
+            return path.join(DATA_DIR, normalized)
+        }
+
+        return path.join(VAULTS_DIR, path.basename(normalized))
     }
 
     /**
@@ -53,24 +70,26 @@ class VaultManager {
         }
 
         const dbFile = vault.dbPath || path.join(VAULTS_DIR, `${vault.name}.db`)
-        const fullPath = path.isAbsolute(dbFile) ? dbFile : path.join(process.cwd(), dbFile)
+        const fullPath = this.resolveVaultDbPath(dbFile)
 
-        // Ensure directory exists
         const dir = path.dirname(fullPath)
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true })
-        }
+        ensureDirectory(dir)
 
-        // Initialize/Sync schema if file is new
         if (!fs.existsSync(fullPath)) {
-            console.log(`[VaultManager] Initializing new database for vault: ${vault.name}`)
-            this.syncSchema(fullPath)
+            if (process.env.ALLOW_RUNTIME_VAULT_BOOTSTRAP === 'true') {
+                console.log(`[VaultManager] Bootstrapping new database for vault: ${vault.name}`)
+                this.syncSchema(fullPath)
+            } else {
+                throw new Error(
+                    `Vault database missing at ${fullPath}. Run node scripts/prepare-runtime.mjs before serving market-data routes.`,
+                )
+            }
         }
 
         const client = new PrismaClient({
             datasources: {
                 db: {
-                    url: `file:${fullPath}`
+                    url: `file:${fullPath.replace(/\\/g, '/')}`
                 }
             }
         })
@@ -126,7 +145,7 @@ class VaultManager {
             // Environment variable override for the push command
             const env = {
                 ...process.env,
-                DATABASE_URL: `file:${dbPath}`,
+                DATABASE_URL: `file:${dbPath.replace(/\\/g, '/')}`,
                 PRISMA_SKIP_POSTINSTALL_GENERATE: 'true'
             }
 

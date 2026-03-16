@@ -1,0 +1,72 @@
+name: Repo Quality
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 'codex/**'
+  pull_request:
+
+jobs:
+  ubuntu-source-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run verify:repo:typecheck
+
+      - name: Source lint
+        run: npm run verify:repo:lint:source
+
+      - name: Repo hygiene
+        run: npm run verify:repo:repo-hygiene
+
+      - name: Docs portability
+        run: npm run verify:repo:docs-portability
+
+      - name: Unit and route tests
+        run: npm run verify:repo:unit
+
+  windows-browser-gates:
+    runs-on: windows-latest
+    env:
+      DATABASE_URL: file:./demo.db
+      ENABLE_DEV_AUTH_BYPASS: 'true'
+      ADMIN_EMAILS: dev@mahita.ai
+      MAHITA_SECRET_KEY: ci-secret-key
+      NEXTAUTH_URL: http://localhost:6244
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prepare runtime
+        run: node scripts/prepare-runtime.mjs --mode=build
+
+      - name: Build
+        run: npm run verify:repo:build
+
+      - name: Install Playwright browsers
+        run: npx playwright install
+
+      - name: Browser suite
+        run: npm run verify:repo:e2e
+
+      - name: Visual suite
+        run: npm run verify:repo:visual
