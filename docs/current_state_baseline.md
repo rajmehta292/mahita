@@ -22,20 +22,20 @@ Documentation tranche update:
 ## Generated Repo Audit Snapshot
 
 <!-- REPO_AUDIT:START -->
-Generated from `docs/internal/generated/repo-audit-report.json` on 2026-03-18T02:32:15.856Z.
+Generated from `docs/internal/generated/repo-audit-report.json` on 2026-03-18T04:43:51.559Z.
 
 - typecheck: pass
 - lint-source: pass
 - lint-noise: pass
 - repo-hygiene: pass
 - docs-portability: pass
-- unit: fail
-- e2e: fail
+- unit: pass
+- e2e: pass
 - visual: pass
 - build: pass
 - live-smoke: manual
 
-- blocking findings: unit, e2e
+- blocking findings: none
 <!-- REPO_AUDIT:END -->
 
 ## Verified Release Gate Status

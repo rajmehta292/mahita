@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 import { signInWithDevBypass } from '@/e2e/support/session'
 
 test('signed-in user can save Schwab credentials and a superuser can load admin tabs', async ({ page }) => {
-    await signInWithDevBypass(page)
+    await signInWithDevBypass(page, '/dashboard', { email: 'raj.dmehta292@gmail.com' })
 
     await page.goto('/settings')
     await expect(page.getByRole('heading', { name: /settings/i })).toBeVisible()
@@ -18,8 +18,8 @@ test('signed-in user can save Schwab credentials and a superuser can load admin 
     await page.getByRole('button', { name: /provider pool/i }).click()
     await expect(page.getByText(/promote provider/i)).toBeVisible()
 
-    await page.getByRole('button', { name: /data command/i }).click()
-    await expect(page.getByText(/operator actions/i)).toBeVisible()
+    await page.getByRole('button', { name: /di-ui/i }).click()
+    await expect(page.getByRole('heading', { name: 'DI-UI' })).toBeVisible()
 
     await page.getByRole('button', { name: /users/i }).click()
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible()

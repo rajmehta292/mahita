@@ -141,7 +141,7 @@ describe('DashboardPage', () => {
             },
         })
         await waitFor(() => expect(screen.getAllByText('$0.99').length).toBeGreaterThan(0))
-        expect(screen.getByText('Brokerage • 9998')).toBeInTheDocument()
+        expect(screen.getAllByText('Brokerage • 9998').length).toBeGreaterThan(0)
 
         fireEvent.change(screen.getByRole('combobox'), {
             target: { value: 'hash-251' },

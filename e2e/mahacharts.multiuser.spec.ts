@@ -1,4 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from '@playwright/test'
+import { signInWithDevBypass } from './support/session'
 
 function buildBars(count: number, intervalSeconds: number) {
     const start = 1_710_000_000
@@ -15,14 +16,6 @@ function buildBars(count: number, intervalSeconds: number) {
             close,
             volume: 150000 + index * 1200,
         }
-    })
-}
-
-async function signInWithDevBypass(page: Page) {
-    await page.goto('/auth/signin')
-    await page.getByRole('button', { name: /sign in with dev bypass/i }).click()
-    await page.waitForURL((url) => !/\/auth\/(signin|post-signin)/.test(url.pathname), {
-        timeout: 15_000,
     })
 }
 

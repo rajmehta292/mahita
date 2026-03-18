@@ -17,6 +17,7 @@ import { dedupeMarketDataPoints, getMissingRanges } from './utils'
 import { getBaseRequirement, deriveBars, timeframeToSeconds } from './timeframe-math'
 import { getRuntimeProviderOrder, normalizeStage2Provider } from './provider-policy'
 import { vaultManager, withVaultQueryRetry } from './vault-manager'
+import { checkSchwabTokenHealth } from '../schwab/runtime'
 
 interface ProviderEntry {
     name: string
@@ -59,6 +60,8 @@ async function withProviderTimeout<T>(operation: Promise<T>, timeoutMs: number, 
 
 export class MarketDataStore {
     private providers: ProviderEntry[]
+    private inFlightRangeFetches = new Map<string, Promise<ChunkIngestionReport>>()
+    private schwabAutoReadinessCache: { checkedAt: number; isValid: boolean } | null = null
 
     constructor() {
         this.providers = [
@@ -192,6 +195,44 @@ export class MarketDataStore {
         return this.providers.filter((entry) => entry.name === normalized)
     }
 
+    private async shouldUseSchwabAutomatically(): Promise<boolean> {
+        if (process.env.USE_MOCK_DATA === 'true') {
+            return true
+        }
+
+        const cached = this.schwabAutoReadinessCache
+        const now = Date.now()
+        if (cached && now - cached.checkedAt < 30_000) {
+            return cached.isValid
+        }
+
+        let isValid = false
+        try {
+            const tokenHealth = await checkSchwabTokenHealth()
+            isValid = tokenHealth.isValid
+        } catch {
+            isValid = false
+        }
+
+        this.schwabAutoReadinessCache = { checkedAt: now, isValid }
+        return isValid
+    }
+
+    private async resolveProviders(providerOverride?: string): Promise<ProviderEntry[]> {
+        const providers = this.getProviders(providerOverride)
+        if (providerOverride || providers.every((entry) => entry.name !== 'schwab')) {
+            return providers
+        }
+
+        const shouldUseSchwab = await this.shouldUseSchwabAutomatically()
+        if (shouldUseSchwab) {
+            return providers
+        }
+
+        const filteredProviders = providers.filter((entry) => entry.name !== 'schwab')
+        return filteredProviders.length > 0 ? filteredProviders : providers
+    }
+
     private getInteractiveRefreshWindowSeconds(timeframe: Timeframe): number {
         switch (timeframe) {
             case '1s':
@@ -228,6 +269,25 @@ export class MarketDataStore {
         }
 
         return merged
+    }
+
+    private getRangeFetchKey(
+        symbol: string,
+        timeframe: Timeframe,
+        range: TimeRange,
+        providerOverride?: string,
+        forceRefresh = false,
+        vaultName = 'schwab'
+    ): string {
+        return [
+            symbol,
+            timeframe,
+            range.startTime,
+            range.endTime,
+            providerOverride || 'auto',
+            forceRefresh ? 'refresh' : 'fill',
+            vaultName,
+        ].join('|')
     }
 
     private planInteractiveMissingRanges(
@@ -309,8 +369,58 @@ export class MarketDataStore {
         providerClient?: unknown,
         providerTimeoutMs = DEFAULT_PROVIDER_TIMEOUT_MS
     ): Promise<ChunkIngestionReport> {
+        if (!providerClient) {
+            const key = this.getRangeFetchKey(symbol, timeframe, range, providerOverride, forceRefresh, vaultName)
+            const existing = this.inFlightRangeFetches.get(key)
+            if (existing) {
+                return existing
+            }
+
+            const sharedPromise = this.fetchMissingRangeInternal(
+                symbol,
+                timeframe,
+                range,
+                providerOverride,
+                forceRefresh,
+                vaultName,
+                providerClient,
+                providerTimeoutMs
+            )
+            this.inFlightRangeFetches.set(key, sharedPromise)
+
+            try {
+                return await sharedPromise
+            } finally {
+                if (this.inFlightRangeFetches.get(key) === sharedPromise) {
+                    this.inFlightRangeFetches.delete(key)
+                }
+            }
+        }
+
+        return this.fetchMissingRangeInternal(
+            symbol,
+            timeframe,
+            range,
+            providerOverride,
+            forceRefresh,
+            vaultName,
+            providerClient,
+            providerTimeoutMs
+        )
+    }
+
+    private async fetchMissingRangeInternal(
+        symbol: string,
+        timeframe: Timeframe,
+        range: TimeRange,
+        providerOverride?: string,
+        forceRefresh = false,
+        vaultName = 'schwab',
+        providerClient?: unknown,
+        providerTimeoutMs = DEFAULT_PROVIDER_TIMEOUT_MS
+    ): Promise<ChunkIngestionReport> {
         const warnings: string[] = []
-        const providers = this.getProviders(providerOverride)
+        const providers = await this.resolveProviders(providerOverride)
         const client = await vaultManager.getClient(vaultName)
 
         if (providers.length === 0) {

@@ -319,6 +319,6 @@ describe('AdminControlPlane', () => {
         fireEvent.click(screen.getByRole('button', { name: /Provider Pool/i }))
 
         await waitFor(() => expect(screen.getByText('Fallback member')).toBeInTheDocument())
-        expect(screen.getByText(/unknown · unknown · priority 10/i)).toBeInTheDocument()
+        expect(screen.getByText(/unknown\s*\/\s*unknown\s*\/\s*priority 10/i)).toBeInTheDocument()
     })
 })

@@ -6,12 +6,14 @@ const {
   telemetryLogMock,
   getClientMock,
   withVaultQueryRetryMock,
+  checkSchwabTokenHealthMock,
 } = vi.hoisted(() => ({
   schwabGetHistoricalDataMock: vi.fn(),
   yahooGetHistoricalDataMock: vi.fn(),
   telemetryLogMock: vi.fn(async () => undefined),
   getClientMock: vi.fn(),
   withVaultQueryRetryMock: vi.fn(async (operation: () => Promise<unknown>) => operation()),
+  checkSchwabTokenHealthMock: vi.fn(async () => ({ isValid: true })),
 }))
 
 vi.mock("@/app/services/market-data/providers/schwab", () => ({
@@ -51,6 +53,10 @@ vi.mock("@/app/services/market-data/vault-manager", () => ({
   withVaultQueryRetry: withVaultQueryRetryMock,
 }))
 
+vi.mock("@/app/services/schwab/runtime", () => ({
+  checkSchwabTokenHealth: checkSchwabTokenHealthMock,
+}))
+
 process.env.MAHITA_MARKET_DATA_PROVIDER_TIMEOUT_MS = "20"
 
 import { MarketDataStore } from "@/app/services/market-data/store"
@@ -71,6 +77,7 @@ describe("MarketDataStore provider fallback", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     rows.splice(0, rows.length)
+    checkSchwabTokenHealthMock.mockResolvedValue({ isValid: true })
 
     getClientMock.mockResolvedValue({
       marketData: {
@@ -187,5 +194,52 @@ describe("MarketDataStore provider fallback", () => {
     expect(result.report.warnings).toEqual(
       expect.arrayContaining([expect.stringContaining("fragmented missing ranges during interactive load")])
     )
+  })
+
+  it("deduplicates concurrent identical range fetches", async () => {
+    schwabGetHistoricalDataMock.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 25))
+      return [
+        {
+          time: 1710000000,
+          open: 1,
+          high: 2,
+          low: 0.5,
+          close: 1.5,
+          volume: 100,
+        },
+      ]
+    })
+
+    const store = new MarketDataStore()
+    await Promise.all([
+      store.getHistoricalDataWithReport("AAPL", "1d", 1709990000, 1710003600, { fetchMode: "interactive" }),
+      store.getHistoricalDataWithReport("AAPL", "1d", 1709990000, 1710003600, { fetchMode: "interactive" }),
+    ])
+
+    expect(schwabGetHistoricalDataMock).toHaveBeenCalledTimes(1)
+  })
+
+  it("skips schwab auto-selection when no runtime token is available", async () => {
+    checkSchwabTokenHealthMock.mockResolvedValue({ isValid: false })
+    yahooGetHistoricalDataMock.mockResolvedValue([
+      {
+        time: 1710000000,
+        open: 1,
+        high: 2,
+        low: 0.5,
+        close: 1.5,
+        volume: 100,
+      },
+    ])
+
+    const store = new MarketDataStore()
+    const result = await store.getHistoricalDataWithReport("AAPL", "1d", 1709990000, 1710003600, {
+      fetchMode: "interactive",
+    })
+
+    expect(schwabGetHistoricalDataMock).not.toHaveBeenCalled()
+    expect(yahooGetHistoricalDataMock).toHaveBeenCalledOnce()
+    expect(result.report.chunkReports[0]?.provider).toBe("yahoo")
   })
 })
