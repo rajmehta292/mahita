@@ -12,7 +12,7 @@ import { SymbolHeader } from './SymbolHeader'
 import { AuthEntryCta } from '../Auth/AuthEntryCta'
 import { useUserPreferences } from '../../hooks/use-user-preferences'
 import { useViewDemand } from '../../hooks/use-view-demand'
-import { readJsonResponse } from '@/lib/app-errors'
+import { fetchJsonWithTimeout } from '@/lib/app-errors'
 
 const Chart = dynamic(() => import('../Chart'), { ssr: false })
 
@@ -26,6 +26,8 @@ interface ChartMarketDataResponse {
         warnings?: string[]
     }
 }
+
+const MARKET_DATA_REQUEST_TIMEOUT_MS = 15_000
 
 const TIMEFRAME_ORDER = ['1m', '3m', '5m', '10m', '15m', '30m', '45m', '1h', '2h', '3h', '4h', '1d', '1w', '1M']
 
@@ -56,12 +58,12 @@ export function ChartWorkspace() {
 
     const safeFetchJson = useCallback(async <T,>(url: string, options?: RequestInit): Promise<T | null> => {
         try {
-            const res = await fetch(url, options)
-            if (res.redirected) {
-                window.location.href = res.url
-                return null
-            }
-            return await readJsonResponse<T>(res, `Request failed for ${url}.`)
+            return await fetchJsonWithTimeout<T>(url, {
+                ...options,
+                timeoutMs: MARKET_DATA_REQUEST_TIMEOUT_MS,
+                fallbackMessage: `Request failed for ${url}.`,
+                timeoutMessage: 'Market data took too long to load.',
+            })
         } catch (error) {
             if (error instanceof DOMException && error.name === 'AbortError') {
                 return null

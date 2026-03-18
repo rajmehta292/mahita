@@ -2,7 +2,7 @@ import prisma from "@/lib/prisma"
 import { marketDataStore } from "./store"
 import { vaultManager } from "./vault-manager"
 import { DataHealthManager } from "./health"
-import { getRuntimeSchwabClientWithOptions } from "@/app/services/schwab/runtime"
+import { getProviderAvailabilitySnapshot, resolveVerificationProviders } from "./provider-policy"
 import { Timeframe } from "./types"
 
 const DEFAULT_POLICY = {
@@ -66,15 +66,6 @@ async function getStoredBars(symbol: string, timeframe: string, rangeStart: numb
 
 function getVaultNameForProvider(provider?: string | null) {
   return provider === "yahoo" ? "yahoo" : "schwab"
-}
-
-async function getVerificationProviderAvailability() {
-  const schwabClient = await getRuntimeSchwabClientWithOptions({ silent: true })
-
-  return {
-    schwab: !!schwabClient,
-    yahoo: true,
-  }
 }
 
 async function getVerificationPolicy(profileId: string | null | undefined, timeframe: string) {
@@ -270,36 +261,25 @@ export async function runVerificationJobNow(verificationJobId: string) {
   })
 
   try {
-    const availability = await getVerificationProviderAvailability()
+    const availability = await getProviderAvailabilitySnapshot()
     const timeframe = job.timeframe as Timeframe
     const windowBars = getVerificationWindowBars(job.timeframe)
     const intervalSeconds = timeframeSeconds(job.timeframe)
-    let primaryProvider = job.sourceProvider || "schwab"
-    if (primaryProvider === "schwab" && !availability.schwab) {
-      primaryProvider = "yahoo"
-    }
+    const providerResolution = resolveVerificationProviders({
+      preferredProvider: job.sourceProvider || "schwab",
+      availability,
+    })
+    const primaryProvider = providerResolution.sourceProvider || "schwab"
 
     let actualMode = job.mode
     let comparisonProvider: string | null = null
     if (job.mode === "SAME_SOURCE") {
       comparisonProvider = primaryProvider
-    } else {
-      const preferredComparison = job.comparisonProvider || (primaryProvider === "yahoo" ? "schwab" : "yahoo")
-      const comparisonAvailable =
-        preferredComparison === "schwab"
-          ? availability.schwab
-          : preferredComparison === "yahoo"
-            ? availability.yahoo
-            : false
-
-      if (comparisonAvailable && preferredComparison !== primaryProvider) {
-        comparisonProvider = preferredComparison
-      } else if (job.mode === "BOTH") {
-        actualMode = "SAME_SOURCE"
-        comparisonProvider = primaryProvider
-      } else {
-        comparisonProvider = null
-      }
+    } else if (providerResolution.comparisonProvider && providerResolution.comparisonProvider !== primaryProvider) {
+      comparisonProvider = providerResolution.comparisonProvider
+    } else if (job.mode === "BOTH") {
+      actualMode = "SAME_SOURCE"
+      comparisonProvider = primaryProvider
     }
 
     const sourceVaultName = getVaultNameForProvider(primaryProvider)

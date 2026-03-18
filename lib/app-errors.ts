@@ -301,3 +301,65 @@ export async function readJsonResponse<T>(
     recoverable: response.status < 500,
   })
 }
+
+interface FetchJsonWithTimeoutOptions extends RequestInit {
+  timeoutMs?: number
+  fallbackMessage: string
+  timeoutMessage?: string
+}
+
+export async function fetchJsonWithTimeout<T>(
+  input: RequestInfo | URL,
+  options: FetchJsonWithTimeoutOptions
+): Promise<T> {
+  const {
+    timeoutMs = 15_000,
+    fallbackMessage,
+    timeoutMessage = "Mahita timed out while waiting for a JSON response.",
+    signal,
+    ...requestInit
+  } = options
+
+  const controller = new AbortController()
+  const resolvedTimeoutMs = Math.max(1_000, Math.floor(timeoutMs))
+  let timedOut = false
+
+  const abortFromParent = () => controller.abort()
+  if (signal) {
+    if (signal.aborted) {
+      abortFromParent()
+    } else {
+      signal.addEventListener("abort", abortFromParent, { once: true })
+    }
+  }
+
+  const timeoutHandle = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, resolvedTimeoutMs)
+
+  try {
+    const response = await fetch(input, {
+      ...requestInit,
+      signal: controller.signal,
+    })
+
+    return await readJsonResponse<T>(response, fallbackMessage)
+  } catch (error) {
+    if (timedOut) {
+      throw new AppError(timeoutMessage, {
+        code: "UPSTREAM_FETCH_FAILED",
+        status: 504,
+        hint: `The request exceeded the ${Math.round(resolvedTimeoutMs / 1000)}s timeout.`,
+        recoverable: true,
+      })
+    }
+
+    throw error
+  } finally {
+    clearTimeout(timeoutHandle)
+    if (signal) {
+      signal.removeEventListener("abort", abortFromParent)
+    }
+  }
+}

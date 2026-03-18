@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma"
 import { providerTelemetryBus } from "@/app/services/market-data/provider-telemetry"
+import { DataHealthManager } from "@/app/services/market-data/health"
 import { getSchedulerSnapshot, runSchedulerAdminAction } from "@/app/services/market-data/scheduler"
 import { readVaultBarsPage } from "@/app/services/market-data/read-service"
 import type { Timeframe } from "@/app/services/market-data/types"
@@ -257,7 +258,7 @@ export async function getDiUiStorageSnapshot(input: {
     timeframe,
   })
 
-  const [inventories, bars] = await Promise.all([
+  const [inventories, bars, parity] = await Promise.all([
     prisma.dataInventory.findMany({
       where: {
         ...(vaultName ? { vault: { name: vaultName } } : {}),
@@ -284,12 +285,17 @@ export async function getDiUiStorageSnapshot(input: {
       pageSize,
       vaultName,
     }),
+    DataHealthManager.getInventoryParitySnapshot({
+      vaultName,
+      limit: 12,
+    }),
   ])
 
   return {
     vaults,
     inventories,
     bars,
+    parity,
     filters: {
       symbol,
       timeframe,

@@ -10,6 +10,12 @@ export function shouldIgnoreMissingSpan(symbol: string, timeframe: Timeframe, di
     const isCrypto = isCryptoSymbol(symbol)
     if (isCrypto) return false
 
+    // Schwab minute series can legitimately arrive with sparse 1m bars.
+    // Treat those short gaps as provider-native instead of attempting endless repair.
+    if (timeframe === '1m' && diffSeconds <= 5 * timeframeToSeconds(timeframe)) {
+        return true
+    }
+
     if (timeframe === '1d' && diffSeconds <= 4 * 86400) {
         return true
     }
@@ -46,7 +52,11 @@ export function getMissingRanges(
     const ranges: TimeRange[] = []
 
     const firstBarTime = sortedData[0].time
-    if (firstBarTime > startTime + Math.floor(interval * 0.5)) {
+    const leadingDiff = firstBarTime - startTime
+    if (
+        firstBarTime > startTime + Math.floor(interval * 0.5)
+        && !shouldIgnoreMissingSpan(symbol, timeframe, leadingDiff)
+    ) {
         ranges.push({
             startTime,
             endTime: Math.min(endTime, Math.max(startTime, firstBarTime - interval))
@@ -74,7 +84,11 @@ export function getMissingRanges(
     }
 
     const lastBarTime = sortedData[sortedData.length - 1].time
-    if (lastBarTime < endTime - Math.floor(interval * 0.5)) {
+    const trailingDiff = endTime - lastBarTime
+    if (
+        lastBarTime < endTime - Math.floor(interval * 0.5)
+        && !shouldIgnoreMissingSpan(symbol, timeframe, trailingDiff)
+    ) {
         ranges.push({
             startTime: Math.max(startTime, lastBarTime + interval),
             endTime

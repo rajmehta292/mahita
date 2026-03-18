@@ -56,7 +56,7 @@ import type {
     StrategyRunSettings,
 } from '@/app/services/trading-engine/types'
 import { resolveHydratedAccountId } from '@/lib/account-selection'
-import { normalizeUnknownError, readJsonResponse } from '@/lib/app-errors'
+import { fetchJsonWithTimeout, normalizeUnknownError } from '@/lib/app-errors'
 import { parseStoredStringArray, serializeStringArray } from '@/lib/preferences-serialization'
 import { buildOrderRequestFromDraft, createOrderDraft, type OrderDraft } from '@/lib/trading/order-draft'
 
@@ -276,6 +276,7 @@ const COMPARISON_MODES: Array<{ value: ComparisonMode, label: string }> = [
     { value: 'force-engine', label: 'Engine Compare' },
 ]
 const RANGE_PRESETS: RangePreset[] = ['1D', '5D', '1M', '3M', '6M', 'YTD', '1Y', 'All']
+const MARKET_DATA_REQUEST_TIMEOUT_MS = 15_000
 const LEFT_RAIL_TOOLS: Array<{ id: LeftTool, label: string, icon: typeof MousePointer2 }> = [
     { id: 'pointer', label: 'Pointer', icon: MousePointer2 },
     { id: 'crosshair', label: 'Crosshair', icon: Crosshair },
@@ -493,6 +494,7 @@ export function SuperChartWorkspace() {
     const [chartData, setChartData] = useState<MarketDataPoint[]>([])
     const [marketDataLoading, setMarketDataLoading] = useState(false)
     const [marketDataError, setMarketDataError] = useState<string | null>(null)
+    const [marketDataReloadToken, setMarketDataReloadToken] = useState(0)
 
     const [drafts, setDrafts] = useState<ScriptDraftDocument[]>([])
     const [defaultTemplate, setDefaultTemplate] = useState('')
@@ -949,16 +951,20 @@ export function SuperChartWorkspace() {
 
     useEffect(() => {
         let cancelled = false
+        const controller = new AbortController()
 
         async function loadMarketData() {
             setMarketDataLoading(true)
             setMarketDataError(null)
 
             try {
-                const response = await fetch(`/api/trading/market-data?symbol=${encodeURIComponent(routeSymbol)}&timeframe=${encodeURIComponent(routeTimeframe)}${provider !== 'auto' ? `&provider=${provider}` : ''}`, {
+                const json = await fetchJsonWithTimeout<{ data?: MarketDataPoint[] }>(`/api/trading/market-data?symbol=${encodeURIComponent(routeSymbol)}&timeframe=${encodeURIComponent(routeTimeframe)}${provider !== 'auto' ? `&provider=${provider}` : ''}`, {
                     cache: 'no-store',
+                    signal: controller.signal,
+                    timeoutMs: MARKET_DATA_REQUEST_TIMEOUT_MS,
+                    fallbackMessage: 'Failed to load chart data.',
+                    timeoutMessage: 'Market data took too long to load. The request was cancelled so the chart does not stay stuck.',
                 })
-                const json = await readJsonResponse<{ data?: MarketDataPoint[] }>(response, 'Failed to load chart data.')
 
                 if (!cancelled) {
                     setChartData((json.data ?? []) as MarketDataPoint[])
@@ -979,8 +985,9 @@ export function SuperChartWorkspace() {
 
         return () => {
             cancelled = true
+            controller.abort()
         }
-    }, [provider, routeSymbol, routeTimeframe])
+    }, [marketDataReloadToken, provider, routeSymbol, routeTimeframe])
 
     useEffect(() => {
         if (watchlistSymbols.length === 0) {
@@ -2205,7 +2212,7 @@ export function SuperChartWorkspace() {
                                         <div className="max-w-lg rounded-3xl border border-rose-500/20 bg-rose-500/10 p-6 text-center">
                                             <div className="text-sm font-semibold text-rose-100">{marketDataError}</div>
                                             <button
-                                                onClick={() => updateWorkspaceRoute(routeSymbol, routeTimeframe, routeDraftId)}
+                                                onClick={() => setMarketDataReloadToken((current) => current + 1)}
                                                 className="mt-4 inline-flex items-center gap-2 rounded-xl border border-rose-400/20 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-rose-100 transition hover:bg-rose-500/10"
                                             >
                                                 <RefreshCw className="h-4 w-4" />

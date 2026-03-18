@@ -12,6 +12,7 @@ export interface ContinuousIngestStatus {
     lastError: string | null
     schedulerEnabled: boolean
     lastCycleSummary: {
+        cycleId: string
         dispatchedIngestionJobs: number
         dispatchedVerificationJobs: number
         queuePressureMode: "balanced" | "one-minute-biased"
@@ -119,6 +120,7 @@ class ContinuousIngestController {
                         limit: 15
                     })
                     this.lastCycleSummary = {
+                        cycleId: `legacy-${Date.now()}`,
                         dispatchedIngestionJobs: 15,
                         dispatchedVerificationJobs: 0,
                         queuePressureMode: "balanced",

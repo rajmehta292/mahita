@@ -87,5 +87,14 @@ describe("/api/trading/market-data", () => {
       verificationStatus: "single-source-unverified",
       sources: ["schwab"],
     })
+    expect(getHistoricalDataWithReportMock).toHaveBeenCalledWith(
+      "AAPL",
+      "5m",
+      expect.any(Number),
+      expect.any(Number),
+      expect.objectContaining({
+        fetchMode: "interactive",
+      })
+    )
   })
 })

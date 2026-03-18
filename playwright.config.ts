@@ -30,22 +30,27 @@ const playwrightRuntimeEnv = {
     NEXTAUTH_URL: 'http://localhost:6245',
 }
 
+const baseURL = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:6245'
+const useExistingServer = process.env.PLAYWRIGHT_USE_EXISTING_SERVER === 'true'
+
 export default defineConfig({
     testDir: './e2e',
     timeout: 30_000,
     use: {
-        baseURL: 'http://localhost:6245',
+        baseURL,
         trace: 'on-first-retry'
     },
-    webServer: {
-        command: [
-            `node -e "const fs=require('fs'); try { fs.rmSync('.next-playwright', { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { if (error?.code !== 'ENOENT') throw error; }"`,
-            withEnv(playwrightEnv, 'npx prisma db push --skip-generate'),
-            withEnv(playwrightEnv, 'npx next build'),
-            withEnv(playwrightRuntimeEnv, 'npx next start -p 6245'),
-        ].join(' && '),
-        url: 'http://localhost:6245/auth/signin',
-        reuseExistingServer: false,
-        timeout: 600_000,
-    },
+    webServer: useExistingServer
+        ? undefined
+        : {
+            command: [
+                `node -e "const fs=require('fs'); try { fs.rmSync('.next-playwright', { recursive: true, force: true, maxRetries: 10, retryDelay: 200 }); } catch (error) { if (error?.code !== 'ENOENT') throw error; }"`,
+                withEnv(playwrightEnv, 'npx prisma db push --skip-generate'),
+                withEnv(playwrightEnv, 'npx next build'),
+                withEnv(playwrightRuntimeEnv, 'npx next start -p 6245'),
+            ].join(' && '),
+            url: `${baseURL}/auth/signin`,
+            reuseExistingServer: false,
+            timeout: 600_000,
+        },
 })

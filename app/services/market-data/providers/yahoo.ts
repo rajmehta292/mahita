@@ -58,10 +58,14 @@ export class YahooProvider implements IDataProvider {
             return []
         }
 
+        const period1 = new Date(startTime * 1000)
+        const safeEndTime = endTime <= startTime ? startTime + 1 : endTime
+        const period2 = new Date(safeEndTime * 1000)
+
         try {
             const rawResult = await this.yahoo.chart(this.normalizeSymbol(symbol), {
-                period1: new Date(startTime * 1000),
-                period2: new Date(endTime * 1000),
+                period1,
+                period2,
                 interval,
                 return: 'array'
             })

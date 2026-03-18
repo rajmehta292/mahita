@@ -14,7 +14,8 @@ import { GoogleProvider } from './providers/google'
 import { MockDataProvider } from './mock-provider'
 import { providerTelemetryBus } from './provider-telemetry'
 import { dedupeMarketDataPoints, getMissingRanges } from './utils'
-import { getBaseRequirement, deriveBars } from './timeframe-math'
+import { getBaseRequirement, deriveBars, timeframeToSeconds } from './timeframe-math'
+import { getRuntimeProviderOrder, normalizeStage2Provider } from './provider-policy'
 import { vaultManager, withVaultQueryRetry } from './vault-manager'
 
 interface ProviderEntry {
@@ -26,6 +27,34 @@ interface FetchOptions {
     forceRefresh?: boolean
     providerOverride?: string
     providerClient?: unknown
+    providerTimeoutMs?: number
+    fetchMode?: 'interactive' | 'repair'
+}
+
+const parsedProviderTimeoutMs = Number(process.env.MAHITA_MARKET_DATA_PROVIDER_TIMEOUT_MS || 20_000)
+const DEFAULT_PROVIDER_TIMEOUT_MS = Number.isFinite(parsedProviderTimeoutMs) && parsedProviderTimeoutMs > 0
+    ? parsedProviderTimeoutMs
+    : 20_000
+const MAX_INTERACTIVE_MISSING_RANGES = 24
+const MAX_INTERACTIVE_SELECTED_RANGES = 4
+
+async function withProviderTimeout<T>(operation: Promise<T>, timeoutMs: number, providerName: string, symbol: string, timeframe: Timeframe) {
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+
+    try {
+        return await Promise.race([
+            operation,
+            new Promise<T>((_, reject) => {
+                timeoutHandle = setTimeout(() => {
+                    reject(new Error(`${providerName} timed out after ${timeoutMs}ms for ${symbol} ${timeframe}.`))
+                }, timeoutMs)
+            }),
+        ])
+    } finally {
+        if (timeoutHandle) {
+            clearTimeout(timeoutHandle)
+        }
+    }
 }
 
 export class MarketDataStore {
@@ -100,7 +129,13 @@ export class MarketDataStore {
             warnings: []
         }
 
-        for (const range of missingRanges) {
+        const plannedRanges = options.fetchMode === 'interactive'
+            ? this.planInteractiveMissingRanges(requiredBaseTimeframe, startTime, endTime, cachedData, missingRanges)
+            : { ranges: missingRanges, warnings: [] }
+
+        report.warnings.push(...plannedRanges.warnings)
+
+        for (const range of plannedRanges.ranges) {
             const chunkReport = await this.fetchMissingRange(
                 normalizedSymbol,
                 requiredBaseTimeframe, // Save internal requests onto the DB as base
@@ -108,7 +143,8 @@ export class MarketDataStore {
                 options.providerOverride,
                 !!options.forceRefresh,
                 targetVault,
-                options.providerClient
+                options.providerClient,
+                options.providerTimeoutMs
             )
 
             report.chunkReports.push(chunkReport)
@@ -147,12 +183,90 @@ export class MarketDataStore {
 
     private getProviders(providerOverride?: string): ProviderEntry[] {
         if (!providerOverride) {
-            return this.providers
+            const runtimeOrder = getRuntimeProviderOrder()
+            const runtimeProviders = this.providers.filter((entry) => runtimeOrder.includes(entry.name as "schwab" | "yahoo"))
+            return runtimeProviders.length > 0 ? runtimeProviders : this.providers
         }
 
-        return this.providers.filter(
-            (entry) => entry.name === providerOverride.trim().toLowerCase()
+        const normalized = normalizeStage2Provider(providerOverride) || providerOverride.trim().toLowerCase()
+        return this.providers.filter((entry) => entry.name === normalized)
+    }
+
+    private getInteractiveRefreshWindowSeconds(timeframe: Timeframe): number {
+        switch (timeframe) {
+            case '1s':
+                return 6 * 3600
+            case '1m':
+                return 3 * 86400
+            case '1h':
+                return 30 * 86400
+            case '1d':
+                return 365 * 86400
+            default:
+                return 30 * 86400
+        }
+    }
+
+    private coalesceRanges(ranges: TimeRange[], mergeGapSeconds: number): TimeRange[] {
+        if (ranges.length <= 1) {
+            return ranges
+        }
+
+        const sortedRanges = [...ranges].sort((left, right) => left.startTime - right.startTime)
+        const merged: TimeRange[] = [{ ...sortedRanges[0] }]
+
+        for (let index = 1; index < sortedRanges.length; index += 1) {
+            const current = sortedRanges[index]
+            const previous = merged[merged.length - 1]
+
+            if (current.startTime <= previous.endTime + mergeGapSeconds) {
+                previous.endTime = Math.max(previous.endTime, current.endTime)
+                continue
+            }
+
+            merged.push({ ...current })
+        }
+
+        return merged
+    }
+
+    private planInteractiveMissingRanges(
+        timeframe: Timeframe,
+        startTime: number,
+        endTime: number,
+        cachedData: MarketDataPoint[],
+        missingRanges: TimeRange[]
+    ): { ranges: TimeRange[]; warnings: string[] } {
+        if (missingRanges.length === 0 || cachedData.length === 0 || missingRanges.length <= MAX_INTERACTIVE_MISSING_RANGES) {
+            return { ranges: missingRanges, warnings: [] }
+        }
+
+        const recentWindowStart = Math.max(startTime, endTime - this.getInteractiveRefreshWindowSeconds(timeframe))
+        const recentRanges = this.coalesceRanges(
+            missingRanges.filter((range) => range.endTime >= recentWindowStart),
+            Math.max(timeframeToSeconds(timeframe) * 30, 30 * 60)
         )
+
+        let selectedRanges = recentRanges
+        if (selectedRanges.length > MAX_INTERACTIVE_SELECTED_RANGES) {
+            selectedRanges = [{ startTime: recentWindowStart, endTime }]
+        }
+
+        if (selectedRanges.length === 0) {
+            return {
+                ranges: [],
+                warnings: [
+                    `Skipped ${missingRanges.length} fragmented missing ranges during interactive load because no recent refresh window needed repair.`
+                ]
+            }
+        }
+
+        return {
+            ranges: selectedRanges,
+            warnings: [
+                `Skipped ${Math.max(0, missingRanges.length - selectedRanges.length)} fragmented missing ranges during interactive load; background repair should fill older holes.`
+            ]
+        }
     }
 
     private async readFromDb(
@@ -192,7 +306,8 @@ export class MarketDataStore {
         providerOverride?: string,
         forceRefresh = false,
         vaultName = 'schwab',
-        providerClient?: unknown
+        providerClient?: unknown,
+        providerTimeoutMs = DEFAULT_PROVIDER_TIMEOUT_MS
     ): Promise<ChunkIngestionReport> {
         const warnings: string[] = []
         const providers = this.getProviders(providerOverride)
@@ -222,7 +337,8 @@ export class MarketDataStore {
                     timeframe,
                     range.startTime,
                     range.endTime,
-                    providerClient
+                    providerClient,
+                    providerTimeoutMs
                 )
                 const persistedBars = await this.persistBars(
                     symbol,
@@ -283,7 +399,8 @@ export class MarketDataStore {
         timeframe: Timeframe,
         startTime: number,
         endTime: number,
-        providerClient?: unknown
+        providerClient?: unknown,
+        providerTimeoutMs = DEFAULT_PROVIDER_TIMEOUT_MS
     ): Promise<MarketDataPoint[]> {
         const startedAt = Date.now()
 
@@ -303,7 +420,15 @@ export class MarketDataStore {
 
         try {
             const fetchedData = dedupeMarketDataPoints(
-                (await entry.provider.getHistoricalData(symbol, timeframe, startTime, endTime, { providerClient })).filter((point) => this.isValidBar(point))
+                (
+                    await withProviderTimeout(
+                        entry.provider.getHistoricalData(symbol, timeframe, startTime, endTime, { providerClient }),
+                        providerTimeoutMs,
+                        entry.name,
+                        symbol,
+                        timeframe
+                    )
+                ).filter((point) => this.isValidBar(point))
             )
 
             await providerTelemetryBus.log({
@@ -401,7 +526,7 @@ export class MarketDataStore {
                 await withVaultQueryRetry(() => client.marketData.createMany({
                     data: dbChunk
                 }))
-            } catch (error) {
+            } catch {
                 for (const row of dbChunk) {
                     await withVaultQueryRetry(() => client.marketData.upsert({
                         where: {

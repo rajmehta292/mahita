@@ -35,7 +35,37 @@ export interface MultiIntervalHealth {
     }>
 }
 
+export interface InventoryParityException {
+    vaultName: string
+    symbol: string
+    timeframe: Timeframe
+    reason: "missing-inventory-row" | "stale-last-bar" | "stale-last-synced"
+    vaultBarCount: number
+    vaultLastBar: Date | null
+    inventoryLastBar: Date | null
+    inventoryLastSynced: Date | null
+}
+
+export interface InventoryParitySnapshot {
+    generatedAt: string
+    summary: {
+        totalVaultKeys: number
+        totalInventoryKeys: number
+        missingInventoryRows: number
+        staleInventoryRows: number
+    }
+    byVault: Array<{
+        vaultName: string
+        totalVaultKeys: number
+        totalInventoryKeys: number
+        missingInventoryRows: number
+        staleInventoryRows: number
+    }>
+    exceptions: InventoryParityException[]
+}
+
 const TRACKED_TIMEFRAMES: Timeframe[] = ['1s', '1m', '1h', '1d', '1w', '1M']
+const DEFAULT_PARITY_STALE_MINUTES = 15
 
 export class DataHealthManager {
     static getTargetHorizon(timeframe: Timeframe): number {
@@ -181,6 +211,61 @@ export class DataHealthManager {
         }
     }
 
+    static async refreshInventorySelection(
+        symbol: string,
+        timeframe: Timeframe,
+        vaultName = 'schwab'
+    ): Promise<HealthReport | null> {
+        const vault = await prisma.vault.findUnique({ where: { name: vaultName } })
+        if (!vault) return null
+
+        const client = await vaultManager.getClient(vaultName)
+        const count = await withVaultQueryRetry(() => client.marketData.count({
+            where: { symbol, timeframe }
+        }))
+
+        if (count === 0) {
+            await prisma.dataInventory.deleteMany({
+                where: {
+                    vaultId: vault.id,
+                    symbol,
+                    timeframe,
+                },
+            })
+            return null
+        }
+
+        const report = await this.getHealth(symbol, timeframe, vaultName)
+        await this.syncInventoryReports([report], vaultName, { pruneMissing: false })
+        return report
+    }
+
+    static async refreshInventorySelections(
+        selections: Array<{ symbol: string; timeframe: Timeframe; vaultName?: string | null }>
+    ) {
+        const uniqueSelections = Array.from(
+            new Map(
+                selections.map((selection) => {
+                    const vaultName = selection.vaultName || 'schwab'
+                    return [`${vaultName}:${selection.symbol}:${selection.timeframe}`, { ...selection, vaultName }]
+                })
+            ).values()
+        )
+
+        const reports: Array<{ symbol: string; timeframe: Timeframe; vaultName: string; report: HealthReport | null }> = []
+        for (const selection of uniqueSelections) {
+            const report = await this.refreshInventorySelection(selection.symbol, selection.timeframe, selection.vaultName || 'schwab')
+            reports.push({
+                symbol: selection.symbol,
+                timeframe: selection.timeframe,
+                vaultName: selection.vaultName || 'schwab',
+                report,
+            })
+        }
+
+        return reports
+    }
+
     static async getAllHealth(vaultName = 'schwab'): Promise<HealthReport[]> {
         const client = await vaultManager.getClient(vaultName)
         const groups = await withVaultQueryRetry(() => client.marketData.groupBy({
@@ -207,10 +292,159 @@ export class DataHealthManager {
         })
     }
 
-    private static async syncInventoryReports(reports: HealthReport[], vaultName: string): Promise<void> {
+    static async getInventoryParitySnapshot(input: { vaultName?: string | null; limit?: number; staleMinutes?: number } = {}): Promise<InventoryParitySnapshot> {
+        const staleMinutes = input.staleMinutes ?? DEFAULT_PARITY_STALE_MINUTES
+        const staleThreshold = Date.now() - staleMinutes * 60_000
+        const limit = Math.max(5, Math.min(200, input.limit ?? 30))
+        const vaults = await prisma.vault.findMany({
+            where: input.vaultName ? { name: input.vaultName } : undefined,
+            orderBy: [{ isEnabled: 'desc' }, { name: 'asc' }],
+            select: { id: true, name: true, isEnabled: true },
+        })
+
+        const exceptions: InventoryParityException[] = []
+        const byVault: InventoryParitySnapshot['byVault'] = []
+        let totalVaultKeys = 0
+        let totalInventoryKeys = 0
+        let missingInventoryRows = 0
+        let staleInventoryRows = 0
+
+        for (const vault of vaults) {
+            const client = await vaultManager.getClient(vault.name)
+            const [vaultGroups, inventoryRows] = await Promise.all([
+                withVaultQueryRetry(() =>
+                    client.marketData.groupBy({
+                        by: ['symbol', 'timeframe'],
+                        _count: { _all: true },
+                        _max: { time: true },
+                    })
+                ),
+                prisma.dataInventory.findMany({
+                    where: { vaultId: vault.id },
+                    select: {
+                        symbol: true,
+                        timeframe: true,
+                        lastBar: true,
+                        lastSynced: true,
+                    },
+                }),
+            ])
+
+            const inventoryMap = new Map(
+                inventoryRows.map((row) => [`${row.symbol}:${row.timeframe}`, row])
+            )
+
+            let vaultMissingCount = 0
+            let vaultStaleCount = 0
+            totalVaultKeys += vaultGroups.length
+            totalInventoryKeys += inventoryRows.length
+
+            for (const group of vaultGroups) {
+                const key = `${group.symbol}:${group.timeframe}`
+                const inventory = inventoryMap.get(key)
+                const latestVaultBar = group._max.time ?? null
+
+                if (!inventory) {
+                    vaultMissingCount += 1
+                    if (exceptions.length < limit) {
+                        exceptions.push({
+                            vaultName: vault.name,
+                            symbol: group.symbol,
+                            timeframe: group.timeframe as Timeframe,
+                            reason: 'missing-inventory-row',
+                            vaultBarCount: group._count._all,
+                            vaultLastBar: latestVaultBar,
+                            inventoryLastBar: null,
+                            inventoryLastSynced: null,
+                        })
+                    }
+                    continue
+                }
+
+                const staleLastBar =
+                    latestVaultBar &&
+                    (!inventory.lastBar || inventory.lastBar.getTime() < latestVaultBar.getTime())
+                const staleLastSynced =
+                    inventory.lastSynced && inventory.lastSynced.getTime() < staleThreshold
+
+                if (!staleLastBar && !staleLastSynced) {
+                    continue
+                }
+
+                vaultStaleCount += 1
+                if (exceptions.length < limit) {
+                    exceptions.push({
+                        vaultName: vault.name,
+                        symbol: group.symbol,
+                        timeframe: group.timeframe as Timeframe,
+                        reason: staleLastBar ? 'stale-last-bar' : 'stale-last-synced',
+                        vaultBarCount: group._count._all,
+                        vaultLastBar: latestVaultBar,
+                        inventoryLastBar: inventory.lastBar,
+                        inventoryLastSynced: inventory.lastSynced,
+                    })
+                }
+            }
+
+            missingInventoryRows += vaultMissingCount
+            staleInventoryRows += vaultStaleCount
+            byVault.push({
+                vaultName: vault.name,
+                totalVaultKeys: vaultGroups.length,
+                totalInventoryKeys: inventoryRows.length,
+                missingInventoryRows: vaultMissingCount,
+                staleInventoryRows: vaultStaleCount,
+            })
+        }
+
+        return {
+            generatedAt: new Date().toISOString(),
+            summary: {
+                totalVaultKeys,
+                totalInventoryKeys,
+                missingInventoryRows,
+                staleInventoryRows,
+            },
+            byVault,
+            exceptions,
+        }
+    }
+
+    static async repairInventoryParity(input: { vaultName?: string | null; limit?: number } = {}) {
+        const snapshot = await this.getInventoryParitySnapshot({
+            vaultName: input.vaultName,
+            limit: input.limit ?? 100,
+        })
+        const candidates = snapshot.exceptions.slice(0, input.limit ?? 100)
+        let repaired = 0
+
+        for (const candidate of candidates) {
+            await this.refreshInventorySelection(candidate.symbol, candidate.timeframe, candidate.vaultName)
+            repaired += 1
+        }
+
+        const after = await this.getInventoryParitySnapshot({
+            vaultName: input.vaultName,
+            limit: input.limit ?? 100,
+        })
+
+        return {
+            repaired,
+            before: snapshot.summary,
+            after: after.summary,
+            remainingExceptions: after.exceptions,
+        }
+    }
+
+    private static async syncInventoryReports(
+        reports: HealthReport[],
+        vaultName: string,
+        options: { pruneMissing?: boolean } = {}
+    ): Promise<void> {
         const vault = await prisma.vault.findUnique({ where: { name: vaultName } })
         if (!vault) return
 
+        const pruneMissing = options.pruneMissing ?? true
         const liveKeys = new Set(reports.map((report) => `${report.symbol}::${report.timeframe}`))
 
         // Use main prisma to track inventory across all vaults
@@ -259,6 +493,10 @@ export class DataHealthManager {
             })
         }
 
+        if (!pruneMissing) {
+            return
+        }
+
         const staleIds = existingInventory
             .filter((item) => !liveKeys.has(`${item.symbol}::${item.timeframe}`))
             .map((item) => item.id)
@@ -303,7 +541,7 @@ export class DataHealthManager {
             }
         }
 
-        await this.refreshInventory(vaultName)
+        await this.refreshInventorySelection(symbol, timeframe, vaultName)
 
         return { gapsFixed, barsAdded }
     }

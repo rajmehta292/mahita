@@ -60,13 +60,13 @@ interface SchedulerResponse {
       label: string | null
       description: string | null
       status: string
-        providerBudgets: Array<{
-          provider: string
-          maxCallsPerMinute: number
-          enabled: boolean
-          runtimeAvailable?: boolean
-          note?: string
-          usedLastMinute: number
+      providerBudgets: Array<{
+        provider: string
+        maxCallsPerMinute: number
+        enabled: boolean
+        runtimeAvailable?: boolean
+        note?: string
+        usedLastMinute: number
         errorCountLastMinute: number
         retryCountLastMinute: number
         throttledSymbols: string[]
@@ -125,12 +125,27 @@ interface SchedulerResponse {
       expiresAt: string
     }>
     runtime: {
+      desiredState: {
+        shouldRun: boolean
+        profileStatus: string
+        isDefault: boolean
+      }
+      actualRuntimeState: {
+        running: boolean
+        currentPhase: string
+        intervalMs: number
+        providerOverride: string | null
+        schedulerEnabled: boolean
+        lastError: string | null
+        cycleCount: number
+      }
       continuousIngest: {
         running: boolean
         currentPhase: string
         intervalMs: number
         schedulerEnabled: boolean
         lastCycleSummary: {
+          cycleId: string
           dispatchedIngestionJobs: number
           dispatchedVerificationJobs: number
           queuePressureMode: 'balanced' | 'one-minute-biased'
@@ -146,6 +161,57 @@ interface SchedulerResponse {
         oldestQueuedAt: string | null
       }
     }
+    providerReadiness: {
+      allowedRuntimeProviders: string[]
+      experimentalProviders: string[]
+      availability: {
+        schwab: boolean
+        yahoo: boolean
+      }
+      tokenHealth: {
+        isValid: boolean
+        error?: string
+      }
+    }
+    inventoryParity: {
+      generatedAt: string
+      summary: {
+        totalVaultKeys: number
+        totalInventoryKeys: number
+        missingInventoryRows: number
+        staleInventoryRows: number
+      }
+      byVault: Array<{
+        vaultName: string
+        totalVaultKeys: number
+        totalInventoryKeys: number
+        missingInventoryRows: number
+        staleInventoryRows: number
+      }>
+      exceptions: Array<{
+        vaultName: string
+        symbol: string
+        timeframe: string
+        reason: string
+        vaultBarCount: number
+        vaultLastBar: string | null
+        inventoryLastBar: string | null
+        inventoryLastSynced: string | null
+      }>
+    }
+    planPreview: Array<{
+      laneKind: string
+      symbolSource: string
+      queueDepthTarget: number
+      existingQueued: number
+      requestedTimeframe: string
+      storageTimeframe: string
+      preferredProvider: string
+      chosenProvider: string | null
+      reason: string
+      blockedReason: string | null
+      previewSymbols: string[]
+    }>
     recentJobs: Array<{
       id: string
       laneKind: string
@@ -171,6 +237,20 @@ interface SchedulerResponse {
       createdAt: string
       metadata: string | null
     }>
+    lastCycleTrace: {
+      cycleId: string | null
+      logs: Array<{
+        id: string
+        stage: string
+        message: string
+        provider: string | null
+        symbol: string | null
+        requestedTimeframe: string | null
+        storageTimeframe: string | null
+        createdAt: string
+        metadata: Record<string, unknown> | null
+      }>
+    }
     verificationSummary: {
       queued: number
       running: number
@@ -306,6 +386,25 @@ interface StorageResponse {
     }>
     totalCount: number
   }
+  parity: {
+    generatedAt: string
+    summary: {
+      totalVaultKeys: number
+      totalInventoryKeys: number
+      missingInventoryRows: number
+      staleInventoryRows: number
+    }
+    exceptions: Array<{
+      vaultName: string
+      symbol: string
+      timeframe: string
+      reason: string
+      vaultBarCount: number
+      vaultLastBar: string | null
+      inventoryLastBar: string | null
+      inventoryLastSynced: string | null
+    }>
+  }
   filters: {
     symbol: string
     timeframe: string
@@ -327,7 +426,7 @@ async function fetchJsonOrThrow<T>(url: string, fallbackMessage: string) {
 
 function StateMessage({ state, empty }: { state: RemoteState<unknown>; empty: string }) {
   if (state.loading && !state.data) {
-    return <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-6 text-sm text-white/50">Loading…</div>
+    return <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-6 text-sm text-white/50">Loading...</div>
   }
 
   if (state.error && !state.data) {
@@ -338,12 +437,16 @@ function StateMessage({ state, empty }: { state: RemoteState<unknown>; empty: st
 }
 
 function formatDate(value?: string | null) {
-  if (!value) return '—'
+  if (!value) return '--'
   return new Date(value).toLocaleString()
 }
 
 function formatPercent(value: number) {
   return `${value.toFixed(2)}%`
+}
+
+function formatProviderAvailability(available: boolean) {
+  return available ? 'ready' : 'unavailable'
 }
 
 function getVerificationTone(status?: string | null) {
@@ -382,6 +485,15 @@ function parseJsonSummary<T>(value?: string | null): T | null {
   } catch {
     return null
   }
+}
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null
+}
+
+function getStringField(record: Record<string, unknown> | null, key: string): string | null {
+  const value = record?.[key]
+  return typeof value === 'string' && value.length > 0 ? value : null
 }
 
 export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
@@ -646,13 +758,13 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
       if (payload && payload.success === false) {
         setGlobalError(payload.failure || payload.error || 'Mahita could not complete the DI-UI scheduler action.')
       }
-      await Promise.all([loadScheduler(true), loadProcessor(true), loadVerification(true)])
+      await Promise.all([loadScheduler(true), loadProcessor(true), loadVerification(true), loadStorage(true)])
     } catch (error) {
       setGlobalError(error instanceof Error ? error.message : 'Mahita could not complete the DI-UI scheduler action.')
     } finally {
       setBusyAction(null)
     }
-  }, [loadProcessor, loadScheduler, loadVerification])
+  }, [loadProcessor, loadScheduler, loadStorage, loadVerification])
 
   const runVerificationAction = useCallback(async (body: Record<string, unknown>) => {
     setBusyAction(String(body.action))
@@ -789,10 +901,40 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
               <p className="text-xs uppercase tracking-[0.2em] text-white/35">Queue Backlog</p>
               <p className="mt-3 text-xl font-semibold">
-                {scheduler.runtime.queueMetrics.totalQueued} queued · {scheduler.runtime.queueMetrics.totalRunning} running
+                {scheduler.runtime.queueMetrics.totalQueued} queued / {scheduler.runtime.queueMetrics.totalRunning} running
               </p>
               <p className="mt-2 text-sm text-white/45">
-                oldest {scheduler.runtime.queueMetrics.oldestQueuedAt ? formatDate(scheduler.runtime.queueMetrics.oldestQueuedAt) : '—'}
+                oldest {scheduler.runtime.queueMetrics.oldestQueuedAt ? formatDate(scheduler.runtime.queueMetrics.oldestQueuedAt) : '--'}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+              <p className="text-xs uppercase tracking-[0.2em] text-white/35">Policy vs Runtime</p>
+              <p className="mt-3 text-xl font-semibold">
+                {scheduler.runtime.desiredState.shouldRun ? 'Profile wants running' : 'Profile wants paused'}
+              </p>
+              <p className="mt-2 text-sm text-white/45">
+                actual {scheduler.runtime.actualRuntimeState.running ? 'running' : 'stopped'} / cycle {scheduler.runtime.actualRuntimeState.cycleCount}
+              </p>
+            </div>
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+              <p className="text-xs uppercase tracking-[0.2em] text-white/35">Provider Readiness</p>
+              <p className="mt-3 text-xl font-semibold">
+                Schwab {formatProviderAvailability(scheduler.providerReadiness.availability.schwab)}
+              </p>
+              <p className="mt-2 text-sm text-white/45">
+                Yahoo {formatProviderAvailability(scheduler.providerReadiness.availability.yahoo)} / token {scheduler.providerReadiness.tokenHealth.isValid ? 'healthy' : 'attention'}
+              </p>
+            </div>
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
+              <p className="text-xs uppercase tracking-[0.2em] text-white/35">Inventory Parity</p>
+              <p className="mt-3 text-xl font-semibold">
+                {scheduler.inventoryParity.summary.missingInventoryRows} missing / {scheduler.inventoryParity.summary.staleInventoryRows} stale
+              </p>
+              <p className="mt-2 text-sm text-white/45">
+                {scheduler.inventoryParity.summary.totalVaultKeys} vault keys / {scheduler.inventoryParity.summary.totalInventoryKeys} inventory rows
               </p>
             </div>
           </div>
@@ -821,7 +963,7 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                   >
                     {scheduler.availableProfiles.map((profile) => (
                       <option key={profile.id} value={profile.id}>
-                        {(profile.label || profile.name)}{profile.isDefault ? ' · active' : ''}
+                        {(profile.label || profile.name)}{profile.isDefault ? ' / active' : ''}
                       </option>
                     ))}
                   </select>
@@ -868,6 +1010,34 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                   >
                     Save policy
                   </button>
+                  <button
+                    onClick={() => runSchedulerAction({ action: 'run-one-cycle', profileId: scheduler.profile.id })}
+                    disabled={busyAction === 'run-one-cycle'}
+                    className="rounded-2xl bg-cyan-500/15 px-4 py-2 text-sm font-medium text-cyan-100 hover:bg-cyan-500/25 disabled:opacity-50"
+                  >
+                    Run one cycle
+                  </button>
+                  <button
+                    onClick={() => runSchedulerAction({ action: 'refresh-inventory', profileId: scheduler.profile.id })}
+                    disabled={busyAction === 'refresh-inventory'}
+                    className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/15 disabled:opacity-50"
+                  >
+                    Refresh inventory
+                  </button>
+                  <button
+                    onClick={() => runSchedulerAction({ action: 'repair-inventory', profileId: scheduler.profile.id })}
+                    disabled={busyAction === 'repair-inventory'}
+                    className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/15 disabled:opacity-50"
+                  >
+                    Repair parity
+                  </button>
+                  <button
+                    onClick={() => runSchedulerAction({ action: 'requeue-failed', profileId: scheduler.profile.id })}
+                    disabled={busyAction === 'requeue-failed'}
+                    className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-medium text-white hover:bg-white/15 disabled:opacity-50"
+                  >
+                    Requeue failed
+                  </button>
                 </div>
               </div>
 
@@ -884,7 +1054,7 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                         <div>
                           <p className="text-sm font-medium uppercase tracking-[0.2em] text-white/60">{budget.provider}</p>
                           <p className="text-xs text-white/35 mt-1">
-                            {editable.note || 'Provider budget'}{budget.runtimeAvailable === false ? ' · runtime unavailable' : ''}
+                            {editable.note || 'Provider budget'}{budget.runtimeAvailable === false ? ' / runtime unavailable' : ''}
                           </p>
                         </div>
                         <label className="inline-flex items-center gap-2 text-xs text-white/60">
@@ -950,6 +1120,47 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                   )
                 })}
               </div>
+
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/60">Plan Preview</h4>
+                    <p className="mt-1 text-sm text-white/45">Next scheduler candidates, provider choice, and block reasons.</p>
+                  </div>
+                  <div className="text-xs text-white/45">
+                    allowed {scheduler.providerReadiness.allowedRuntimeProviders.join(', ')} / experimental {scheduler.providerReadiness.experimentalProviders.join(', ')}
+                  </div>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {scheduler.planPreview.map((plan) => (
+                    <div key={plan.laneKind} className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{plan.laneKind}</span>
+                            <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/45">{plan.symbolSource}</span>
+                          </div>
+                          <p className="mt-1 text-sm text-white/45">{plan.reason}</p>
+                        </div>
+                        <div className="text-right text-xs text-white/45">
+                          <div>queued {plan.existingQueued} / target {plan.queueDepthTarget}</div>
+                          <div>{plan.requestedTimeframe} to {plan.storageTimeframe}</div>
+                        </div>
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs">
+                        <span className="rounded-full border border-white/10 px-2 py-1 text-white/60">preferred {plan.preferredProvider}</span>
+                        <span className={`rounded-full border px-2 py-1 ${plan.chosenProvider ? 'border-emerald-400/30 bg-emerald-500/10 text-emerald-100' : 'border-rose-400/30 bg-rose-500/10 text-rose-100'}`}>
+                          {plan.chosenProvider ? `chosen ${plan.chosenProvider}` : 'blocked'}
+                        </span>
+                        {plan.blockedReason && (
+                          <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-amber-100">{plan.blockedReason}</span>
+                        )}
+                      </div>
+                      <p className="mt-3 text-xs text-white/45">{plan.previewSymbols.join(', ') || 'No candidate symbols for this lane right now.'}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 flex flex-col gap-4">
@@ -968,13 +1179,107 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="font-medium">{demand.surface}</p>
-                        <p className="text-sm text-white/45">{demand.symbol || 'surface-wide'} {demand.timeframe ? `· ${demand.timeframe}` : ''}</p>
+                        <p className="text-sm text-white/45">{demand.symbol || 'surface-wide'} {demand.timeframe ? ` / ${demand.timeframe}` : ''}</p>
                       </div>
                       <div className="text-right text-xs text-white/45">
                         <div>{demand.refreshIntervalSeconds}s refresh</div>
                         <div>expires {formatDate(demand.expiresAt)}</div>
                       </div>
                     </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-[1fr_1fr] gap-6">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold">Last Cycle Trace</h3>
+                  <p className="mt-1 text-sm text-white/45">End-to-end trace of the latest scheduler cycle.</p>
+                </div>
+                <div className="text-xs text-white/45">{scheduler.lastCycleTrace.cycleId || 'no cycle id yet'}</div>
+              </div>
+              <div className="space-y-3">
+                {scheduler.lastCycleTrace.logs.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 px-4 py-5 text-sm text-white/45">
+                    No cycle trace has been recorded yet.
+                  </div>
+                )}
+                {scheduler.lastCycleTrace.logs.map((log) => (
+                  <div key={log.id} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                    {(() => {
+                      const metadata = asRecord(log.metadata)
+                      const providerDecision = asRecord(metadata?.providerDecision)
+                      const cycleId = getStringField(metadata, 'cycleId')
+                      const laneReason = getStringField(metadata, 'laneReason')
+                      const symbolSource = getStringField(metadata, 'symbolSource')
+                      const blockedReason = getStringField(metadata, 'blockedReason')
+                      const storageTarget = getStringField(metadata, 'storageTarget')
+                      const preferredProvider = getStringField(providerDecision, 'preferredProvider')
+                      const queuedProvider = getStringField(providerDecision, 'queuedProvider')
+
+                      return (
+                        <>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium">{log.stage}</p>
+                        <p className="mt-1 text-sm text-white/45">{log.message}</p>
+                      </div>
+                      <div className="text-right text-xs text-white/45">
+                        <div>{formatDate(log.createdAt)}</div>
+                        <div>{log.symbol || 'system'} {log.storageTimeframe ? `to ${log.storageTimeframe}` : ''}</div>
+                      </div>
+                    </div>
+                    {(cycleId || laneReason || symbolSource || blockedReason || storageTarget || preferredProvider || queuedProvider) && (
+                      <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-white/60">
+                        {cycleId && <span className="rounded-full border border-white/10 bg-black/30 px-2 py-1">cycle {cycleId}</span>}
+                        {laneReason && <span className="rounded-full border border-white/10 bg-black/30 px-2 py-1">reason {laneReason}</span>}
+                        {symbolSource && <span className="rounded-full border border-white/10 bg-black/30 px-2 py-1">source {symbolSource}</span>}
+                        {preferredProvider && <span className="rounded-full border border-white/10 bg-black/30 px-2 py-1">preferred {preferredProvider}</span>}
+                        {queuedProvider && <span className="rounded-full border border-white/10 bg-black/30 px-2 py-1">queued {queuedProvider}</span>}
+                        {storageTarget && <span className="rounded-full border border-white/10 bg-black/30 px-2 py-1">vault {storageTarget}</span>}
+                        {blockedReason && <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-amber-100">{blockedReason}</span>}
+                      </div>
+                    )}
+                        </>
+                      )
+                    })()}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 flex flex-col gap-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-semibold">Inventory Parity Exceptions</h3>
+                  <p className="mt-1 text-sm text-white/45">Cases where vault data and inventory metadata do not agree.</p>
+                </div>
+                <div className="text-xs text-white/45">updated {formatDate(scheduler.inventoryParity.generatedAt)}</div>
+              </div>
+              <div className="space-y-3">
+                {scheduler.inventoryParity.exceptions.length === 0 && (
+                  <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 px-4 py-5 text-sm text-white/45">
+                    No parity exceptions detected.
+                  </div>
+                )}
+                {scheduler.inventoryParity.exceptions.map((exception) => (
+                  <div key={`${exception.vaultName}:${exception.symbol}:${exception.timeframe}:${exception.reason}`} className="rounded-2xl border border-white/10 bg-black/20 px-4 py-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="font-medium">{exception.symbol} {exception.timeframe}</p>
+                        <p className="mt-1 text-sm text-white/45">{exception.reason} in {exception.vaultName}</p>
+                      </div>
+                      <div className="text-right text-xs text-white/45">
+                        <div>{exception.vaultBarCount} vault bars</div>
+                        <div>vault {formatDate(exception.vaultLastBar)}</div>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-xs text-white/45">
+                      inventory last bar {formatDate(exception.inventoryLastBar)} / last synced {formatDate(exception.inventoryLastSynced)}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -1002,7 +1307,7 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                             <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/45">{lane.providerPreference || 'auto'}</span>
                           </div>
                           <p className="text-sm text-white/45 mt-1">
-                            queued {lane.queued} · running {lane.running} · completed {lane.completed} · failed {lane.failed}
+                            queued {lane.queued} / running {lane.running} / completed {lane.completed} / failed {lane.failed}
                           </p>
                         </div>
                         <label className="inline-flex items-center gap-2 text-xs text-white/60">
@@ -1089,7 +1394,7 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                           <p className="text-xs uppercase tracking-[0.2em] text-white/35">Canonical intervals</p>
                           <p className="mt-3 text-sm text-white">{lane.canonicalIntervals.join(', ') || 'None'}</p>
                           <p className="mt-1 text-xs text-white/45">
-                            reserved {lane.reservedCallsPerMinute ?? 0} · min {lane.minCallsPerMinute ?? 0}
+                            reserved {lane.reservedCallsPerMinute ?? 0} / min {lane.minCallsPerMinute ?? 0}
                           </p>
                         </div>
                       </div>
@@ -1113,7 +1418,7 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                           <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/45">{target.preset}</span>
                         </div>
                         <p className="text-sm text-white/45 mt-1">
-                          {target.symbolCount} symbols · {target.canonicalIntervals.join(', ')}
+                          {target.symbolCount} symbols / {target.canonicalIntervals.join(', ')}
                         </p>
                       </div>
                       <button
@@ -1142,7 +1447,7 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                         )
                       })}
                     </div>
-                    <p className="mt-3 text-xs text-white/45 leading-6">{target.previewSymbols.join(' · ') || 'No symbols enabled yet.'}</p>
+                    <p className="mt-3 text-xs text-white/45 leading-6">{target.previewSymbols.join(' / ') || 'No symbols enabled yet.'}</p>
 
                     {target.preset === 'CUSTOM' && (
                       <div className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
@@ -1199,7 +1504,7 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                 <p className="text-xs uppercase tracking-[0.2em] text-white/35">{metric.provider}</p>
                 <p className="mt-3 text-3xl font-semibold">{metric.callsPerMinute}</p>
                 <p className="mt-1 text-sm text-white/45">calls / min</p>
-                <p className="mt-4 text-sm text-white/60">errors {metric.errorCount} · retries {metric.retryCount}</p>
+                <p className="mt-4 text-sm text-white/60">errors {metric.errorCount} / retries {metric.retryCount}</p>
                 {metric.throttledSymbols.length > 0 && (
                   <p className="mt-2 text-xs text-amber-100/80">throttled {metric.throttledSymbols.slice(0, 4).join(', ')}</p>
                 )}
@@ -1307,7 +1612,7 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <span className="font-medium">{job.symbol}</span>
-                      <span className="text-sm text-white/45">{job.requestedTimeframe} → {job.storageTimeframe}</span>
+                      <span className="text-sm text-white/45">{job.requestedTimeframe} to {job.storageTimeframe}</span>
                     </div>
                     <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/45">{job.status}</span>
                   </div>
@@ -1318,12 +1623,12 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                     <span className={`rounded-full border px-2 py-1 ${getVerificationTone(job.verificationStatus)}`}>{job.verificationStatus || 'unverified'}</span>
                   </div>
                   <p className="mt-2 text-sm text-white/45">
-                    {job.vaultName || 'pending vault'} · updated {formatDate(job.updatedAt)}
-                    {summary?.persistedBars != null ? ` · persisted ${summary.persistedBars.toLocaleString()} bars` : ''}
+                    {job.vaultName || 'pending vault'} / updated {formatDate(job.updatedAt)}
+                    {summary?.persistedBars != null ? ` / persisted ${summary.persistedBars.toLocaleString()} bars` : ''}
                   </p>
                   {summary?.healthScore != null && (
                     <p className="mt-2 text-xs text-white/45">
-                      health {summary.healthScore.toFixed(1)}%{summary.targetCoveragePercent != null ? ` · coverage ${summary.targetCoveragePercent.toFixed(1)}%` : ''}
+                      health {summary.healthScore.toFixed(1)}%{summary.targetCoveragePercent != null ? ` / coverage ${summary.targetCoveragePercent.toFixed(1)}%` : ''}
                     </p>
                   )}
                   {job.lastError && <p className="mt-2 text-xs text-rose-200/90">{job.lastError}</p>}
@@ -1347,6 +1652,14 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                 <div key={log.id} className="px-5 py-4">
                   {(() => {
                     const metadata = parseJsonSummary<Record<string, unknown>>(log.metadata)
+                    const providerDecision = asRecord(metadata?.providerDecision)
+                    const cycleId = getStringField(metadata, 'cycleId')
+                    const laneReason = getStringField(metadata, 'laneReason')
+                    const symbolSource = getStringField(metadata, 'symbolSource')
+                    const blockedReason = getStringField(metadata, 'blockedReason')
+                    const storageTarget = getStringField(metadata, 'storageTarget')
+                    const preferredProvider = getStringField(providerDecision, 'preferredProvider')
+                    const queuedProvider = getStringField(providerDecision, 'queuedProvider')
                     return (
                       <>
                   <div className="flex items-center justify-between gap-3">
@@ -1360,15 +1673,26 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                   <p className="mt-2 text-sm text-white/80">{log.message}</p>
                   {log.provider && (
                     <p className="mt-2 text-xs text-white/45">
-                      provider {log.provider}{log.storageTimeframe ? ` · stored as ${log.storageTimeframe}` : ''}
+                      provider {log.provider}{log.storageTimeframe ? ` / stored as ${log.storageTimeframe}` : ''}
                     </p>
+                  )}
+                  {(cycleId || laneReason || symbolSource || storageTarget || preferredProvider || queuedProvider || blockedReason) && (
+                    <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-white/60">
+                      {cycleId && <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1">cycle {cycleId}</span>}
+                      {laneReason && <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1">reason {laneReason}</span>}
+                      {symbolSource && <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1">source {symbolSource}</span>}
+                      {preferredProvider && <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1">preferred {preferredProvider}</span>}
+                      {queuedProvider && <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1">queued {queuedProvider}</span>}
+                      {storageTarget && <span className="rounded-full border border-white/10 bg-black/20 px-2 py-1">vault {storageTarget}</span>}
+                      {blockedReason && <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-2 py-1 text-amber-100">{blockedReason}</span>}
+                    </div>
                   )}
                   {metadata?.summary && (
                     <p className="mt-2 text-xs text-white/45">
                       {(() => {
                         const summary = metadata.summary as { persistedBars?: number; fetchedBars?: number } | undefined
                         if (!summary) return null
-                        return `persisted ${summary.persistedBars ?? 0} bars${summary.fetchedBars != null ? ` · fetched ${summary.fetchedBars}` : ''}`
+                        return `persisted ${summary.persistedBars ?? 0} bars${summary.fetchedBars != null ? ` / fetched ${summary.fetchedBars}` : ''}`
                       })()}
                     </p>
                   )}
@@ -1499,7 +1823,7 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                         <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] text-white/45">{job.status}</span>
                       </div>
                       <p className="mt-2 text-sm text-white/45">
-                        {job.mode} · {job.sourceProvider || 'schwab'} vs {job.comparisonProvider || '—'}
+                      {job.mode} / {job.sourceProvider || 'schwab'} vs {job.comparisonProvider || '--'}
                       </p>
                       {summary?.verificationStatus && (
                         <div className="mt-2 flex flex-wrap gap-2 text-xs">
@@ -1542,10 +1866,10 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                         <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] ${getVerificationTone(observation.classification === 'MATERIAL_DIFFERENCE' ? 'disputed' : observation.classification === 'PROVIDER_GAP' ? 'stale' : 'same-source-verified')}`}>{observation.decision}</span>
                       </div>
                       <p className="mt-2 text-sm text-white/80">
-                        {observation.primaryProvider || 'primary'} {observation.primaryClose ?? '—'} vs {observation.secondaryProvider || 'secondary'} {observation.secondaryClose ?? '—'}
+                        {observation.primaryProvider || 'primary'} {observation.primaryClose ?? '--'} vs {observation.secondaryProvider || 'secondary'} {observation.secondaryClose ?? '--'}
                       </p>
                       <p className="mt-2 text-xs text-white/45">
-                        diff {observation.priceDiffBps != null ? formatPercent(observation.priceDiffBps / 100) : '—'} · volume Δ {observation.volumeDiffPct != null ? `${observation.volumeDiffPct.toFixed(2)}%` : '—'}
+                        diff {observation.priceDiffBps != null ? formatPercent(observation.priceDiffBps / 100) : '--'} / volume delta {observation.volumeDiffPct != null ? `${observation.volumeDiffPct.toFixed(2)}%` : '--'}
                       </p>
                     </div>
                   ))}
@@ -1605,6 +1929,45 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
               <button onClick={() => void loadStorage(true)} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10">
                 Refresh
               </button>
+              <button
+                onClick={() => runSchedulerAction({
+                  action: 'refresh-inventory',
+                  profileId: schedulerState.data?.scheduler?.profile.id,
+                  provider: storageFilters.vault === 'auto' ? undefined : storageFilters.vault,
+                  symbol: storageFilters.symbol,
+                  timeframe: storageFilters.timeframe,
+                })}
+                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+              >
+                Reconcile current
+              </button>
+              <button
+                onClick={() => runSchedulerAction({
+                  action: 'repair-inventory',
+                  profileId: schedulerState.data?.scheduler?.profile.id,
+                  provider: storageFilters.vault === 'auto' ? undefined : storageFilters.vault,
+                })}
+                className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+              >
+                Repair parity
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-white/35">Parity Snapshot</p>
+              <p className="mt-3 text-2xl font-semibold">{data.parity.summary.missingInventoryRows} missing</p>
+              <p className="mt-1 text-sm text-white/45">{data.parity.summary.staleInventoryRows} stale rows</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-white/35">Vault Coverage</p>
+              <p className="mt-3 text-2xl font-semibold">{data.parity.summary.totalVaultKeys}</p>
+              <p className="mt-1 text-sm text-white/45">vault keys tracked</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+              <p className="text-xs uppercase tracking-[0.2em] text-white/35">Inventory Rows</p>
+              <p className="mt-3 text-2xl font-semibold">{data.parity.summary.totalInventoryKeys}</p>
+              <p className="mt-1 text-sm text-white/45">metadata rows tracked</p>
             </div>
           </div>
         </div>
@@ -1631,10 +1994,10 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                     </div>
                   </div>
                   <p className="mt-2 text-sm text-white/45">
-                    {row.vault?.name || 'unknown vault'} · {row.barCount.toLocaleString()} bars · {row.gapCount} gaps · health {row.healthScore.toFixed(1)}%
+                    {row.vault?.name || 'unknown vault'} / {row.barCount.toLocaleString()} bars / {row.gapCount} gaps / health {row.healthScore.toFixed(1)}%
                   </p>
                   <p className="mt-2 text-xs text-white/45">
-                    {row.storageClass} · canonical {row.canonicalInterval || row.timeframe} · method {row.verificationMethod || 'none'}
+                    {row.storageClass} / canonical {row.canonicalInterval || row.timeframe} / method {row.verificationMethod || 'none'}
                   </p>
                 </div>
               ))}
@@ -1651,7 +2014,7 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
                 </div>
                 {data.inventories[0] && (
                   <div className="mt-1 text-[11px] text-white/45">
-                    {data.inventories[0].storageClass} · {data.inventories[0].verificationStatus}
+                    {data.inventories[0].storageClass} / {data.inventories[0].verificationStatus}
                   </div>
                 )}
               </div>
@@ -1717,7 +2080,7 @@ export function DiUiWorkspace({ refreshToken = 0 }: { refreshToken?: number }) {
             <p className="text-[11px] uppercase tracking-[0.3em] text-white/35">Data Ingestion Interface</p>
             <h2 className="text-3xl font-semibold tracking-tight mt-2">DI-UI</h2>
             <p className="text-sm text-white/45 mt-2 max-w-3xl">
-              Live scheduler control, provider traffic, processing flow, verification, and raw storage browsing for Mahita’s market-data runtime.
+              Live scheduler control, provider traffic, processing flow, verification, and raw storage browsing for Mahita&apos;s market-data runtime.
             </p>
           </div>
           <div className="flex items-center gap-2">

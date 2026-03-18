@@ -32,6 +32,8 @@ const DEFAULT_LOOKBACKS: Record<Timeframe, number> = {
     '1M': 15 * 31536000
 }
 
+const ROUTE_PROVIDER_TIMEOUT_MS = 12_000
+
 function isPlatformDataVerificationStatus(value: string | null | undefined): value is PlatformDataVerificationStatus {
     return value === 'single-source-unverified'
         || value === 'same-source-verified'
@@ -74,7 +76,9 @@ export async function GET(req: NextRequest) {
     try {
         const result = await marketDataStore.getHistoricalDataWithReport(symbol, timeframe, startTime, endTime, {
             providerOverride: provider,
-            forceRefresh
+            forceRefresh,
+            providerTimeoutMs: ROUTE_PROVIDER_TIMEOUT_MS,
+            fetchMode: 'interactive',
         })
 
         const storageTimeframe = getBaseRequirement(timeframe)

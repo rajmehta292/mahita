@@ -213,8 +213,8 @@ interface RemoteState<T> {
 const tabs: Array<{ id: AdminTab; label: string; icon: typeof Shield }> = [
     { id: 'overview', label: 'Overview', icon: Shield },
     { id: 'providers', label: 'Provider Pool', icon: Database },
-    { id: 'data-command', label: 'Data Command', icon: Wrench },
     { id: 'di-ui', label: 'DI-UI', icon: Layers3 },
+    { id: 'data-command', label: 'Recovery', icon: Wrench },
     { id: 'users', label: 'Users', icon: Users },
     { id: 'audits', label: 'Audit Log', icon: Activity },
 ]
@@ -252,7 +252,7 @@ function TabStateMessage({
     if (loading) {
         return (
             <div className="rounded-3xl border border-white/10 bg-white/[0.03] px-5 py-6 text-sm text-white/60">
-                Loading…
+                Loading...
             </div>
         )
     }
@@ -643,7 +643,7 @@ export function AdminControlPlane() {
                         <p className="text-[11px] uppercase tracking-[0.3em] text-white/35">Superuser Control Plane</p>
                         <h1 className="text-3xl font-semibold tracking-tight">Admin Control</h1>
                         <p className="text-sm text-white/45 mt-2">
-                            Provider pool, user oversight, audited operations, and the rebuilt data command live here now.
+                            DI-UI is the primary operator surface. Recovery actions, provider oversight, and audited administration stay here with it.
                         </p>
                     </div>
                     <button
@@ -778,7 +778,7 @@ export function AdminControlPlane() {
                                                     </div>
                                                     <p className="text-sm text-white/45 mt-1">
                                                         Actor: {event.actorUser.email || event.actorUser.name || 'Unknown'}
-                                                        {event.targetUser ? ` · Target: ${event.targetUser.email || event.targetUser.name}` : ''}
+                                                        {event.targetUser ? `  /  Target: ${event.targetUser.email || event.targetUser.name}` : ''}
                                                     </p>
                                                 </div>
                                             ))}
@@ -840,7 +840,7 @@ export function AdminControlPlane() {
                                     </div>
                                     <div className="divide-y divide-white/5">
                                         {providerPoolState.loading && providerPool.length === 0 && (
-                                            <div className="px-5 py-6 text-sm text-white/45">Loading provider-pool members…</div>
+                                            <div className="px-5 py-6 text-sm text-white/45">Loading provider-pool members...</div>
                                         )}
                                         {!providerPoolState.loading && providerPool.length === 0 && (
                                             <div className="px-5 py-6 text-sm text-white/45">No provider pool members configured yet.</div>
@@ -861,7 +861,7 @@ export function AdminControlPlane() {
                                                             <span className="text-[10px] uppercase tracking-[0.2em] text-white/35">{member.status}</span>
                                                         </div>
                                                         <p className="text-sm text-white/45 mt-1">
-                                                            {credentialProvider} · {credentialSource} · priority {member.priority}
+                                                            {credentialProvider}  /  {credentialSource}  /  priority {member.priority}
                                                         </p>
                                                         {credentialSource === 'USER_SCHWAB_CONFIG' && (
                                                             <p className="text-xs text-amber-200/80 mt-1">
@@ -917,7 +917,7 @@ export function AdminControlPlane() {
                             <TabStateMessage
                                 loading={dataCommandState.loading}
                                 error={dataCommandState.error}
-                                empty="Data Command data is not available yet."
+                                empty="Recovery data is not available yet."
                             />
                         ) : dataCommand ? (
                             <div className="flex flex-col gap-6">
@@ -954,7 +954,12 @@ export function AdminControlPlane() {
 
                                 <div className="grid grid-cols-1 xl:grid-cols-[380px_minmax(0,1fr)] gap-6">
                                     <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 flex flex-col gap-4">
-                                        <h2 className="text-lg font-semibold">Operator Actions</h2>
+                                        <div>
+                                            <h2 className="text-lg font-semibold">Recovery Actions</h2>
+                                            <p className="mt-1 text-sm text-white/45">
+                                                Use DI-UI for live runtime control. Use Recovery only for repair and break-glass maintenance.
+                                            </p>
+                                        </div>
                                         <div className="rounded-2xl border border-white/10 bg-black/20 p-4 text-sm">
                                             <p className="font-medium">Runtime health</p>
                                             <p className="mt-2 text-white/60">
@@ -999,7 +1004,7 @@ export function AdminControlPlane() {
                                                             <span className="text-xs text-white/35">{row.vault?.name || 'No vault'}</span>
                                                         </div>
                                                         <p className="text-sm text-white/45 mt-1">
-                                                            Health {row.healthScore.toFixed(1)}% · Coverage {row.targetCoveragePercent.toFixed(1)}% · Gaps {row.gapCount}
+                                                            Health {row.healthScore.toFixed(1)}%  /  Coverage {row.targetCoveragePercent.toFixed(1)}%  /  Gaps {row.gapCount}
                                                         </p>
                                                     </div>
                                                     <button
@@ -1030,7 +1035,7 @@ export function AdminControlPlane() {
                                                     <div className="text-white/35 text-xs">{formatDate(event.timestamp)}</div>
                                                 </div>
                                                 <div className="text-white/40 text-xs mt-1">
-                                                    {[event.provider, event.symbol, event.timeframe, event.kind].filter(Boolean).join(' · ')}
+                                                    {[event.provider, event.symbol, event.timeframe, event.kind].filter(Boolean).join('  /  ')}
                                                 </div>
                                             </div>
                                         ))}
@@ -1116,7 +1121,7 @@ export function AdminControlPlane() {
                                             </div>
                                             <p className="text-sm text-white/45 mt-1">
                                                 Actor: {event.actorUser.email || event.actorUser.name || 'Unknown'}
-                                                {event.targetUser ? ` · Target: ${event.targetUser.email || event.targetUser.name}` : ''}
+                                                {event.targetUser ? `  /  Target: ${event.targetUser.email || event.targetUser.name}` : ''}
                                             </p>
                                             {event.reason && <p className="text-sm text-amber-200/80 mt-1">Reason: {event.reason}</p>}
                                             {event.metadata && (

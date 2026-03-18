@@ -7,8 +7,15 @@ import { listActiveViewDemands, purgeExpiredViewDemands } from "./view-demand"
 import { runVerificationJobNow, seedAfterHoursVerificationJobs } from "./verification"
 import { executeIngestionJob } from "./job-executor"
 import { continuousIngestController } from "./continuous-ingest-controller"
+import { DataHealthManager } from "./health"
+import {
+  decideRuntimeProvider,
+  getProviderAvailabilitySnapshot,
+  getProviderReadinessSnapshot,
+  resolveVerificationProviders as resolveProviderVerificationPair,
+  type ProviderAvailabilitySnapshot,
+} from "./provider-policy"
 import { writeAdminAuditEvent } from "@/lib/security/platform-security"
-import { getRuntimeSchwabClientWithOptions } from "@/app/services/schwab/runtime"
 
 const DEFAULT_PROFILE_NAME = "presentation-default"
 const DEFAULT_PROVIDER_BUDGETS = [
@@ -145,6 +152,7 @@ const DEFAULT_TARGETS = [
     symbols: [] as string[],
   },
 ]
+const SCHEDULER_SNAPSHOT_TIMEOUT_MS = 5_000
 
 function parseJsonArray(value?: string | null): string[] {
   if (!value) return []
@@ -165,12 +173,69 @@ function parseJsonObject<T>(value: string | null | undefined, fallback: T): T {
   }
 }
 
+function parseMetadataRecord(value?: string | null) {
+  if (!value) return null
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>
+    return parsed && typeof parsed === "object" ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+async function withSchedulerTimeout<T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((resolve) => {
+        timeoutHandle = setTimeout(() => resolve(fallback), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timeoutHandle) {
+      clearTimeout(timeoutHandle)
+    }
+  }
+}
+
 function defaultVerificationPolicies() {
   return [
     { timeframe: "1m", sameSourcePriceToleranceBps: 5, crossSourcePriceToleranceBps: 10, volumeTolerancePct: 5 },
     { timeframe: "1h", sameSourcePriceToleranceBps: 8, crossSourcePriceToleranceBps: 15, volumeTolerancePct: 8 },
     { timeframe: "1w", sameSourcePriceToleranceBps: 12, crossSourcePriceToleranceBps: 20, volumeTolerancePct: 12 },
   ]
+}
+
+interface SchedulerDesiredState {
+  shouldRun: boolean
+  profileStatus: string
+  isDefault: boolean
+}
+
+interface SchedulerActualRuntimeState {
+  running: boolean
+  currentPhase: string
+  intervalMs: number
+  providerOverride: string | null
+  schedulerEnabled: boolean
+  lastError: string | null
+  cycleCount: number
+}
+
+interface SchedulerPlanPreviewItem {
+  laneKind: string
+  symbolSource: string
+  queueDepthTarget: number
+  existingQueued: number
+  requestedTimeframe: string
+  storageTimeframe: string
+  preferredProvider: string
+  chosenProvider: string | null
+  reason: string
+  blockedReason: string | null
+  previewSymbols: string[]
 }
 
 function getRecentProviderUsage(events: ProviderTelemetryEvent[]) {
@@ -270,16 +335,26 @@ async function ensureProfileDefaults(profileId: string) {
       const existingSet = new Set(existingSymbols.map((item) => item.symbol))
       const symbolsToCreate = target.symbols.filter((symbol) => !existingSet.has(symbol))
 
-	      if (symbolsToCreate.length > 0) {
-	        await prisma.ingestionTargetSymbol.createMany({
-	          data: symbolsToCreate.map((symbol) => ({
-	            targetId: record.id,
-	            symbol,
-	            enabled: true,
-	            canonicalIntervals: JSON.stringify(target.canonicalIntervals),
-	          })),
-	        })
-	      }
+      for (const symbol of symbolsToCreate) {
+        await prisma.ingestionTargetSymbol.upsert({
+          where: {
+            targetId_symbol: {
+              targetId: record.id,
+              symbol,
+            },
+          },
+          update: {
+            enabled: true,
+            canonicalIntervals: JSON.stringify(target.canonicalIntervals),
+          },
+          create: {
+            targetId: record.id,
+            symbol,
+            enabled: true,
+            canonicalIntervals: JSON.stringify(target.canonicalIntervals),
+          },
+        })
+      }
 
       await prisma.ingestionTargetSymbol.updateMany({
         where: {
@@ -381,6 +456,7 @@ async function getAllProfiles() {
 }
 
 async function ensureSchedulerRuntime(profile: Awaited<ReturnType<typeof getProfileWithRelations>>) {
+  await reconcileDefaultSchedulerRuntime()
   const status = continuousIngestController.getStatus()
 
   if (profile.status !== "ACTIVE") {
@@ -430,18 +506,14 @@ async function resolveVerificationProviders(input: {
     sourceProvider = "schwab"
   }
 
-  const comparisonProvider =
-    sourceProvider === "schwab"
-      ? availability.yahoo
-        ? "yahoo"
-        : null
-      : availability.schwab
-        ? "schwab"
-        : null
+  const providerPair = resolveProviderVerificationPair({
+    preferredProvider: sourceProvider,
+    availability,
+  })
 
   return {
-    sourceProvider,
-    comparisonProvider,
+    sourceProvider: providerPair.sourceProvider || sourceProvider,
+    comparisonProvider: providerPair.comparisonProvider,
     availability,
   }
 }
@@ -499,6 +571,9 @@ async function ensureJobsForLane(input: {
   storageTimeframe: string
   provider: string
   queueDepthTarget: number
+  cycleId: string
+  queueReason: string
+  symbolSource: string
 }) {
   const existing = await prisma.ingestionJob.findMany({
     where: {
@@ -552,30 +627,57 @@ async function ensureJobsForLane(input: {
     data: { cursor },
   })
 
-  await prisma.ingestionJob.createMany({
-    data: nextJobs.map((job, index) => ({
+  const scheduledFor = new Date()
+  for (const [index, job] of nextJobs.entries()) {
+    const createdJob = await prisma.ingestionJob.create({
+      data: {
+        profileId: input.profileId,
+        laneKind: input.lane.kind,
+        symbol: job.symbol,
+        requestedTimeframe: job.requestedTimeframe,
+        storageTimeframe: job.storageTimeframe,
+        provider: job.provider,
+        status: "QUEUED",
+        priorityScore: Math.max(1, 100 - input.lane.priorityOrder - index),
+        scheduledFor,
+        queueBucket: input.lane.kind,
+        vaultName: input.provider === "yahoo" ? "yahoo" : "schwab",
+        provenanceStatus: job.requestedTimeframe === job.storageTimeframe ? "native-cached" : "derived",
+        verificationStatus: "unverified",
+      },
+    })
+
+    await logDispatch({
       profileId: input.profileId,
+      ingestionJobId: createdJob.id,
       laneKind: input.lane.kind,
+      stage: "queued",
+      message: `Queued ${job.symbol} ${job.requestedTimeframe} for ${input.lane.kind}.`,
+      provider: job.provider,
       symbol: job.symbol,
       requestedTimeframe: job.requestedTimeframe,
       storageTimeframe: job.storageTimeframe,
-      provider: job.provider,
-      status: "QUEUED",
-      priorityScore: Math.max(1, 100 - input.lane.priorityOrder - index),
-      scheduledFor: new Date(),
-      queueBucket: input.lane.kind,
-      vaultName: input.provider === "yahoo" ? "yahoo" : "schwab",
-      provenanceStatus: job.requestedTimeframe === job.storageTimeframe ? "native-cached" : "derived",
-      verificationStatus: "unverified",
-    })),
-  })
+      metadata: {
+        cycleId: input.cycleId,
+        laneReason: input.queueReason,
+        symbolSource: input.symbolSource,
+        providerDecision: {
+          preferredProvider: input.lane.providerPreference || "schwab",
+          queuedProvider: job.provider,
+        },
+        budgetDecision: "dispatch-time-budget-check",
+        storageTarget: job.provider === "yahoo" ? "yahoo" : "schwab",
+      },
+    })
+  }
 
   return nextJobs.length
 }
 
-async function seedCompatibilityJobs(profile: Awaited<ReturnType<typeof getProfileWithRelations>>) {
+async function seedCompatibilityJobs(profile: Awaited<ReturnType<typeof getProfileWithRelations>>, cycleId: string) {
   await purgeExpiredViewDemands()
   const activeViewDemands = await listActiveViewDemands()
+  const providerAvailability = await getSchedulerProviderAvailability()
   const hasQueuePressure = (await prisma.ingestionJob.count({
     where: {
       profileId: profile.id,
@@ -594,14 +696,35 @@ async function seedCompatibilityJobs(profile: Awaited<ReturnType<typeof getProfi
         .filter((demand) => demand.symbol && demand.timeframe)
         .map((demand) => ({ symbol: demand.symbol!, timeframe: demand.timeframe || "1m" }))
       const uniqueDemands = Array.from(new Map(demands.map((demand) => [`${demand.symbol}:${demand.timeframe}`, demand])).values())
+      const providerDecision = decideRuntimeProvider({
+        preferredProvider: lane.providerPreference,
+        providerAvailability,
+      })
+      if (!providerDecision.chosenProvider) {
+        await logDispatch({
+          profileId: profile.id,
+          laneKind: lane.kind,
+          stage: "blocked",
+          message: `Skipped ${lane.kind} queueing because no runtime provider was available.`,
+          metadata: {
+            cycleId,
+            laneReason: "active-view-demand",
+            blockedReason: providerDecision.blockedReason,
+          },
+        })
+        continue
+      }
       await ensureJobsForLane({
         profileId: profile.id,
         lane,
         targetSymbols: uniqueDemands.map((item) => item.symbol),
         requestedTimeframe: "1m",
         storageTimeframe: "1m",
-        provider: lane.providerPreference || "schwab",
+        provider: providerDecision.chosenProvider,
         queueDepthTarget: Math.max(uniqueDemands.length, 6),
+        cycleId,
+        queueReason: "active-view-demand",
+        symbolSource: "view-demands",
       })
       continue
     }
@@ -615,6 +738,24 @@ async function seedCompatibilityJobs(profile: Awaited<ReturnType<typeof getProfi
 
     if (!target?.enabled) continue
     const symbols = await resolveTargetSymbols(target)
+    const providerDecision = decideRuntimeProvider({
+      preferredProvider: target.providerPreference || lane.providerPreference,
+      providerAvailability,
+    })
+    if (!providerDecision.chosenProvider) {
+      await logDispatch({
+        profileId: profile.id,
+        laneKind: lane.kind,
+        stage: "blocked",
+        message: `Skipped ${lane.kind} queueing because no runtime provider was available.`,
+        metadata: {
+          cycleId,
+          laneReason: target.preset,
+          blockedReason: providerDecision.blockedReason,
+        },
+      })
+      continue
+    }
     const queueDepthTarget = lane.kind === "DOW30_REALTIME"
       ? Math.min(symbols.length, 30)
       : lane.kind === "SELECTED_OR_SP500_REALTIME"
@@ -627,8 +768,11 @@ async function seedCompatibilityJobs(profile: Awaited<ReturnType<typeof getProfi
       targetSymbols: symbols,
       requestedTimeframe: lane.kind === "DOW30_REALTIME" || lane.kind === "SELECTED_OR_SP500_REALTIME" ? "30s" : "1m",
       storageTimeframe: "1m",
-      provider: lane.providerPreference || "schwab",
+      provider: providerDecision.chosenProvider,
       queueDepthTarget,
+      cycleId,
+      queueReason: target.preset,
+      symbolSource: target.preset,
     })
   }
 
@@ -637,34 +781,232 @@ async function seedCompatibilityJobs(profile: Awaited<ReturnType<typeof getProfi
   }
 }
 
+async function buildSchedulerPlanPreview(
+  profile: Awaited<ReturnType<typeof getProfileWithRelations>>,
+  providerAvailability: ProviderAvailabilitySnapshot
+): Promise<SchedulerPlanPreviewItem[]> {
+  await purgeExpiredViewDemands()
+  const activeViewDemands = await listActiveViewDemands()
+  const hasQueuePressure = (await prisma.ingestionJob.count({
+    where: {
+      profileId: profile.id,
+      laneKind: "SELECTED_ALL_1M",
+      status: "QUEUED",
+    },
+  })) > 120
+  const split = getQueueWeightSplit(hasQueuePressure)
+  const queuedCounts = await prisma.ingestionJob.groupBy({
+    by: ["laneKind"],
+    where: {
+      profileId: profile.id,
+      status: "QUEUED",
+    },
+    _count: { _all: true },
+  })
+  const queuedMap = new Map(queuedCounts.map((row) => [row.laneKind, row._count._all]))
+
+  const preview: SchedulerPlanPreviewItem[] = []
+  for (const lane of profile.lanes) {
+    if (!lane.enabled) {
+      preview.push({
+        laneKind: lane.kind,
+        symbolSource: "disabled",
+        queueDepthTarget: 0,
+        existingQueued: queuedMap.get(lane.kind) ?? 0,
+        requestedTimeframe: "1m",
+        storageTimeframe: "1m",
+        preferredProvider: lane.providerPreference || "schwab",
+        chosenProvider: null,
+        reason: "Lane disabled.",
+        blockedReason: "lane-disabled",
+        previewSymbols: [],
+      })
+      continue
+    }
+
+    if (lane.kind === "AFTER_HOURS_VERIFY" || lane.kind === "REPEAT_FETCH_VERIFY") {
+      preview.push({
+        laneKind: lane.kind,
+        symbolSource: lane.kind === "AFTER_HOURS_VERIFY" ? "verification-candidates" : "post-ingest-repeat-verification",
+        queueDepthTarget: lane.kind === "AFTER_HOURS_VERIFY" ? 10 : 1,
+        existingQueued: queuedMap.get(lane.kind) ?? 0,
+        requestedTimeframe: "1m",
+        storageTimeframe: "1m",
+        preferredProvider: lane.providerPreference || "schwab",
+        chosenProvider: lane.providerPreference || "schwab",
+        reason: lane.kind === "AFTER_HOURS_VERIFY" ? "Queue after-hours comparison jobs." : "Queue repeat verification after completed 1m ingest jobs.",
+        blockedReason: null,
+        previewSymbols: [],
+      })
+      continue
+    }
+
+    if (lane.kind === "USER_VIEW") {
+      const demands = activeViewDemands.filter((demand) => demand.symbol)
+      const providerDecision = decideRuntimeProvider({
+        preferredProvider: lane.providerPreference,
+        providerAvailability,
+      })
+      preview.push({
+        laneKind: lane.kind,
+        symbolSource: "view-demands",
+        queueDepthTarget: Math.max(demands.length, 6),
+        existingQueued: queuedMap.get(lane.kind) ?? 0,
+        requestedTimeframe: "1m",
+        storageTimeframe: "1m",
+        preferredProvider: providerDecision.preferredProvider,
+        chosenProvider: providerDecision.chosenProvider,
+        reason: "Prioritize symbols actively viewed in product surfaces.",
+        blockedReason: providerDecision.blockedReason,
+        previewSymbols: demands.slice(0, 12).map((demand) => demand.symbol!),
+      })
+      continue
+    }
+
+    const target = profile.targets.find((item) => {
+      if (lane.kind === "DOW30_REALTIME") return item.preset === "DOW30"
+      if (lane.kind === "SELECTED_OR_SP500_REALTIME") return item.preset === "SP500" || item.preset === "CUSTOM"
+      if (lane.kind === "SELECTED_ALL_1M") return item.preset === "ALL_ENABLED"
+      return false
+    })
+
+    if (!target?.enabled) {
+      preview.push({
+        laneKind: lane.kind,
+        symbolSource: "target-disabled",
+        queueDepthTarget: 0,
+        existingQueued: queuedMap.get(lane.kind) ?? 0,
+        requestedTimeframe: "1m",
+        storageTimeframe: "1m",
+        preferredProvider: lane.providerPreference || "schwab",
+        chosenProvider: null,
+        reason: "Target disabled.",
+        blockedReason: "target-disabled",
+        previewSymbols: [],
+      })
+      continue
+    }
+
+    const symbols = await resolveTargetSymbols(target)
+    const providerDecision = decideRuntimeProvider({
+      preferredProvider: target.providerPreference || lane.providerPreference,
+      providerAvailability,
+    })
+    const queueDepthTarget = lane.kind === "DOW30_REALTIME"
+      ? Math.min(symbols.length, 30)
+      : lane.kind === "SELECTED_OR_SP500_REALTIME"
+        ? Math.max(20, Math.round(80 * split.selectedRealtime))
+        : Math.max(60, Math.round(120 * split.all1m))
+
+    preview.push({
+      laneKind: lane.kind,
+      symbolSource: target.preset,
+      queueDepthTarget,
+      existingQueued: queuedMap.get(lane.kind) ?? 0,
+      requestedTimeframe: lane.kind === "DOW30_REALTIME" || lane.kind === "SELECTED_OR_SP500_REALTIME" ? "30s" : "1m",
+      storageTimeframe: "1m",
+      preferredProvider: providerDecision.preferredProvider,
+      chosenProvider: providerDecision.chosenProvider,
+      reason: `Queue symbols from ${target.name}.`,
+      blockedReason: providerDecision.blockedReason,
+      previewSymbols: symbols.slice(0, 12),
+    })
+  }
+
+  return preview
+}
+
 function getProviderBudgets(profile: Awaited<ReturnType<typeof getProfileWithRelations>>) {
   return parseJsonObject(profile.providerBudgetsJson, DEFAULT_PROVIDER_BUDGETS)
 }
 
 async function getSchedulerProviderAvailability() {
-  const schwabClient = await getRuntimeSchwabClientWithOptions({ silent: true })
-
-  return {
-    schwab: !!schwabClient,
-    yahoo: true,
-  }
+  return getProviderAvailabilitySnapshot()
 }
 
 function resolveDispatchProvider(input: {
   preferredProvider: string
   availableByProvider: Map<string, number>
-  providerAvailability: Awaited<ReturnType<typeof getSchedulerProviderAvailability>>
+  providerAvailability: ProviderAvailabilitySnapshot
 }) {
-  const preferredIsAvailable = input.providerAvailability[input.preferredProvider as keyof typeof input.providerAvailability] ?? true
-  if (preferredIsAvailable && (input.availableByProvider.get(input.preferredProvider) ?? 0) > 0) {
-    return input.preferredProvider
+  const decision = decideRuntimeProvider({
+    preferredProvider: input.preferredProvider,
+    providerAvailability: input.providerAvailability,
+  })
+
+  if (decision.chosenProvider && (input.availableByProvider.get(decision.chosenProvider) ?? 0) > 0) {
+    return {
+      provider: decision.chosenProvider,
+      fallbackReason: decision.fallbackReason,
+      blockedReason: null,
+    }
   }
 
-  if (input.preferredProvider === "schwab" && input.providerAvailability.yahoo && (input.availableByProvider.get("yahoo") ?? 0) > 0) {
-    return "yahoo"
+  return {
+    provider: null,
+    fallbackReason: decision.fallbackReason,
+    blockedReason: decision.blockedReason || `No remaining budget for ${decision.preferredProvider}.`,
+  }
+}
+
+function getDesiredSchedulerState(profile: Awaited<ReturnType<typeof getProfileWithRelations>>): SchedulerDesiredState {
+  return {
+    shouldRun: profile.status === "ACTIVE",
+    profileStatus: profile.status,
+    isDefault: profile.isDefault,
+  }
+}
+
+function getActualSchedulerRuntimeState(): SchedulerActualRuntimeState {
+  const status = continuousIngestController.getStatus()
+  return {
+    running: status.running,
+    currentPhase: status.currentPhase,
+    intervalMs: status.intervalMs,
+    providerOverride: status.providerOverride,
+    schedulerEnabled: status.schedulerEnabled,
+    lastError: status.lastError,
+    cycleCount: status.cycleCount,
+  }
+}
+
+let schedulerRuntimeInitPromise: Promise<void> | null = null
+
+export async function reconcileDefaultSchedulerRuntime() {
+  if (schedulerRuntimeInitPromise) {
+    await schedulerRuntimeInitPromise
+    return
   }
 
-  return input.preferredProvider
+  schedulerRuntimeInitPromise = (async () => {
+    try {
+      const profile = await getProfileWithRelations()
+      const desired = getDesiredSchedulerState(profile)
+      const actual = getActualSchedulerRuntimeState()
+
+      if (desired.shouldRun && !actual.running) {
+        await continuousIngestController.start({ useScheduler: true })
+        await providerTelemetryBus.log({
+          kind: "control",
+          message: "Scheduler runtime auto-reconciled from ACTIVE profile state.",
+          response: { profileId: profile.id },
+        })
+      }
+
+      if (!desired.shouldRun && actual.running) {
+        await continuousIngestController.stop()
+        await providerTelemetryBus.log({
+          kind: "control",
+          message: "Scheduler runtime auto-paused to match profile state.",
+          response: { profileId: profile.id },
+        })
+      }
+    } finally {
+      schedulerRuntimeInitPromise = null
+    }
+  })()
+
+  await schedulerRuntimeInitPromise
 }
 
 async function dispatchIngestionJob(job: {
@@ -676,6 +1018,7 @@ async function dispatchIngestionJob(job: {
   storageTimeframe: string
   provider: string
   vaultName: string | null
+  dispatchMetadata?: Record<string, unknown>
 }) {
   await prisma.ingestionJob.update({
     where: { id: job.id },
@@ -695,6 +1038,7 @@ async function dispatchIngestionJob(job: {
     symbol: job.symbol,
     requestedTimeframe: job.requestedTimeframe,
     storageTimeframe: job.storageTimeframe,
+    metadata: job.dispatchMetadata ?? null,
   })
 
   try {
@@ -727,6 +1071,7 @@ async function dispatchIngestionJob(job: {
       requestedTimeframe: job.requestedTimeframe,
       storageTimeframe: job.storageTimeframe,
       metadata: {
+        ...(job.dispatchMetadata ?? {}),
         providerRequested: job.provider,
         providerUsed: result.providerUsed,
         summary: result.summary,
@@ -771,12 +1116,16 @@ async function dispatchIngestionJob(job: {
       symbol: job.symbol,
       requestedTimeframe: job.requestedTimeframe,
       storageTimeframe: job.storageTimeframe,
-      metadata: { error: message },
+      metadata: {
+        ...(job.dispatchMetadata ?? {}),
+        error: message,
+      },
     })
   }
 }
 
 export interface SchedulerCycleResult {
+  cycleId: string
   dispatchedIngestionJobs: number
   dispatchedVerificationJobs: number
   queuePressureMode: "balanced" | "one-minute-biased"
@@ -786,10 +1135,14 @@ export interface SchedulerCycleResult {
 export async function runSchedulerCompatibilityCycle(options: {
   intervalMs: number
   providerOverride?: string | null
+  forceRun?: boolean
 }) {
+  await reconcileDefaultSchedulerRuntime()
   const profile = await getProfileWithRelations()
-  if (profile.status !== "ACTIVE") {
+  const cycleId = `cycle-${Date.now()}`
+  if (profile.status !== "ACTIVE" && !options.forceRun) {
     return {
+      cycleId,
       dispatchedIngestionJobs: 0,
       dispatchedVerificationJobs: 0,
       queuePressureMode: "balanced",
@@ -797,7 +1150,7 @@ export async function runSchedulerCompatibilityCycle(options: {
     } satisfies SchedulerCycleResult
   }
 
-  await seedCompatibilityJobs(profile)
+  await seedCompatibilityJobs(profile, cycleId)
 
   const events = providerTelemetryBus.getRecent(500)
   const usage = getRecentProviderUsage(events)
@@ -844,20 +1197,46 @@ export async function runSchedulerCompatibilityCycle(options: {
     const laneJobs = queuedJobs.filter((job) => job.laneKind === laneKind)
     for (const job of laneJobs) {
       const preferredProvider = options.providerOverride || job.provider
-      const provider = resolveDispatchProvider({
+      const providerDecision = resolveDispatchProvider({
         preferredProvider,
         availableByProvider,
         providerAvailability,
       })
-      const remaining = availableByProvider.get(provider) ?? 0
-      if (remaining <= 0) {
+      if (!providerDecision.provider) {
+        await logDispatch({
+          profileId: profile.id,
+          ingestionJobId: job.id,
+          laneKind: job.laneKind,
+          stage: "blocked",
+          message: `Blocked ${job.symbol} ${job.requestedTimeframe} because no provider could dispatch it.`,
+          provider: preferredProvider,
+          symbol: job.symbol,
+          requestedTimeframe: job.requestedTimeframe,
+          storageTimeframe: job.storageTimeframe,
+          metadata: {
+            cycleId,
+            providerDecision,
+          },
+        })
         continue
       }
+      const remaining = availableByProvider.get(providerDecision.provider) ?? 0
+      if (remaining <= 0) continue
       await dispatchIngestionJob({
         ...job,
-        provider,
+        provider: providerDecision.provider,
+        dispatchMetadata: {
+          cycleId,
+          laneReason: job.laneKind,
+          providerDecision,
+          budgetDecision: {
+            remainingBeforeDispatch: remaining,
+            intervalMs: options.intervalMs,
+          },
+          storageTarget: providerDecision.provider === "yahoo" ? "yahoo" : "schwab",
+        },
       })
-      availableByProvider.set(provider, remaining - 1)
+      availableByProvider.set(providerDecision.provider, remaining - 1)
       dispatchedIngestionJobs += 1
     }
   }
@@ -907,6 +1286,7 @@ export async function runSchedulerCompatibilityCycle(options: {
   }
 
   return {
+    cycleId,
     dispatchedIngestionJobs,
     dispatchedVerificationJobs,
     queuePressureMode,
@@ -919,6 +1299,7 @@ export async function getSchedulerSnapshot() {
   const availableProfiles = await getAllProfiles()
   const budgets = getProviderBudgets(profile)
   const providerAvailability = await getSchedulerProviderAvailability()
+  const providerReadiness = await getProviderReadinessSnapshot()
   const events = providerTelemetryBus.getRecent(500)
   const usage = getRecentProviderUsage(events)
   const viewDemands = await listActiveViewDemands()
@@ -951,13 +1332,50 @@ export async function getSchedulerSnapshot() {
     take: 80,
   })
   const continuousIngestStatus = await ensureSchedulerRuntime(profile)
-  const availableUniverseSymbols = await getGlobalUniverse()
+  const desiredState = getDesiredSchedulerState(profile)
+  const actualRuntimeState = getActualSchedulerRuntimeState()
+  const fallbackInventoryParity = {
+    generatedAt: new Date().toISOString(),
+    summary: {
+      totalVaultKeys: 0,
+      totalInventoryKeys: 0,
+      missingInventoryRows: 0,
+      staleInventoryRows: 0,
+    },
+    byVault: [],
+    exceptions: [],
+  }
+  const [availableUniverseSymbols, planPreview, inventoryParity] = await Promise.all([
+    withSchedulerTimeout(getGlobalUniverse(), SCHEDULER_SNAPSHOT_TIMEOUT_MS, [] as string[]),
+    withSchedulerTimeout(buildSchedulerPlanPreview(profile, providerAvailability), SCHEDULER_SNAPSHOT_TIMEOUT_MS, [] as SchedulerPlanPreviewItem[]),
+    withSchedulerTimeout(DataHealthManager.getInventoryParitySnapshot({ limit: 20 }), SCHEDULER_SNAPSHOT_TIMEOUT_MS, fallbackInventoryParity),
+  ])
   const queuedAll1m = await prisma.ingestionJob.count({
     where: { profileId: profile.id, laneKind: "SELECTED_ALL_1M", status: "QUEUED" },
   })
   const queuedRealtime = await prisma.ingestionJob.count({
     where: { profileId: profile.id, laneKind: "SELECTED_OR_SP500_REALTIME", status: "QUEUED" },
   })
+  const latestCycleId = recentDispatchLogs
+    .map((log) => parseMetadataRecord(log.metadata)?.cycleId)
+    .find((cycleId): cycleId is string => typeof cycleId === "string" && cycleId.length > 0) || null
+  const lastCycleTrace = latestCycleId
+    ? recentDispatchLogs
+        .filter((log) => parseMetadataRecord(log.metadata)?.cycleId === latestCycleId)
+        .slice(0, 20)
+        .reverse()
+        .map((log) => ({
+          id: log.id,
+          stage: log.stage,
+          message: log.message,
+          provider: log.provider,
+          symbol: log.symbol,
+          requestedTimeframe: log.requestedTimeframe,
+          storageTimeframe: log.storageTimeframe,
+          createdAt: log.createdAt,
+          metadata: parseMetadataRecord(log.metadata),
+        }))
+    : []
 
   return {
     profile: {
@@ -1036,6 +1454,8 @@ export async function getSchedulerSnapshot() {
       expiresAt: demand.expiresAt,
     })),
     runtime: {
+      desiredState,
+      actualRuntimeState,
       continuousIngest: continuousIngestStatus,
       afterHoursMode: isAfterHoursWindow(),
       queuePressureMode: queuedAll1m > queuedRealtime
@@ -1048,8 +1468,18 @@ export async function getSchedulerSnapshot() {
         oldestQueuedAt: oldestQueuedJob?.scheduledFor?.toISOString() ?? oldestQueuedJob?.createdAt?.toISOString() ?? null,
       },
     },
+    providerReadiness,
+    inventoryParity,
+    planPreview,
     recentJobs,
-    recentDispatchLogs,
+    recentDispatchLogs: recentDispatchLogs.map((log) => ({
+      ...log,
+      metadata: log.metadata,
+    })),
+    lastCycleTrace: {
+      cycleId: latestCycleId,
+      logs: lastCycleTrace,
+    },
     verificationSummary: {
       queued: verificationCounts.filter((row) => row.status === "QUEUED").reduce((sum, row) => sum + row._count._all, 0),
       running: verificationCounts.filter((row) => row.status === "RUNNING").reduce((sum, row) => sum + row._count._all, 0),
@@ -1204,6 +1634,100 @@ export async function runSchedulerAdminAction(input: {
     return { success: true }
   }
 
+  if (input.action === "run-one-cycle") {
+    const result = await runSchedulerCompatibilityCycle({
+      intervalMs: input.intervalMs ?? 60_000,
+      providerOverride: input.provider ?? undefined,
+      forceRun: true,
+    })
+    await writeAdminAuditEvent({
+      actorUserId: input.actorUserId,
+      action: "DI_UI_RUN_ONE_CYCLE",
+      metadata: JSON.stringify({ profileId: profile.id, intervalMs: input.intervalMs ?? 60_000 }),
+    })
+    return { success: true, result }
+  }
+
+  if (input.action === "refresh-inventory") {
+    let result: unknown
+    if (input.symbol && input.timeframe) {
+      result = await DataHealthManager.refreshInventorySelection(
+        input.symbol.toUpperCase(),
+        input.timeframe as import("./types").Timeframe,
+        input.provider || "schwab"
+      )
+    } else {
+      await DataHealthManager.refreshInventory(input.provider || undefined)
+      result = { scope: input.provider || "all-vaults" }
+    }
+    await writeAdminAuditEvent({
+      actorUserId: input.actorUserId,
+      action: "DI_UI_REFRESH_INVENTORY",
+      metadata: JSON.stringify({ profileId: profile.id, symbol: input.symbol ?? null, timeframe: input.timeframe ?? null, vault: input.provider ?? null }),
+    })
+    return { success: true, result }
+  }
+
+  if (input.action === "repair-inventory") {
+    const result = await DataHealthManager.repairInventoryParity({
+      vaultName: input.provider ?? undefined,
+      limit: 100,
+    })
+    await writeAdminAuditEvent({
+      actorUserId: input.actorUserId,
+      action: "DI_UI_REPAIR_INVENTORY",
+      metadata: JSON.stringify({ profileId: profile.id, vault: input.provider ?? null }),
+    })
+    return { success: true, result }
+  }
+
+  if (input.action === "requeue-failed") {
+    const failedJobs = await prisma.ingestionJob.findMany({
+      where: {
+        profileId: profile.id,
+        status: "FAILED",
+        ...(input.symbol ? { symbol: input.symbol.toUpperCase() } : {}),
+        ...(input.timeframe ? { storageTimeframe: input.timeframe } : {}),
+      },
+      orderBy: [{ updatedAt: "desc" }],
+      take: 50,
+    })
+
+    for (const job of failedJobs) {
+      await prisma.ingestionJob.update({
+        where: { id: job.id },
+        data: {
+          status: "QUEUED",
+          scheduledFor: new Date(),
+          startedAt: null,
+          completedAt: null,
+          lastError: null,
+        },
+      })
+      await logDispatch({
+        profileId: profile.id,
+        ingestionJobId: job.id,
+        laneKind: job.laneKind,
+        stage: "requeued",
+        message: `Requeued failed job for ${job.symbol} ${job.storageTimeframe}.`,
+        provider: job.provider,
+        symbol: job.symbol,
+        requestedTimeframe: job.requestedTimeframe,
+        storageTimeframe: job.storageTimeframe,
+        metadata: {
+          reason: "operator-requeue-failed",
+        },
+      })
+    }
+
+    await writeAdminAuditEvent({
+      actorUserId: input.actorUserId,
+      action: "DI_UI_REQUEUE_FAILED",
+      metadata: JSON.stringify({ profileId: profile.id, requeued: failedJobs.length }),
+    })
+    return { success: true, requeued: failedJobs.length }
+  }
+
   if (input.action === "run-after-hours-verification") {
     await seedAfterHoursVerificationJobs(profile.id)
     const verificationJobs = await prisma.verificationJob.findMany({
@@ -1260,6 +1784,7 @@ export async function runSchedulerAdminAction(input: {
       profileId: profile.id,
       isDefault: true,
     })
+    await reconcileDefaultSchedulerRuntime()
     await writeAdminAuditEvent({
       actorUserId: input.actorUserId,
       action: "DI_UI_SET_ACTIVE_PROFILE",

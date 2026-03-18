@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events'
-import { existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readSync } from 'node:fs'
 import { appendFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
@@ -24,6 +24,7 @@ class ProviderTelemetryBus {
     private readonly logPath = path.join(process.cwd(), 'logs', 'provider-traffic.jsonl')
     private events: ProviderTelemetryEvent[] = []
     private readonly maxEvents = 500
+    private readonly hydrateByteLimit = 2 * 1024 * 1024
 
     constructor() {
         this.emitter.setMaxListeners(0)
@@ -77,19 +78,49 @@ class ProviderTelemetryBus {
                 return
             }
 
-            const raw = readFileSync(this.logPath, 'utf8').trim()
+            const raw = this.readRecentLogChunk().trim()
             if (!raw) {
                 return
             }
 
-            this.events = raw
-                .split('\n')
+            const lines = raw.split('\n')
+            const safeLines = lines.length > this.maxEvents
+                ? lines.slice(-this.maxEvents)
+                : lines
+
+            this.events = safeLines
                 .slice(-this.maxEvents)
                 .map((line) => JSON.parse(line) as ProviderTelemetryEvent)
                 .filter((event) => !!event?.id)
         } catch (error) {
             console.error('[ProviderTelemetryBus] Failed to hydrate telemetry log:', error)
             this.events = []
+        }
+    }
+
+    private readRecentLogChunk() {
+        const fd = openSync(this.logPath, 'r')
+
+        try {
+            const stats = fstatSync(fd)
+            if (stats.size === 0) {
+                return ''
+            }
+
+            const bytesToRead = Math.min(stats.size, this.hydrateByteLimit)
+            const start = Math.max(0, stats.size - bytesToRead)
+            const buffer = Buffer.alloc(bytesToRead)
+            readSync(fd, buffer, 0, bytesToRead, start)
+
+            let chunk = buffer.toString('utf8')
+            if (start > 0) {
+                const firstNewline = chunk.indexOf('\n')
+                chunk = firstNewline >= 0 ? chunk.slice(firstNewline + 1) : ''
+            }
+
+            return chunk
+        } finally {
+            closeSync(fd)
         }
     }
 

@@ -68,6 +68,10 @@ export async function executeIngestionJob(
     }
   )
 
+  if (fetchResult.report.dbTotalAfterFetch === 0) {
+    throw new Error(`NO_BARS_RETURNED: ${providerUsed} returned no cached bars for ${input.symbol} ${storageTimeframe}.`)
+  }
+
   const summary = {
     processed: 1,
     persistedBars: fetchResult.report.persistedBars,
@@ -75,10 +79,11 @@ export async function executeIngestionJob(
     timeframes: [storageTimeframe],
   }
 
-  await DataHealthManager.refreshInventory()
+  await DataHealthManager.refreshInventorySelection(input.symbol, storageTimeframe, providerUsed === "yahoo" ? "yahoo" : "schwab")
   const healthSnapshot = await DataHealthManager.getHealth(
     input.symbol,
-    storageTimeframe
+    storageTimeframe,
+    providerUsed === "yahoo" ? "yahoo" : "schwab"
   )
 
   return {

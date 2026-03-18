@@ -156,7 +156,7 @@ class IngestionService {
                             totalPersisted += bootstrapResult.persistedBars
                             totalProcessed++
 
-                            await DataHealthManager.refreshInventory()
+                            await DataHealthManager.refreshInventorySelection(symbol, timeframe)
                             const postBootstrapHealth = await DataHealthManager.getHealth(symbol, timeframe)
 
                             await logger({
@@ -184,11 +184,11 @@ class IngestionService {
                                     rangeEnd: actualStart
                                 })
 
-                                const backfillResult = await this.fillRange(symbol, timeframe, targetStart, actualStart, options.provider, pauseMs, logger)
+                                const backfillResult = await this.fillRange(symbol, timeframe, targetStart, actualStart, options.provider, pauseMs, logger, activeClient)
                                 totalPersisted += backfillResult.persistedBars
                                 totalProcessed++
 
-                                await DataHealthManager.refreshInventory()
+                                await DataHealthManager.refreshInventorySelection(symbol, timeframe)
                                 const postBackfillHealth = await DataHealthManager.getHealth(symbol, timeframe)
 
                                 await logger({
@@ -210,11 +210,11 @@ class IngestionService {
                                 timeframe
                             })
 
-                            const fixReport = await DataHealthManager.syncGaps(symbol, timeframe, options.provider)
+                            const fixReport = await DataHealthManager.syncGaps(symbol, timeframe, options.provider, 'schwab', activeClient)
                             totalProcessed++
                             totalPersisted += fixReport.barsAdded
 
-                            await DataHealthManager.refreshInventory()
+                            await DataHealthManager.refreshInventorySelection(symbol, timeframe)
                             const postGapHealth = await DataHealthManager.getHealth(symbol, timeframe)
 
                             await logger({
@@ -253,7 +253,7 @@ class IngestionService {
                                 totalProcessed++
                                 totalPersisted += tailResult.report.persistedBars
 
-                                await DataHealthManager.refreshInventory()
+                                await DataHealthManager.refreshInventorySelection(symbol, timeframe)
                                 const postTailHealth = await DataHealthManager.getHealth(symbol, timeframe)
 
                                 await logger({
@@ -286,7 +286,6 @@ class IngestionService {
             // Advance the cursor by exactly how many items we evaluated globally
             this.cursor = (this.cursor + totalProcessed) % universe.length
 
-            await DataHealthManager.refreshInventory()
             await logger({
                 message: 'Ingestion sweep complete.',
                 totalProcessed,
